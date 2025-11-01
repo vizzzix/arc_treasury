@@ -1,21 +1,15 @@
 // Auto-generated contract addresses - DO NOT EDIT MANUALLY
-// Generated on: 2025-10-31T13:06:45.934Z
+// Generated on: 2025-11-01T18:14:44.025Z
 
-// Test token addresses (our deployed mocks)
-// Note: Official Arc USDC (0x3600...0000) has special behavior that's incompatible with our contracts
-// Using standard ERC-20 mocks for easier testing
 export const CONTRACT_ADDRESSES = {
-  // Mock tokens (standard ERC-20 with mint function)
-  USDC: "0x260c4725760ecB414f2a4b7f191DdE36A0797483", // MockUSDC
-  EURC: "0xb0a3f4d67BB1EFBf4a9C506226c5d705e1CdBbBD", // MockEURC  
-  XSGD: "0xE5a859A422ee4570D713b98Bb8cC99ee277b021a", // MockXSGD
-  
-  // Наши деплоенные контракты
-  SwapRouter: "0xB6bdf5FCB0b17bB1b75CFF664d9eb311F8B977D7",
-  YieldAggregator: "0x87E9EB8f48D147e2E15F81bE1a158eF61262CffC",
-  AITreasury: "0x0B7950Ec78d5f7B53B120c889F83a6bd1fB0da59",
-  StrategyManager: "0xEB3F374404048C2fE852a978bB390EE67d7f8500",
-  
+  USDC: "0xaE5C5476A25DAFfA2c7d4685Ffc19a4dd27ef367",
+  EURC: "0x5BF19fbCbE8FE02C6e8055A7F1BF1fF39c8dBe15",
+  XSGD: "0xdEa1ED355bA16A5BA5388Ddf217160c266956E51",
+  SwapRouter: "0x23e591D1D107B1Db066F34d506b5B5AeB8D7254A",
+  YieldAggregator: "0x1162B23d8b8550071eFFD552ACBa6A8F917F15F9",
+  AITreasury: "0x1d0a51b405F1d7E15aB07Ee19863C5Bf0b2be6d9",
+  StrategyManager: "0x333589D6c4485e300141f553663CBABBdDF39e98",
+  deployer: "0xb5e3c55c5d43E476fDA81f1202Fe55AE0b32dF3c",
   network: "arcTestnet",
   chainId: 5042002
 };
