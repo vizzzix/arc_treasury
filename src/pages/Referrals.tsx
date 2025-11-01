@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePoints } from "@/contexts/PointsContext";
-import { Users, Copy, Check, Star, TrendingUp, Gift, Trophy } from "lucide-react";
+import { Copy, Check, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 const Referrals = () => {
@@ -24,9 +24,9 @@ const Referrals = () => {
   if (!isConnected) {
     return (
       <div className="min-h-screen pt-24 pb-12 px-4">
-        <div className="container mx-auto max-w-4xl">
+        <div className="container mx-auto max-w-3xl">
           <Card className="modern-card p-12 text-center">
-            <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+            <Trophy className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-2xl font-bold mb-2">Connect Your Wallet</h2>
             <p className="text-muted-foreground">
               Please connect your wallet to access referral program
@@ -39,110 +39,64 @@ const Referrals = () => {
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-4">
-      <div className="container mx-auto max-w-4xl space-y-6">
+      <div className="container mx-auto max-w-3xl space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-bold mb-2">Referral Program</h1>
-          <p className="text-muted-foreground">Invite friends and earn rewards together</p>
+          <h1 className="text-4xl font-bold mb-2">Referrals</h1>
+          <p className="text-muted-foreground">Invite friends and earn rewards</p>
         </div>
 
-        {/* Total Points - Prominent */}
-        <Card className="modern-card p-8 text-center border-2 border-primary/20">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 mb-4">
-            <Trophy className="w-8 h-8 text-primary" />
+        {/* Total Points */}
+        <Card className="modern-card p-8 text-center border border-border/50">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-4">
+            <Trophy className="w-7 h-7 text-primary" />
           </div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">Total Points</h3>
-          <div className="text-5xl font-bold gradient-text mb-6">
+          <h3 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Total Points</h3>
+          <div className="text-4xl font-bold gradient-text mb-6">
             {points.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/30">
+          <div className="grid grid-cols-4 gap-4 pt-4 border-t border-border/30 text-sm">
             <div>
               <div className="text-xs text-muted-foreground mb-1">Deposits</div>
-              <div className="text-lg font-semibold text-success">{points.depositPoints.toLocaleString()}</div>
+              <div className="font-semibold text-success">{points.depositPoints.toLocaleString()}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">Withdrawals</div>
-              <div className="text-lg font-semibold text-primary">{points.withdrawPoints.toLocaleString()}</div>
+              <div className="font-semibold text-primary">{points.withdrawPoints.toLocaleString()}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">Referrals</div>
-              <div className="text-lg font-semibold text-accent">{points.referralPoints.toLocaleString()}</div>
+              <div className="font-semibold text-accent">{points.referralPoints.toLocaleString()}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">Holding</div>
-              <div className="text-lg font-semibold text-warning">{points.holdingPoints.toLocaleString()}</div>
+              <div className="font-semibold text-warning">{points.holdingPoints.toLocaleString()}</div>
             </div>
           </div>
         </Card>
 
-        {/* Stats Overview */}
-        <div className="grid md:grid-cols-3 gap-6">
-          <Card className="modern-card p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Total Referrals</div>
-                <div className="text-3xl font-bold">{referral.referrals.length}</div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="modern-card p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-success/20 to-success/10 flex items-center justify-center">
-                <Star className="w-6 h-6 text-success" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Points Earned</div>
-                <div className="text-3xl font-bold text-success">{Math.floor(referral.earnings).toLocaleString()}</div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="modern-card p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-warning/20 to-warning/10 flex items-center justify-center">
-                <Gift className="w-6 h-6 text-warning" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Referral Points</div>
-                <div className="text-3xl font-bold text-warning">{Math.floor(points.referralPoints).toLocaleString()}</div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Referral Link Card */}
+        {/* Referral Link */}
         <Card className="modern-card p-6">
-          <h2 className="text-xl font-bold mb-6">Your Referral Link</h2>
-
-          <div className="space-y-4">
-            {/* Referral Code */}
+          <h2 className="text-lg font-semibold mb-4">Your Referral Link</h2>
+          <div className="space-y-3">
             <div className="space-y-2">
-              <Label>Your Code</Label>
-              <div className="flex gap-2">
-                <div className="flex-1 px-4 py-3 rounded-lg bg-secondary/50 border border-border/50">
-                  <div className="font-mono text-2xl font-bold text-center gradient-text">
-                    {referral.code}
-                  </div>
-                </div>
+              <Label className="text-xs text-muted-foreground">Referral Code</Label>
+              <div className="px-4 py-3 rounded-lg bg-secondary/30 border border-border/50 font-mono text-lg font-bold text-center">
+                {referral.code}
               </div>
             </div>
-
-            {/* Referral Link */}
             <div className="space-y-2">
-              <Label>Referral Link</Label>
+              <Label className="text-xs text-muted-foreground">Full Link</Label>
               <div className="flex gap-2">
                 <Input
                   value={`${window.location.origin}?ref=${referral.code}`}
                   readOnly
-                  className="glass-card font-mono text-sm"
+                  className="font-mono text-sm"
                 />
                 <Button
                   onClick={copyReferralLink}
-                  className="bg-gradient-to-r from-primary to-accent hover:opacity-90 gap-2"
+                  variant="outline"
+                  className="gap-2"
                 >
                   {copied ? (
                     <>
@@ -152,7 +106,7 @@ const Referrals = () => {
                   ) : (
                     <>
                       <Copy className="w-4 h-4" />
-                      Copy Link
+                      Copy
                     </>
                   )}
                 </Button>
@@ -161,111 +115,43 @@ const Referrals = () => {
           </div>
         </Card>
 
-        {/* How it Works */}
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="modern-card p-5">
+            <div className="text-xs text-muted-foreground mb-1">Total Referrals</div>
+            <div className="text-2xl font-bold">{referral.referrals.length}</div>
+          </Card>
+          <Card className="modern-card p-5">
+            <div className="text-xs text-muted-foreground mb-1">Points Earned</div>
+            <div className="text-2xl font-bold text-success">{Math.floor(referral.earnings).toLocaleString()}</div>
+          </Card>
+        </div>
+
+        {/* How It Works - Minimal */}
         <Card className="modern-card p-6">
-          <h2 className="text-xl font-bold mb-6">How Referrals Work</h2>
-
-          <div className="space-y-4">
-            <div className="flex gap-4 p-4 rounded-lg bg-primary/10 border border-primary/20">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">
-                1
-              </div>
-              <div>
-                <h3 className="font-semibold mb-1">Share Your Link</h3>
-                <p className="text-sm text-muted-foreground">
-                  Copy and share your unique referral link with friends
-                </p>
-              </div>
+          <h2 className="text-lg font-semibold mb-4">How It Works</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex gap-3">
+              <span className="text-primary font-bold">1.</span>
+              <span className="text-muted-foreground">Share your referral link with friends</span>
             </div>
-
-            <div className="flex gap-4 p-4 rounded-lg bg-success/10 border border-success/20">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-success/20 flex items-center justify-center font-bold text-success">
-                2
-              </div>
-              <div>
-                <h3 className="font-semibold mb-1">They Sign Up</h3>
-                <p className="text-sm text-muted-foreground">
-                  When someone connects their wallet via your link, you earn <strong>100 points</strong>
-                </p>
-              </div>
+            <div className="flex gap-3">
+              <span className="text-primary font-bold">2.</span>
+              <span className="text-muted-foreground">They connect wallet → you earn <strong className="text-foreground">100 points</strong></span>
             </div>
-
-            <div className="flex gap-4 p-4 rounded-lg bg-warning/10 border border-warning/20">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center font-bold text-warning">
-                3
-              </div>
-              <div>
-                <h3 className="font-semibold mb-1">Earn from Their Deposits</h3>
-                <p className="text-sm text-muted-foreground">
-                  You earn <strong>5% of their deposit amounts</strong> as bonus points!
-                </p>
-              </div>
+            <div className="flex gap-3">
+              <span className="text-primary font-bold">3.</span>
+              <span className="text-muted-foreground">Their deposits → you earn <strong className="text-foreground">5% as points</strong></span>
             </div>
-          </div>
-        </Card>
-
-        {/* Rewards Table */}
-        <Card className="modern-card p-6">
-          <h2 className="text-xl font-bold mb-6">Reward Structure</h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border/50">
-                  <th className="text-left py-3 px-4">Action</th>
-                  <th className="text-left py-3 px-4">Points Earned</th>
-                  <th className="text-left py-3 px-4">Example</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                <tr className="border-b border-border/30">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-primary" />
-                      <span>Referral Signup</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-semibold">100 points</td>
-                  <td className="py-3 px-4 text-muted-foreground">One-time bonus</td>
-                </tr>
-                <tr className="border-b border-border/30">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-success" />
-                      <span>Referral Deposits</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-semibold">5% of amount</td>
-                  <td className="py-3 px-4 text-muted-foreground">$1000 deposit = 50 pts</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-2">
-                      <Gift className="w-4 h-4 text-warning" />
-                      <span>Unlimited Referrals</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4 font-semibold">No limit</td>
-                  <td className="py-3 px-4 text-muted-foreground">Invite everyone!</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </Card>
 
         {/* Referred By */}
         {referral.referredBy && (
-          <Card className="modern-card p-6 border-2 border-accent/30">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent/20 to-accent/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">You were referred by</div>
-                <div className="font-mono font-bold">
-                  {referral.referredBy.slice(0, 10)}...{referral.referredBy.slice(-8)}
-                </div>
-              </div>
+          <Card className="modern-card p-6 border border-accent/30">
+            <div className="text-xs text-muted-foreground mb-1">You were referred by</div>
+            <div className="font-mono font-semibold">
+              {referral.referredBy.slice(0, 10)}...{referral.referredBy.slice(-8)}
             </div>
           </Card>
         )}
@@ -275,4 +161,3 @@ const Referrals = () => {
 };
 
 export default Referrals;
-

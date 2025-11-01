@@ -1,9 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Wallet, LayoutDashboard, PlusCircle, BarChart3, LogOut, Copy, Check, DollarSign, Sun, Moon, Settings, Star, Users, HelpCircle, Gift } from "lucide-react";
+import { Wallet, LayoutDashboard, PlusCircle, BarChart3, LogOut, Copy, Check, DollarSign, Sun, Moon, Settings, Users, HelpCircle, Gift } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { usePoints } from "@/contexts/PointsContext";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ethers, Contract } from "ethers";
@@ -21,7 +20,6 @@ const Navbar = () => {
   const isActive = (path: string) => location.pathname === path;
   const { address, isConnected, isConnecting, connectWallet, disconnectWallet, balance } = useWallet();
   const { theme, toggleTheme } = useTheme();
-  const { points } = usePoints();
   const [copied, setCopied] = useState(false);
 
   const formatAddress = (addr: string) => {
@@ -136,21 +134,6 @@ const Navbar = () => {
                     )}
                   </div>
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                
-                {/* Points Display */}
-                <div className="px-2 py-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
-                    <div className="flex items-center gap-2">
-                      <Star className="w-4 h-4 text-warning" />
-                      <span className="text-sm font-medium">Total Points</span>
-                    </div>
-                    <span className="font-bold gradient-text">
-                      {Math.floor(points.total).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
                 <DropdownMenuSeparator />
                 
                 <DropdownMenuItem onClick={copyAddress} className="cursor-pointer">

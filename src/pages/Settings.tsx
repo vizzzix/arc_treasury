@@ -6,9 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useWallet } from "@/contexts/WalletContext";
-import { usePoints } from "@/contexts/PointsContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { User, Mail, Twitter, Shield, Copy, Check, Star, Users } from "lucide-react";
+import { User, Mail, Twitter, Shield, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface UserProfile {
@@ -20,7 +19,6 @@ interface UserProfile {
 
 const Settings = () => {
   const { address, isConnected } = useWallet();
-  const { referral, points } = usePoints();
   const { theme, toggleTheme } = useTheme();
   const [profile, setProfile] = useState<UserProfile>({
     email: "",
@@ -55,13 +53,6 @@ const Settings = () => {
     }
   };
 
-  const copyReferralLink = () => {
-    const referralLink = `${window.location.origin}?ref=${referral.code}`;
-    navigator.clipboard.writeText(referralLink);
-    setCopied(true);
-    toast.success("Referral link copied!");
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   if (!isConnected) {
     return (
@@ -207,38 +198,6 @@ const Settings = () => {
           </div>
         </Card>
 
-        {/* Points Summary */}
-        <Card className="modern-card p-6">
-          <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-            <Star className="w-5 h-5 text-warning" />
-            Your Points
-          </h2>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
-              <div className="text-3xl font-bold gradient-text">{points.total}</div>
-              <div className="text-sm text-muted-foreground mt-1">Total Points</div>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-secondary/30">
-              <div className="text-2xl font-bold text-success">{points.depositPoints}</div>
-              <div className="text-sm text-muted-foreground mt-1">Deposits</div>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-secondary/30">
-              <div className="text-2xl font-bold text-primary">{points.withdrawPoints}</div>
-              <div className="text-sm text-muted-foreground mt-1">Withdrawals</div>
-            </div>
-            <div className="text-center p-4 rounded-lg bg-secondary/30">
-              <div className="text-2xl font-bold text-accent">{points.referralPoints}</div>
-              <div className="text-sm text-muted-foreground mt-1">Referrals</div>
-            </div>
-          </div>
-
-          <div className="mt-6 p-4 rounded-lg bg-warning/10 border border-warning/20">
-            <p className="text-sm text-muted-foreground">
-              💡 <span className="font-semibold">Coming soon:</span> Redeem points for premium features, reduced fees, and exclusive rewards!
-            </p>
-          </div>
-        </Card>
       </div>
     </div>
   );
