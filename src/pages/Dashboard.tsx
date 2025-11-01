@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowUpRight, ArrowDownLeft, Settings, RefreshCw, TrendingUp, Wallet, PlusCircle, Copy, ArrowRight } from "lucide-react";
+import { ArrowUpRight, ArrowDownLeft, Settings, RefreshCw, TrendingUp, Wallet, PlusCircle, Copy, ArrowRight, Trash2 } from "lucide-react";
 import StatCard from "@/components/StatCard";
 import DepositWithdrawModal from "@/components/DepositWithdrawModal";
 import TokenBalance from "@/components/TokenBalance";
@@ -16,7 +16,7 @@ import { toast } from "sonner";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { totalValueLocked, totalYieldGenerated, rebalance, loading } = useTreasury();
+  const { totalValueLocked, totalYieldGenerated, rebalance, deleteTreasury, loading, treasuries } = useTreasury();
   const { isConnected, address } = useWallet();
   const { applyReferralCode } = usePoints();
   const [depositModalOpen, setDepositModalOpen] = useState(false);
@@ -24,7 +24,7 @@ const Dashboard = () => {
   const [treasuryAddress, setTreasuryAddress] = useState<string>("");
   const [treasuryMetadata, setTreasuryMetadata] = useState<TreasuryMetadata | null>(null);
 
-  // Load treasury address and metadata from localStorage
+  // Load treasury address and metadata from localStorage and contract
   useEffect(() => {
     if (address) {
       const savedTreasury = localStorage.getItem(`treasury_${address}`);
@@ -32,7 +32,11 @@ const Dashboard = () => {
       
       if (savedTreasury) {
         setTreasuryAddress(savedTreasury);
+      } else if (treasuries.length > 0) {
+        // Use first treasury from contract if no localStorage
+        setTreasuryAddress(treasuries[0].address);
       }
+      
       if (savedMetadata) {
         setTreasuryMetadata(JSON.parse(savedMetadata));
       }
@@ -49,7 +53,7 @@ const Dashboard = () => {
         }
       }
     }
-  }, [address]);
+  }, [address, treasuries]);
 
 
   const handleRebalance = async () => {
@@ -58,6 +62,23 @@ const Dashboard = () => {
       return;
     }
     await rebalance(treasuryAddress);
+  };
+
+  const handleDeleteTreasury = async () => {
+    if (!isConnected || !treasuryAddress) {
+      toast.error("No treasury selected");
+      return;
+    }
+
+    if (!confirm("⚠️ Delete this Treasury? This action cannot be undone. Make sure all balances are zero.")) {
+      return;
+    }
+
+    const success = await deleteTreasury(treasuryAddress);
+    if (success) {
+      setTreasuryAddress("");
+      setTreasuryMetadata(null);
+    }
   };
 
   const portfolioData = [
@@ -168,17 +189,7 @@ const Dashboard = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    if (address) {
-                      if (confirm("Create a new Treasury? Current Treasury will remain on-chain but won't be shown here.")) {
-                        localStorage.removeItem(`treasury_${address}`);
-                        localStorage.removeItem(`treasury_metadata_${address}`);
-                        setTreasuryAddress("");
-                        setTreasuryMetadata(null);
-                        setCreateModalOpen(true);
-                      }
-                    }
-                  }}
+                  onClick={() => navigate("/create")}
                   className="gap-2"
                 >
                   <PlusCircle className="w-4 h-4" />
@@ -188,21 +199,12 @@ const Dashboard = () => {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    if (address) {
-                      if (confirm("Remove this Treasury from dashboard? It will remain on-chain, you can re-add it later.")) {
-                        localStorage.removeItem(`treasury_${address}`);
-                        localStorage.removeItem(`treasury_metadata_${address}`);
-                        setTreasuryAddress("");
-                        setTreasuryMetadata(null);
-                        toast.success("Treasury removed from dashboard");
-                      }
-                    }
-                  }}
-                  className="gap-2 text-destructive hover:text-destructive"
+                  onClick={handleDeleteTreasury}
+                  disabled={loading}
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
                 >
-                  <Wallet className="w-4 h-4" />
-                  Remove
+                  <Trash2 className="w-4 h-4" />
+                  Delete
                 </Button>
               </div>
             </div>

@@ -20,8 +20,10 @@ interface TreasuryContextType {
   deposit: (treasuryAddr: string, token: string, amount: string) => Promise<boolean>;
   withdraw: (treasuryAddr: string, token: string, amount: string) => Promise<boolean>;
   rebalance: (treasuryAddr: string) => Promise<boolean>;
+  deleteTreasury: (treasuryAddr: string) => Promise<boolean>;
   getTokenBalance: (token: string) => Promise<string>;
   approveToken: (token: string, spender: string, amount: string) => Promise<boolean>;
+  loadUserTreasuries: () => Promise<void>;
   totalValueLocked: string;
   totalTreasuries: string;
   totalYieldGenerated: string;
@@ -35,8 +37,10 @@ const TreasuryContext = createContext<TreasuryContextType>({
   deposit: async () => false,
   withdraw: async () => false,
   rebalance: async () => false,
+  deleteTreasury: async () => false,
   getTokenBalance: async () => "0",
   approveToken: async () => false,
+  loadUserTreasuries: async () => {},
   totalValueLocked: "0",
   totalTreasuries: "0",
   totalYieldGenerated: "0",
@@ -143,6 +147,7 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
 
       toast.success("Treasury created successfully!");
       await refreshData();
+      await loadUserTreasuries();
       
       return treasuryAddress;
     } catch (error: any) {
@@ -407,9 +412,123 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const loadUserTreasuries = async () => {
+    if (!isConnected || !address) return;
+
+    try {
+      setLoading(true);
+      const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
+      if (!contract) return;
+
+      console.log("📊 Loading user treasuries from contract...");
+      const treasuryAddresses = await contract.getUserTreasuries(address);
+      console.log("✅ Found treasuries:", treasuryAddresses);
+
+      // Load details for each treasury
+      const loadedTreasuries: Treasury[] = [];
+      for (const treasuryAddr of treasuryAddresses) {
+        try {
+          const details = await contract.getTreasuryDetails(treasuryAddr);
+          
+          // Load balances for each token
+          const balances: { [token: string]: string } = {};
+          for (const token of details[1]) {
+            const balance = await contract.getTokenBalance(treasuryAddr, token);
+            balances[token] = ethers.formatUnits(balance, 6);
+          }
+
+          loadedTreasuries.push({
+            address: treasuryAddr,
+            owner: details[0],
+            tokens: details[1],
+            totalValue: ethers.formatUnits(details[2], 6),
+            balances,
+          });
+        } catch (error) {
+          console.error(`Failed to load treasury ${treasuryAddr}:`, error);
+        }
+      }
+
+      setTreasuries(loadedTreasuries);
+      console.log("✅ Loaded", loadedTreasuries.length, "treasuries");
+    } catch (error: any) {
+      console.error("❌ Error loading user treasuries:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteTreasury = async (treasuryAddr: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      console.log("🗑️ Deleting treasury:", treasuryAddr);
+
+      const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
+      if (!contract) {
+        toast.error("Failed to connect to contract");
+        return false;
+      }
+
+      // Check all balances are zero
+      const details = await contract.getTreasuryDetails(treasuryAddr);
+      for (const token of details[1]) {
+        const balance = await contract.getTokenBalance(treasuryAddr, token);
+        if (balance > 0) {
+          toast.error("Cannot delete treasury with non-zero balance. Withdraw all funds first.");
+          return false;
+        }
+      }
+
+      toast.info("Deleting treasury...");
+      const tx = await contract.deleteTreasury(treasuryAddr);
+      console.log("  Tx hash:", tx.hash);
+      
+      await tx.wait();
+      console.log("  ✅ Treasury deleted!");
+
+      toast.success("Treasury deleted successfully!", {
+        action: {
+          label: "View on ArcScan",
+          onClick: () => window.open(`https://testnet.arcscan.app/tx/${tx.hash}`, '_blank')
+        }
+      });
+
+      // Remove from localStorage
+      if (address) {
+        const savedTreasury = localStorage.getItem(`treasury_${address}`);
+        if (savedTreasury === treasuryAddr) {
+          localStorage.removeItem(`treasury_${address}`);
+          localStorage.removeItem(`treasury_metadata_${address}`);
+        }
+      }
+
+      await loadUserTreasuries();
+      return true;
+    } catch (error: any) {
+      console.error("❌ Error deleting treasury:", error);
+      
+      let userMessage = "Failed to delete treasury";
+      if (error.message) {
+        if (error.message.includes("Treasury has non-zero balance")) {
+          userMessage = "Cannot delete treasury with funds. Withdraw all tokens first.";
+        } else if (error.message.includes("user rejected")) {
+          userMessage = "Transaction rejected by user";
+        } else {
+          userMessage = error.reason || error.message;
+        }
+      }
+      
+      toast.error(userMessage);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isConnected && address) {
       refreshData();
+      loadUserTreasuries();
     }
   }, [isConnected, address]);
 
@@ -420,8 +539,10 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     deposit,
     withdraw,
     rebalance,
+    deleteTreasury,
     getTokenBalance,
     approveToken,
+    loadUserTreasuries,
     totalValueLocked,
     totalTreasuries,
     totalYieldGenerated,

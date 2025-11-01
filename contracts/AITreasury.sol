@@ -43,6 +43,10 @@ contract AITreasury is Ownable, ReentrancyGuard {
     mapping(address => bool) public supportedTokens;
     address[] public supportedTokenList;
     
+    // Track user's treasuries
+    mapping(address => address[]) public userTreasuries;
+    mapping(address => bool) public treasuryExists;
+    
     ISwapRouter public swapRouter;
     IYieldAggregator public yieldAggregator;
     
@@ -66,6 +70,7 @@ contract AITreasury is Ownable, ReentrancyGuard {
     event Rebalanced(address indexed treasury, address tokenFrom, address tokenTo, uint256 amountFrom, uint256 amountTo);
     event YieldClaimed(address indexed treasury, uint256 amount);
     event ConfigUpdated(address indexed treasury);
+    event TreasuryDeleted(address indexed owner, address indexed treasury);
 
     // Modifiers
     modifier onlyTreasuryOwner(address treasuryAddr) {
@@ -119,6 +124,10 @@ contract AITreasury is Ownable, ReentrancyGuard {
         for (uint256 i = 0; i < tokens.length; i++) {
             newTreasury.targetAllocations[tokens[i]] = allocations[i];
         }
+
+        // Track user's treasury
+        userTreasuries[msg.sender].push(treasuryAddr);
+        treasuryExists[treasuryAddr] = true;
 
         totalTreasuries++;
         emit TreasuryCreated(msg.sender, treasuryAddr);
@@ -231,6 +240,44 @@ contract AITreasury is Ownable, ReentrancyGuard {
      */
     function getTokenBalance(address treasuryAddr, address token) external view returns (uint256 balance) {
         return treasuries[treasuryAddr].balances[token];
+    }
+
+    /**
+     * @notice Get all treasuries owned by a user
+     * @param user User address
+     * @return treasuryAddresses Array of treasury addresses
+     */
+    function getUserTreasuries(address user) external view returns (address[] memory treasuryAddresses) {
+        return userTreasuries[user];
+    }
+
+    /**
+     * @notice Delete a treasury (only if all balances are zero)
+     * @param treasuryAddr Address of the treasury to delete
+     */
+    function deleteTreasury(address treasuryAddr) external validTreasury(treasuryAddr) onlyTreasuryOwner(treasuryAddr) {
+        Treasury storage treasury = treasuries[treasuryAddr];
+        
+        // Ensure all balances are zero
+        for (uint256 i = 0; i < treasury.tokens.length; i++) {
+            require(treasury.balances[treasury.tokens[i]] == 0, "Treasury has non-zero balance");
+        }
+        
+        // Mark as deleted
+        treasuryExists[treasuryAddr] = false;
+        delete treasuries[treasuryAddr];
+        
+        // Remove from user's list
+        address[] storage userTreasuriesList = userTreasuries[msg.sender];
+        for (uint256 i = 0; i < userTreasuriesList.length; i++) {
+            if (userTreasuriesList[i] == treasuryAddr) {
+                userTreasuriesList[i] = userTreasuriesList[userTreasuriesList.length - 1];
+                userTreasuriesList.pop();
+                break;
+            }
+        }
+
+        emit TreasuryDeleted(msg.sender, treasuryAddr);
     }
 
     /**

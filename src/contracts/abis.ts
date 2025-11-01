@@ -21,6 +21,8 @@ export const AI_TREASURY_ABI = [
   "function needsRebalancing(address treasuryAddr) view returns (bool)",
   "function getTreasuryDetails(address treasuryAddr) view returns (address owner, address[] tokens, uint256 totalValue)",
   "function getTokenBalance(address treasuryAddr, address token) view returns (uint256)",
+  "function getUserTreasuries(address user) view returns (address[])",
+  "function deleteTreasury(address treasuryAddr)",
   "function totalValueLocked() view returns (uint256)",
   "function totalTreasuries() view returns (uint256)",
   "function totalYieldGenerated() view returns (uint256)",
@@ -28,6 +30,7 @@ export const AI_TREASURY_ABI = [
   "event Deposited(address indexed treasury, address indexed token, uint256 amount)",
   "event Withdrawn(address indexed treasury, address indexed token, uint256 amount)",
   "event Rebalanced(address indexed treasury, address tokenFrom, address tokenTo, uint256 amountFrom, uint256 amountTo)",
+  "event TreasuryDeleted(address indexed owner, address indexed treasury)",
 ];
 
 export const STRATEGY_MANAGER_ABI = [
