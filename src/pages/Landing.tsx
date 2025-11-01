@@ -1,12 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, BookOpen, Github, ExternalLink, Sparkles, LineChart, LayoutGrid, CheckCircle2 } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 const Landing = () => {
   const valueProps = [
@@ -31,25 +25,6 @@ const Landing = () => {
     { number: "1", title: "Connect Wallet", description: "MetaMask to Arc Testnet" },
     { number: "2", title: "Create Treasury", description: "Choose your strategy" },
     { number: "3", title: "Deposit & Rebalance", description: "AI manages allocations" }
-  ];
-
-  const faqs = [
-    {
-      q: "What is Arc Treasury?",
-      a: "A stablecoin treasury management platform on Arc Network with automated rebalancing, yield generation, and zero-fee swaps for USDC/EURC/XSGD."
-    },
-    {
-      q: "How does it differ from Aave/Compound?",
-      a: "Arc Treasury provides unified multi-asset management, automated rebalancing strategies, and USDC-denominated gas fees — all in one dashboard."
-    },
-    {
-      q: "Why Arc Network?",
-      a: "USDC-native gas payments, sub-second finality, deterministic fees, and EVM compatibility make Arc ideal for stablecoin finance."
-    },
-    {
-      q: "Is this real money?",
-      a: "Currently on Arc Testnet with mock tokens. Production deployment with real assets will follow security audits."
-    }
   ];
 
   return (
@@ -190,33 +165,6 @@ const Landing = () => {
               <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
             </a>
           </div>
-        </div>
-      </section>
-
-      {/* FAQ - 4 questions */}
-      <section className="relative mx-auto max-w-4xl px-6 py-16">
-        <h2 className="text-3xl font-bold text-center mb-10">Frequently Asked Questions</h2>
-        <Accordion type="single" collapsible className="space-y-3">
-          {faqs.map((faq, i) => (
-            <AccordionItem 
-              key={i} 
-              value={`item-${i}`} 
-              className="border border-border/50 rounded-2xl px-6 bg-card/20 hover:bg-card/30 transition-colors"
-            >
-              <AccordionTrigger className="hover:no-underline text-left font-semibold py-5">
-                {faq.q}
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground pb-5 leading-relaxed">
-                {faq.a}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-        <div className="text-center mt-8">
-          <Link to="/faq" className="inline-flex items-center gap-2 text-primary hover:gap-3 transition-all font-medium">
-            View all FAQs
-            <ArrowRight className="w-4 h-4" />
-          </Link>
         </div>
       </section>
 

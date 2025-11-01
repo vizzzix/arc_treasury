@@ -36,8 +36,8 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass-card border-b border-border/50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/30">
+      <div className="container mx-auto px-6 h-14 flex items-center justify-between">
         <Link to="/" className="flex items-center space-x-3 group">
           <img src="/logo.svg" alt="Arc Treasury" className="w-10 h-10 group-hover:scale-110 transition-transform" />
           <span className="font-bold text-xl gradient-text">Arc Treasury</span>
