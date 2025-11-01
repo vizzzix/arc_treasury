@@ -303,7 +303,7 @@ const CreateTreasuryNew = () => {
               ))}
             </div>
 
-            {selectedTemplate && (
+            {selectedTemplate && selectedTemplate !== "ai-custom" && (
               <div className="p-4 rounded-lg bg-accent/10 border border-accent/20 mb-6">
                 <div className="flex items-start gap-2">
                   <Info className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
