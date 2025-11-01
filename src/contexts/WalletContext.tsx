@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { ethers } from "ethers";
+import { ethers, Contract } from "ethers";
 import { toast } from "sonner";
+import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
+import { MOCK_ERC20_ABI } from "@/contracts/abis";
 
 interface WalletContextType {
   address: string | null;
@@ -42,10 +44,17 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         const walletAddress = accounts[0];
         setAddress(walletAddress);
         
-        // Get balance
-        const balanceWei = await provider.getBalance(walletAddress);
-        const balanceEth = ethers.formatEther(balanceWei);
-        setBalance(parseFloat(balanceEth).toFixed(4));
+        // Get USDC balance instead of ETH
+        try {
+          const signer = await provider.getSigner();
+          const usdcContract = new Contract(CONTRACT_ADDRESSES.USDC, MOCK_ERC20_ABI, signer);
+          const usdcBalance = await usdcContract.balanceOf(walletAddress);
+          const balanceFormatted = ethers.formatUnits(usdcBalance, 6);
+          setBalance(parseFloat(balanceFormatted).toFixed(2));
+        } catch (error) {
+          console.error("Error getting USDC balance:", error);
+          setBalance("0.00");
+        }
         
         // Store in localStorage
         localStorage.setItem("walletAddress", walletAddress);
@@ -83,10 +92,17 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
           if (accounts.includes(savedAddress)) {
             setAddress(savedAddress);
             
-            // Get balance
-            const balanceWei = await provider.getBalance(savedAddress);
-            const balanceEth = ethers.formatEther(balanceWei);
-            setBalance(parseFloat(balanceEth).toFixed(4));
+            // Get USDC balance
+            try {
+              const signer = await provider.getSigner();
+              const usdcContract = new Contract(CONTRACT_ADDRESSES.USDC, MOCK_ERC20_ABI, signer);
+              const usdcBalance = await usdcContract.balanceOf(savedAddress);
+              const balanceFormatted = ethers.formatUnits(usdcBalance, 6);
+              setBalance(parseFloat(balanceFormatted).toFixed(2));
+            } catch (error) {
+              console.error("Error getting USDC balance:", error);
+              setBalance("0.00");
+            }
           } else {
             localStorage.removeItem("walletAddress");
           }

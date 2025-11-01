@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
 import { useTreasury } from "@/contexts/TreasuryContext";
+import { usePoints } from "@/contexts/PointsContext";
+import { toast } from "sonner";
+import { RefreshCw, Star } from "lucide-react";
 
 interface DepositWithdrawModalProps {
   open: boolean;
@@ -16,9 +19,11 @@ interface DepositWithdrawModalProps {
 
 const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: DepositWithdrawModalProps) => {
   const { deposit, withdraw, approveToken, getTokenBalance, loading } = useTreasury();
+  const { addDepositPoints, addWithdrawPoints } = usePoints();
   const [selectedToken, setSelectedToken] = useState<string>("USDC");
   const [amount, setAmount] = useState<string>("");
   const [tokenBalance, setTokenBalance] = useState<string>("0");
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   const tokens = [
     { symbol: "USDC", address: CONTRACT_ADDRESSES.USDC },
@@ -26,13 +31,41 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
     { symbol: "XSGD", address: CONTRACT_ADDRESSES.XSGD },
   ];
 
+  // Load balance when modal opens or token changes
+  useEffect(() => {
+    if (open && selectedToken) {
+      loadBalance();
+    }
+  }, [open, selectedToken]);
+
+  const loadBalance = async () => {
+    console.log("🔄 Modal: Loading balance for", selectedToken);
+    setLoadingBalance(true);
+    setTokenBalance("0"); // Сбрасываем перед загрузкой
+    
+    try {
+      const tokenInfo = tokens.find(t => t.symbol === selectedToken);
+      if (!tokenInfo || !tokenInfo.address) {
+        console.error("❌ Token info not found for:", selectedToken);
+        setTokenBalance("0");
+        return;
+      }
+      
+      console.log("🔍 Modal: Getting balance for address:", tokenInfo.address);
+      const balance = await getTokenBalance(tokenInfo.address);
+      console.log("✅ Modal: Balance received:", balance);
+      
+      setTokenBalance(balance || "0");
+    } catch (error) {
+      console.error("❌ Modal: Error loading balance:", error);
+      setTokenBalance("0");
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
+
   const handleTokenChange = async (token: string) => {
     setSelectedToken(token);
-    const tokenInfo = tokens.find(t => t.symbol === token);
-    if (tokenInfo) {
-      const balance = await getTokenBalance(tokenInfo.address);
-      setTokenBalance(balance);
-    }
   };
 
   const handleMaxClick = () => {
@@ -40,10 +73,33 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
   };
 
   const handleSubmit = async () => {
-    if (!amount || parseFloat(amount) <= 0) return;
+    const amountNum = parseFloat(amount);
+    const balanceNum = parseFloat(tokenBalance);
+
+    if (!amount || amountNum <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (amountNum > balanceNum) {
+      toast.error(`Insufficient balance! You have ${balanceNum.toFixed(2)} ${selectedToken}`);
+      return;
+    }
+
+    if (!treasuryAddress || treasuryAddress === "") {
+      toast.error("Treasury address not found. Please create a treasury first.");
+      return;
+    }
 
     const tokenInfo = tokens.find(t => t.symbol === selectedToken);
-    if (!tokenInfo) return;
+    if (!tokenInfo) {
+      toast.error("Token not found");
+      return;
+    }
+
+    console.log("💰 Depositing:", amountNum, selectedToken);
+    console.log("💳 Balance:", balanceNum);
+    console.log("✅ Validation passed!");
 
     if (mode === "deposit") {
       // First approve
@@ -53,12 +109,26 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
       // Then deposit
       const success = await deposit(treasuryAddress, tokenInfo.address, amount);
       if (success) {
+        // Award points for deposit
+        const amountNum = parseFloat(amount);
+        addDepositPoints(amountNum);
+        
+        const pointsEarned = Math.floor(amountNum * 0.01);
+        toast.success(`Deposit successful! +${pointsEarned} points earned! ⭐`);
+        
         onOpenChange(false);
         setAmount("");
       }
     } else {
       const success = await withdraw(treasuryAddress, tokenInfo.address, amount);
       if (success) {
+        // Award points for withdrawal
+        const amountNum = parseFloat(amount);
+        addWithdrawPoints(amountNum);
+        
+        const pointsEarned = Math.floor(amountNum * 0.005);
+        toast.success(`Withdrawal successful! +${pointsEarned} points earned! ⭐`);
+        
         onOpenChange(false);
         setAmount("");
       }
@@ -97,9 +167,21 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <Label>Amount</Label>
-              <span className="text-sm text-muted-foreground">
-                Balance: {parseFloat(tokenBalance).toLocaleString()}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Balance: {loadingBalance ? "Loading..." : parseFloat(tokenBalance).toLocaleString()}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadBalance}
+                  disabled={loadingBalance}
+                  className="h-6 w-6 p-0"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingBalance ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Input

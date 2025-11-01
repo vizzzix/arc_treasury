@@ -1,7 +1,9 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Wallet, LayoutDashboard, PlusCircle, BarChart3, LogOut, Copy, Check } from "lucide-react";
+import { Wallet, LayoutDashboard, PlusCircle, BarChart3, LogOut, Copy, Check, DollarSign, Sun, Moon, Settings, Star, Users, HelpCircle } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { usePoints } from "@/contexts/PointsContext";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -16,6 +18,8 @@ const Navbar = () => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
   const { address, isConnected, isConnecting, connectWallet, disconnectWallet, balance } = useWallet();
+  const { theme, toggleTheme } = useTheme();
+  const { points } = usePoints();
   const [copied, setCopied] = useState(false);
 
   const formatAddress = (addr: string) => {
@@ -67,17 +71,40 @@ const Navbar = () => {
               Analytics
             </Button>
           </Link>
+          <Link to="/faq">
+            <Button
+              variant={isActive("/faq") ? "default" : "ghost"}
+              className="gap-2"
+            >
+              <HelpCircle className="w-4 h-4" />
+              FAQ
+            </Button>
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 glow-effect">
+          {/* Theme Toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="rounded-full hover:bg-primary/10"
+          >
+            {theme === "dark" ? (
+              <Sun className="w-5 h-5" />
+            ) : (
+              <Moon className="w-5 h-5" />
+            )}
+          </Button>
+
+          <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
             <div className="w-2 h-2 rounded-full bg-success animate-pulse shadow-lg shadow-success/50" />
             <span className="text-sm font-medium">Arc Testnet</span>
           </div>
           
           {!isConnected ? (
             <Button 
-              className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all glow-effect hover:scale-105"
+              className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all hover:scale-105"
               onClick={connectWallet}
               disabled={isConnecting}
             >
@@ -89,7 +116,7 @@ const Navbar = () => {
           ) : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all glow-effect hover:scale-105">
+                <Button className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-all hover:scale-105">
                   <Wallet className="w-4 h-4" />
                   <span className="hidden sm:inline">{formatAddress(address!)}</span>
                 </Button>
@@ -100,13 +127,30 @@ const Navbar = () => {
                     <div className="text-xs text-muted-foreground">Wallet Address</div>
                     <div className="font-mono text-sm">{formatAddress(address!)}</div>
                     {balance && (
-                      <div className="text-xs text-muted-foreground mt-2">
-                        Balance: {balance} ETH
+                      <div className="flex items-center gap-1 mt-2 px-2 py-1 rounded bg-success/10 border border-success/20">
+                        <DollarSign className="w-3 h-3 text-success" />
+                        <span className="text-sm font-semibold text-success">{balance} USDC</span>
                       </div>
                     )}
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                
+                {/* Points Display */}
+                <div className="px-2 py-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-warning" />
+                      <span className="text-sm font-medium">Total Points</span>
+                    </div>
+                    <span className="font-bold gradient-text">
+                      {Math.floor(points.total).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator />
+                
                 <DropdownMenuItem onClick={copyAddress} className="cursor-pointer">
                   {copied ? (
                     <Check className="w-4 h-4 mr-2" />
@@ -114,6 +158,18 @@ const Navbar = () => {
                     <Copy className="w-4 h-4 mr-2" />
                   )}
                   {copied ? "Copied!" : "Copy Address"}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link to="/referrals" className="flex items-center">
+                    <Users className="w-4 h-4 mr-2" />
+                    Referrals
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer">
+                  <Link to="/settings" className="flex items-center">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={disconnectWallet} className="cursor-pointer text-destructive">
                   <LogOut className="w-4 h-4 mr-2" />

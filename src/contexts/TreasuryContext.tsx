@@ -65,9 +65,21 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getContract = async (contractAddress: string, abi: any[]) => {
-    const signer = await getSigner();
-    if (!signer) return null;
-    return new Contract(contractAddress, abi, signer);
+    try {
+      if (!contractAddress || contractAddress === "0x0000000000000000000000000000000000000000") {
+        console.error("Invalid contract address:", contractAddress);
+        return null;
+      }
+      const signer = await getSigner();
+      if (!signer) {
+        console.error("No signer available");
+        return null;
+      }
+      return new Contract(contractAddress, abi, signer);
+    } catch (error) {
+      console.error("Error creating contract:", error);
+      return null;
+    }
   };
 
   const refreshData = async () => {
@@ -145,6 +157,11 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
   const deposit = async (treasuryAddr: string, token: string, amount: string): Promise<boolean> => {
     try {
       setLoading(true);
+      console.log("💰 Starting deposit...");
+      console.log("  Treasury:", treasuryAddr);
+      console.log("  Token:", token);
+      console.log("  Amount:", amount);
+
       const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
       if (!contract) {
         toast.error("Failed to connect to contract");
@@ -152,18 +169,60 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const amountWei = ethers.parseUnits(amount, 6);
+      console.log("  Amount (wei):", amountWei.toString());
       
-      toast.info("Depositing...");
-      const tx = await contract.deposit(treasuryAddr, token, amountWei);
-      await tx.wait();
+      // Check if token is supported
+      const isSupported = await contract.supportedTokens(token);
+      console.log("  Token supported:", isSupported);
+      if (!isSupported) {
+        toast.error("Token not supported in contract");
+        return false;
+      }
 
-      toast.success("Deposit successful!");
-      await refreshData();
+      // Check treasury exists
+      const treasuryDetails = await contract.getTreasuryDetails(treasuryAddr);
+      console.log("  Treasury owner:", treasuryDetails[0]);
+      console.log("  Treasury tokens:", treasuryDetails[1]);
       
+      toast.info("Sending deposit transaction...");
+      const tx = await contract.deposit(treasuryAddr, token, amountWei);
+      console.log("  Tx hash:", tx.hash);
+      console.log("  🔗 View on ArcScan:", `https://testnet.arcscan.app/tx/${tx.hash}`);
+      
+      toast.info("Waiting for confirmation...");
+      const receipt = await tx.wait();
+      console.log("  ✅ Confirmed! Block:", receipt.blockNumber);
+      console.log("  Gas used:", receipt.gasUsed.toString());
+
+      toast.success(`Deposit successful! Gas: ${ethers.formatUnits(receipt.gasUsed, 6)} USDC`, {
+        action: {
+          label: "View on ArcScan",
+          onClick: () => window.open(`https://testnet.arcscan.app/tx/${tx.hash}`, '_blank')
+        }
+      });
+      
+      await refreshData();
       return true;
     } catch (error: any) {
-      console.error("Error depositing:", error);
-      toast.error(error.message || "Failed to deposit");
+      console.error("❌ Error depositing:", error);
+      
+      // Parse error message
+      let userMessage = "Failed to deposit";
+      if (error.message) {
+        if (error.message.includes("Token not supported")) {
+          userMessage = "Token not supported in this treasury";
+        } else if (error.message.includes("Token not in treasury allocation")) {
+          userMessage = "Token not in treasury allocation. Create a new treasury with this token.";
+        } else if (error.message.includes("transfer amount exceeds balance")) {
+          userMessage = "Insufficient token balance in your wallet";
+        } else if (error.message.includes("user rejected")) {
+          userMessage = "Transaction rejected by user";
+        } else {
+          userMessage = error.reason || error.message;
+        }
+      }
+      
+      toast.error(userMessage);
       return false;
     } finally {
       setLoading(false);
@@ -173,6 +232,11 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
   const withdraw = async (treasuryAddr: string, token: string, amount: string): Promise<boolean> => {
     try {
       setLoading(true);
+      console.log("💸 Starting withdrawal...");
+      console.log("  Treasury:", treasuryAddr);
+      console.log("  Token:", token);
+      console.log("  Amount:", amount);
+
       const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
       if (!contract) {
         toast.error("Failed to connect to contract");
@@ -180,18 +244,51 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const amountWei = ethers.parseUnits(amount, 6);
-      
-      toast.info("Withdrawing...");
-      const tx = await contract.withdraw(treasuryAddr, token, amountWei);
-      await tx.wait();
+      console.log("  Amount (wei):", amountWei.toString());
 
-      toast.success("Withdrawal successful!");
-      await refreshData();
+      // Check treasury balance
+      const treasuryBalance = await contract.getTokenBalance(treasuryAddr, token);
+      console.log("  Treasury balance:", ethers.formatUnits(treasuryBalance, 6));
       
+      if (treasuryBalance < amountWei) {
+        toast.error(`Insufficient treasury balance. Available: ${ethers.formatUnits(treasuryBalance, 6)}`);
+        return false;
+      }
+      
+      toast.info("Sending withdrawal transaction...");
+      const tx = await contract.withdraw(treasuryAddr, token, amountWei);
+      console.log("  Tx hash:", tx.hash);
+      console.log("  🔗 View on ArcScan:", `https://testnet.arcscan.app/tx/${tx.hash}`);
+      
+      toast.info("Waiting for confirmation...");
+      const receipt = await tx.wait();
+      console.log("  ✅ Confirmed! Block:", receipt.blockNumber);
+      console.log("  Gas used:", receipt.gasUsed.toString());
+
+      toast.success(`Withdrawal successful! Gas: ${ethers.formatUnits(receipt.gasUsed, 6)} USDC`, {
+        action: {
+          label: "View on ArcScan",
+          onClick: () => window.open(`https://testnet.arcscan.app/tx/${tx.hash}`, '_blank')
+        }
+      });
+      
+      await refreshData();
       return true;
     } catch (error: any) {
-      console.error("Error withdrawing:", error);
-      toast.error(error.message || "Failed to withdraw");
+      console.error("❌ Error withdrawing:", error);
+      
+      let userMessage = "Failed to withdraw";
+      if (error.message) {
+        if (error.message.includes("Insufficient balance")) {
+          userMessage = "Insufficient treasury balance";
+        } else if (error.message.includes("user rejected")) {
+          userMessage = "Transaction rejected by user";
+        } else {
+          userMessage = error.reason || error.message;
+        }
+      }
+      
+      toast.error(userMessage);
       return false;
     } finally {
       setLoading(false);
@@ -225,39 +322,51 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getTokenBalance = async (token: string): Promise<string> => {
+    console.log("🔍 getTokenBalance called with:", { token, address, isConnected });
+    
     try {
       if (!address) {
-        console.log("No address connected");
+        console.warn("⚠️ No address connected");
         return "0";
       }
 
       // Проверяем что адрес контракта валидный
       if (!token || token === "0x0000000000000000000000000000000000000000") {
-        console.log("Invalid token address:", token);
+        console.warn("⚠️ Invalid token address:", token);
         return "0";
       }
 
+      console.log("📞 Creating contract for token:", token);
       const contract = await getContract(token, MOCK_ERC20_ABI);
       if (!contract) {
-        console.log("Contract not created");
+        console.error("❌ Contract not created");
         return "0";
       }
 
-      console.log("Fetching balance for", token, "address:", address);
+      console.log("📊 Fetching balance for", token, "from address:", address);
       const balance = await contract.balanceOf(address);
+      console.log("💰 Raw balance:", balance.toString());
+      
       const formatted = ethers.formatUnits(balance, 6);
-      console.log("Balance:", formatted);
+      console.log("✅ Formatted balance:", formatted);
+      
       return formatted;
     } catch (error: any) {
-      console.error("Error getting token balance:", error);
+      console.error("❌ Error getting token balance:", error);
       console.error("Token:", token);
       console.error("Address:", address);
+      console.error("Error details:", error.message);
       return "0";
     }
   };
 
   const approveToken = async (token: string, spender: string, amount: string): Promise<boolean> => {
     try {
+      console.log("🔐 Approving token...");
+      console.log("  Token:", token);
+      console.log("  Spender:", spender);
+      console.log("  Amount:", amount);
+
       const contract = await getContract(token, MOCK_ERC20_ABI);
       if (!contract) {
         toast.error("Failed to connect to token contract");
@@ -265,15 +374,34 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const amountWei = ethers.parseUnits(amount, 6);
+      console.log("  Amount in wei:", amountWei.toString());
+
+      // Check current allowance
+      const currentAllowance = await contract.allowance(address, spender);
+      console.log("  Current allowance:", currentAllowance.toString());
+
+      // If already approved enough, skip
+      if (currentAllowance >= amountWei) {
+        console.log("  ✅ Already approved!");
+        toast.success("Token already approved!");
+        return true;
+      }
       
       toast.info("Approving token...");
       const tx = await contract.approve(spender, amountWei);
-      await tx.wait();
+      console.log("  Approve tx:", tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log("  ✅ Approve confirmed!");
+
+      // Verify allowance
+      const newAllowance = await contract.allowance(address, spender);
+      console.log("  New allowance:", newAllowance.toString());
 
       toast.success("Token approved!");
       return true;
     } catch (error: any) {
-      console.error("Error approving token:", error);
+      console.error("❌ Error approving token:", error);
       toast.error(error.message || "Failed to approve token");
       return false;
     }

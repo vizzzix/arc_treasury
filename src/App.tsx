@@ -7,18 +7,25 @@ import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import CreateTreasury from "./pages/CreateTreasury";
 import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
+import Referrals from "./pages/Referrals";
+import FAQ from "./pages/FAQ";
 import NotFound from "./pages/NotFound";
 import Navbar from "./components/Navbar";
 import { WalletProvider } from "./contexts/WalletContext";
 import { TreasuryProvider } from "./contexts/TreasuryContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { PointsProvider } from "./contexts/PointsContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <WalletProvider>
-        <TreasuryProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <WalletProvider>
+          <PointsProvider>
+            <TreasuryProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -29,14 +36,19 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/create" element={<CreateTreasury />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/referrals" element={<Referrals />} />
+              <Route path="/faq" element={<FAQ />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>
         </BrowserRouter>
-        </TreasuryProvider>
-      </WalletProvider>
-    </TooltipProvider>
+            </TreasuryProvider>
+          </PointsProvider>
+        </WalletProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

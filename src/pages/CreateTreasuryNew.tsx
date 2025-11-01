@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Shield, Zap, TrendingUp, ArrowRight, ArrowLeft, Info, CheckCircle2, HelpCircle } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Shield, Zap, TrendingUp, ArrowRight, ArrowLeft, Info, CheckCircle2 } from "lucide-react";
 import { useTreasury } from "@/contexts/TreasuryContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
@@ -39,15 +38,15 @@ const CreateTreasuryNew = () => {
       name: "Conservative",
       icon: Shield,
       allocation: { USDC: 70, EURC: 20, XSGD: 10 },
-      description: "Maximum stability",
-      details: "70% USD focus for minimal risk. Perfect for long-term savings.",
+      description: "Максимальная стабильность",
+      details: "70% в USD для минимального риска. Идеально для долгосрочных сбережений.",
       apy: "3-5%",
-      risk: "Low",
+      risk: "Низкий",
       color: "from-blue-500 to-blue-600",
       tips: [
-        "✅ Best for conservative holders",
-        "✅ Minimal volatility",
-        "❌ Lower returns",
+        "✅ Лучший выбор для накопления",
+        "✅ Минимальная волатильность",
+        "❌ Низкая доходность",
       ],
     },
     {
@@ -55,15 +54,15 @@ const CreateTreasuryNew = () => {
       name: "Balanced",
       icon: Zap,
       allocation: { USDC: 50, EURC: 30, XSGD: 20 },
-      description: "Balance of risk & returns",
-      details: "Regional diversification. Recommended for most users.",
+      description: "Баланс риска и доходности",
+      details: "Диверсификация по регионам. Рекомендуется большинству пользователей.",
       apy: "5-8%",
-      risk: "Medium",
+      risk: "Средний",
       color: "from-purple-500 to-purple-600",
       tips: [
-        "✅ Optimal diversification",
-        "✅ Moderate returns",
-        "✅ Best for most users",
+        "✅ Оптимальная диверсификация",
+        "✅ Средняя доходность",
+        "✅ Подходит для большинства",
       ],
     },
     {
@@ -71,15 +70,15 @@ const CreateTreasuryNew = () => {
       name: "Aggressive",
       icon: TrendingUp,
       allocation: { USDC: 30, EURC: 40, XSGD: 30 },
-      description: "Maximum returns",
-      details: "Equal distribution. For experienced users and international businesses.",
+      description: "Максимальная доходность",
+      details: "Равное распределение. Для опытных пользователей и международного бизнеса.",
       apy: "8-12%",
-      risk: "High",
+      risk: "Высокий",
       color: "from-orange-500 to-red-600",
       tips: [
-        "✅ Maximum potential returns",
-        "⚠️ Higher volatility",
-        "⚠️ For experienced users",
+        "✅ Максимальная доходность",
+        "⚠️ Высокая волатильность",
+        "⚠️ Для опытных пользователей",
       ],
     },
   ];
@@ -155,14 +154,13 @@ const CreateTreasuryNew = () => {
   };
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen pt-24 pb-12 px-4">
-        <div className="container mx-auto max-w-4xl space-y-8">
+    <div className="min-h-screen pt-24 pb-12 px-4">
+      <div className="container mx-auto max-w-4xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold gradient-text">Create Your Treasury</h1>
           <p className="text-lg text-muted-foreground">
-            Step-by-step automated portfolio setup
+            Пошаговая настройка автоматизированного портфеля
           </p>
         </div>
 
@@ -172,25 +170,25 @@ const CreateTreasuryNew = () => {
         {/* Step 1: Name & Avatar */}
         {step === 1 && (
           <Card className="modern-card p-8">
-            <h2 className="text-2xl font-bold mb-6">Step 1: Name & Avatar</h2>
+            <h2 className="text-2xl font-bold mb-6">Шаг 1: Имя и Аватар</h2>
             
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label>Treasury Name</Label>
+                <Label>Название Treasury</Label>
                 <Input
                   value={treasuryName}
                   onChange={(e) => setTreasuryName(e.target.value)}
-                  placeholder="e.g., My Savings, Investment Fund..."
+                  placeholder="Например: Мои Сбережения, Инвестиционный Фонд..."
                   maxLength={30}
                   className="glass-card text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
-                  {treasuryName.length}/30 characters
+                  {treasuryName.length}/30 символов
                 </p>
               </div>
 
               <div className="space-y-3">
-                <Label>Choose Avatar</Label>
+                <Label>Выберите Аватар</Label>
                 <div className="grid grid-cols-8 gap-2">
                   {TREASURY_AVATARS.map((emoji) => (
                     <button
@@ -216,9 +214,9 @@ const CreateTreasuryNew = () => {
                 <div className="flex items-start gap-2">
                   <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-semibold mb-1">💡 Tip:</p>
+                    <p className="font-semibold mb-1">💡 Совет:</p>
                     <p className="text-muted-foreground">
-                      Choose a memorable name and emoji. This helps you quickly identify your Treasury!
+                      Выберите запоминающееся имя и эмодзи. Это поможет быстро находить ваш Treasury в будущем!
                     </p>
                   </div>
                 </div>
@@ -231,7 +229,7 @@ const CreateTreasuryNew = () => {
                   disabled={!treasuryName.trim()}
                   className="bg-gradient-to-r from-primary to-accent hover:opacity-90 gap-2"
                 >
-                  Next
+                  Далее
                   <ArrowRight className="w-5 h-5" />
                 </Button>
               </div>
@@ -242,35 +240,7 @@ const CreateTreasuryNew = () => {
         {/* Step 2: Strategy Selection */}
         {step === 2 && (
           <Card className="modern-card p-8">
-            <h2 className="text-2xl font-bold mb-6">Step 2: Choose Strategy</h2>
-            
-            {/* AI Recommendation */}
-            <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">🤖</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold">AI Recommendation</h3>
-                    <div className="px-2 py-0.5 rounded-full bg-purple-500/20 text-xs font-semibold text-purple-400">
-                      BETA
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Based on current market conditions and your wallet history, we recommend:
-                  </p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-semibold">Balanced Strategy</span>
-                    <span className="text-muted-foreground">—</span>
-                    <span className="text-success">60% USDC / 25% EURC / 15% XSGD</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    💡 This provides optimal diversification for current testnet conditions
-                  </p>
-                </div>
-              </div>
-            </div>
+            <h2 className="text-2xl font-bold mb-6">Шаг 2: Выберите Стратегию</h2>
             
             <div className="grid md:grid-cols-3 gap-4 mb-6">
               {templates.map((template) => (
@@ -292,16 +262,16 @@ const CreateTreasuryNew = () => {
                   <h3 className="font-bold text-lg mb-2">{template.name}</h3>
                   <p className="text-sm text-muted-foreground mb-3">{template.description}</p>
                   
-                    <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">APY:</span>
                       <span className="font-semibold text-success">{template.apy}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Risk:</span>
+                      <span className="text-muted-foreground">Риск:</span>
                       <span className={`font-semibold ${
-                        template.risk === 'Low' ? 'text-success' : 
-                        template.risk === 'Medium' ? 'text-warning' : 'text-destructive'
+                        template.risk === 'Низкий' ? 'text-success' : 
+                        template.risk === 'Средний' ? 'text-warning' : 'text-destructive'
                       }`}>
                         {template.risk}
                       </span>
@@ -345,7 +315,7 @@ const CreateTreasuryNew = () => {
                 className="gap-2"
               >
                 <ArrowLeft className="w-5 h-5" />
-                Back
+                Назад
               </Button>
               <Button
                 size="lg"
@@ -353,7 +323,7 @@ const CreateTreasuryNew = () => {
                 disabled={!selectedTemplate}
                 className="bg-gradient-to-r from-primary to-accent hover:opacity-90 gap-2"
               >
-                Next
+                Далее
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </div>
@@ -363,7 +333,7 @@ const CreateTreasuryNew = () => {
         {/* Step 3: Fine-tune Allocation */}
         {step === 3 && (
           <Card className="modern-card p-8">
-            <h2 className="text-2xl font-bold mb-6">Step 3: Fine-tune Allocation</h2>
+            <h2 className="text-2xl font-bold mb-6">Шаг 3: Точная Настройка</h2>
             
             <div className="space-y-6 mb-6">
               {Object.entries(allocations).map(([token, value]) => (
@@ -394,14 +364,14 @@ const CreateTreasuryNew = () => {
 
               <div className="p-4 rounded-lg bg-secondary/50 border border-border/50">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold">Total:</span>
+                  <span className="font-semibold">Итого:</span>
                   <span className={`text-2xl font-bold ${totalAllocation === 100 ? 'text-success' : 'text-destructive'}`}>
                     {totalAllocation}%
                   </span>
                 </div>
                 {totalAllocation !== 100 && (
                   <p className="text-sm text-destructive mt-2">
-                    ⚠️ Total must equal 100%
+                    ⚠️ Сумма должна быть ровно 100%
                   </p>
                 )}
               </div>
@@ -409,12 +379,12 @@ const CreateTreasuryNew = () => {
 
             <div className="p-4 rounded-lg bg-warning/10 border border-warning/20 mb-6">
               <div className="flex items-start gap-2">
-                <Info className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
-                  <p className="font-semibold mb-1">💡 Tip:</p>
+                  <p className="font-semibold mb-1">💡 Подсказка:</p>
                   <p className="text-muted-foreground">
-                    Higher token allocation = greater influence on portfolio risk. 
-                    USD is typically the most stable choice.
+                    Чем выше доля токена, тем больше он влияет на общий риск портфеля. 
+                    USD обычно самый стабильный выбор.
                   </p>
                 </div>
               </div>
@@ -428,7 +398,7 @@ const CreateTreasuryNew = () => {
                 className="gap-2"
               >
                 <ArrowLeft className="w-5 h-5" />
-                Back
+                Назад
               </Button>
               <Button
                 size="lg"
@@ -436,7 +406,7 @@ const CreateTreasuryNew = () => {
                 disabled={totalAllocation !== 100}
                 className="bg-gradient-to-r from-primary to-accent hover:opacity-90 gap-2"
               >
-                Next
+                Далее
                 <ArrowRight className="w-5 h-5" />
               </Button>
             </div>
@@ -446,26 +416,16 @@ const CreateTreasuryNew = () => {
         {/* Step 4: Advanced Settings */}
         {step === 4 && (
           <Card className="modern-card p-8">
-            <h2 className="text-2xl font-bold mb-6">Step 4: Advanced Settings</h2>
+            <h2 className="text-2xl font-bold mb-6">Шаг 4: Дополнительные Настройки</h2>
             
             <div className="space-y-6 mb-6">
               {/* Auto Yield */}
               <div className="p-4 rounded-lg bg-secondary/30 border border-border/50">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Label className="text-lg font-semibold">Auto-Yield Generation</Label>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p>When enabled, idle funds are automatically deposited into yield protocols to earn 5-12% APY. You keep full control and can withdraw anytime.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                    <Label className="text-lg font-semibold">Автоматическая Генерация Yield</Label>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Idle funds automatically deployed to generate passive income
+                      Неиспользуемые средства автоматически размещаются в протоколах для генерации дохода
                     </p>
                   </div>
                   <Switch
@@ -475,24 +435,14 @@ const CreateTreasuryNew = () => {
                 </div>
                 {autoYield && (
                   <div className="mt-3 p-3 rounded-lg bg-success/10 border border-success/20 text-sm">
-                    ✅ Expected yield: 5-12% APY
+                    ✅ Ожидаемая доходность: 5-12% годовых
                   </div>
                 )}
               </div>
 
               {/* Rebalance Threshold */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Label className="text-lg font-semibold">Rebalance Threshold</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Rebalancing triggers when your portfolio drifts beyond this percentage from target allocation. Lower = more frequent rebalancing (higher gas costs).</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
+                <Label className="text-lg font-semibold">Порог Ребалансировки</Label>
                 <div className="flex items-center gap-4">
                   <Slider
                     value={[rebalanceThreshold]}
@@ -505,7 +455,7 @@ const CreateTreasuryNew = () => {
                   <div className="text-2xl font-bold w-16 text-right">{rebalanceThreshold}%</div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Auto-rebalance triggers when allocation drifts {rebalanceThreshold}% from target
+                  Ребалансировка запускается когда распределение отклоняется на {rebalanceThreshold}% от целевого
                 </p>
                 
                 <div className="grid grid-cols-3 gap-3 mt-4">
@@ -514,21 +464,21 @@ const CreateTreasuryNew = () => {
                     className={`p-3 rounded-lg text-sm ${rebalanceThreshold === 1 ? 'bg-primary/20 border-2 border-primary' : 'bg-secondary/30'}`}
                   >
                     <div className="font-bold">1%</div>
-                    <div className="text-xs text-muted-foreground">Frequent</div>
+                    <div className="text-xs text-muted-foreground">Частая</div>
                   </button>
                   <button
                     onClick={() => setRebalanceThreshold(5)}
                     className={`p-3 rounded-lg text-sm ${rebalanceThreshold === 5 ? 'bg-primary/20 border-2 border-primary' : 'bg-secondary/30'}`}
                   >
                     <div className="font-bold">5%</div>
-                    <div className="text-xs text-muted-foreground">Optimal</div>
+                    <div className="text-xs text-muted-foreground">Оптимально</div>
                   </button>
                   <button
                     onClick={() => setRebalanceThreshold(10)}
                     className={`p-3 rounded-lg text-sm ${rebalanceThreshold === 10 ? 'bg-primary/20 border-2 border-primary' : 'bg-secondary/30'}`}
                   >
                     <div className="font-bold">10%</div>
-                    <div className="text-xs text-muted-foreground">Rare</div>
+                    <div className="text-xs text-muted-foreground">Редкая</div>
                   </button>
                 </div>
               </div>
@@ -537,10 +487,10 @@ const CreateTreasuryNew = () => {
                 <div className="flex items-start gap-2">
                   <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                   <div className="text-sm">
-                    <p className="font-semibold mb-1">💡 Recommendation:</p>
+                    <p className="font-semibold mb-1">💡 Рекомендация:</p>
                     <p className="text-muted-foreground">
-                      5% is the optimal balance between rebalancing frequency and gas savings.
-                      Lower = more frequent (higher gas), higher = less frequent (higher drift risk).
+                      5% - оптимальный баланс между частотой ребалансировки и экономией на комиссиях.
+                      Меньше = чаще ребалансировка (больше газа), больше = реже (выше риск отклонения).
                     </p>
                   </div>
                 </div>
@@ -555,7 +505,7 @@ const CreateTreasuryNew = () => {
                 className="gap-2"
               >
                 <ArrowLeft className="w-5 h-5" />
-                Back
+                Назад
               </Button>
               <Button
                 size="lg"
@@ -563,7 +513,7 @@ const CreateTreasuryNew = () => {
                 disabled={loading || !treasuryName.trim() || totalAllocation !== 100}
                 className="bg-gradient-to-r from-primary to-accent hover:opacity-90 gap-2 px-8"
               >
-                {loading ? "Creating..." : "Create Treasury"}
+                {loading ? "Создание..." : "Создать Treasury"}
                 <CheckCircle2 className="w-5 h-5" />
               </Button>
             </div>
@@ -573,22 +523,22 @@ const CreateTreasuryNew = () => {
         {/* Preview Box (always visible) */}
         {step > 1 && (
           <Card className="modern-card p-6 border-2 border-primary/30">
-            <h3 className="font-semibold mb-4">Treasury Preview</h3>
+            <h3 className="font-semibold mb-4">Предпросмотр Treasury</h3>
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-3xl">
                 {selectedAvatar}
               </div>
               <div className="flex-1">
-                <h4 className="text-xl font-bold">{treasuryName || "Treasury Name"}</h4>
+                <h4 className="text-xl font-bold">{treasuryName || "Имя не указано"}</h4>
                 <p className="text-sm text-muted-foreground">
                   {allocations.USDC}% USDC • {allocations.EURC}% EURC • {allocations.XSGD}% XSGD
                 </p>
                 <div className="flex items-center gap-4 mt-2 text-xs">
                   <span className="text-muted-foreground">
-                    Yield: {autoYield ? "✅ Enabled" : "❌ Disabled"}
+                    Yield: {autoYield ? "✅ Включен" : "❌ Выключен"}
                   </span>
                   <span className="text-muted-foreground">
-                    Threshold: {rebalanceThreshold}%
+                    Порог: {rebalanceThreshold}%
                   </span>
                 </div>
               </div>
@@ -597,7 +547,6 @@ const CreateTreasuryNew = () => {
         )}
       </div>
     </div>
-    </TooltipProvider>
   );
 };
 

@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
-import { DollarSign, TrendingUp, RefreshCw } from "lucide-react";
+import { DollarSign, TrendingUp, RefreshCw, Gift } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useTreasury } from "@/contexts/TreasuryContext";
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ethers, Contract } from "ethers";
+import { MOCK_ERC20_ABI } from "@/contracts/abis";
 
 const TokenBalance = () => {
   const { address, isConnected } = useWallet();
@@ -22,22 +25,66 @@ const TokenBalance = () => {
     { symbol: "XSGD", address: CONTRACT_ADDRESSES.XSGD, icon: "💴", color: "from-green-500 to-green-600" },
   ];
 
+  const mintTestTokens = async () => {
+    if (!isConnected || !address) return;
+
+    try {
+      toast.info("Minting 1000 test tokens...");
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const mintABI = ["function mint(address to, uint256 amount) public"];
+      
+      // Mint USDC
+      const usdc = new Contract(CONTRACT_ADDRESSES.USDC, mintABI, signer);
+      const tx1 = await usdc.mint(address, ethers.parseUnits("1000", 6));
+      await tx1.wait();
+
+      // Mint EURC
+      const eurc = new Contract(CONTRACT_ADDRESSES.EURC, mintABI, signer);
+      const tx2 = await eurc.mint(address, ethers.parseUnits("1000", 6));
+      await tx2.wait();
+
+      // Mint XSGD
+      const xsgd = new Contract(CONTRACT_ADDRESSES.XSGD, mintABI, signer);
+      const tx3 = await xsgd.mint(address, ethers.parseUnits("1000", 6));
+      await tx3.wait();
+
+      toast.success("1000 tokens minted for each currency!");
+      fetchBalances();
+    } catch (error: any) {
+      console.error("Error minting:", error);
+      toast.error("Failed to mint tokens");
+    }
+  };
+
   const fetchBalances = async () => {
     if (!isConnected || !address) return;
 
     setLoading(true);
     try {
+      console.log("🔍 Fetching token balances...");
+      console.log("USDC address:", CONTRACT_ADDRESSES.USDC);
+      console.log("EURC address:", CONTRACT_ADDRESSES.EURC);
+      console.log("XSGD address:", CONTRACT_ADDRESSES.XSGD);
+      console.log("Wallet address:", address);
+
       const usdcBalance = await getTokenBalance(CONTRACT_ADDRESSES.USDC);
       const eurcBalance = await getTokenBalance(CONTRACT_ADDRESSES.EURC);
       const xsgdBalance = await getTokenBalance(CONTRACT_ADDRESSES.XSGD);
+
+      console.log("✅ Balances fetched:", { USDC: usdcBalance, EURC: eurcBalance, XSGD: xsgdBalance });
 
       setBalances({
         USDC: usdcBalance,
         EURC: eurcBalance,
         XSGD: xsgdBalance,
       });
+
+      toast.success("Balances updated!");
     } catch (error) {
-      console.error("Error fetching balances:", error);
+      console.error("❌ Error fetching balances:", error);
+      toast.error("Failed to fetch balances. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -98,23 +145,39 @@ const TokenBalance = () => {
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-muted-foreground mb-1">Total Balance</h3>
+            <h3 className="text-lg font-semibold text-muted-foreground mb-1">💳 Wallet Balance</h3>
             <div className="flex items-center gap-2">
               <span className="text-3xl font-bold gradient-text">
                 ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <TrendingUp className="w-5 h-5 text-success" />
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Available to deposit into Treasury
+            </p>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchBalances}
-            disabled={loading}
-            className="hover:bg-primary/10"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex gap-2">
+            {totalValue === 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={mintTestTokens}
+                className="gap-2 border-success/30 hover:bg-success/10"
+              >
+                <Gift className="w-4 h-4 text-success" />
+                Get Test Tokens
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={fetchBalances}
+              disabled={loading}
+              className="hover:bg-primary/10"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -124,7 +187,7 @@ const TokenBalance = () => {
               className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors border border-border/50"
             >
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${token.color} flex items-center justify-center text-xl glow-effect`}>
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${token.color} flex items-center justify-center text-xl`}>
                   {token.icon}
                 </div>
                 <div>

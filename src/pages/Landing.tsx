@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, BookOpen, Github, ExternalLink, Sparkles, LineChart, LayoutGrid } from "lucide-react";
+import { ArrowRight, BookOpen, Github, ExternalLink, Sparkles, LineChart, LayoutGrid, CheckCircle2 } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -53,80 +53,112 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/10 rounded-full blur-3xl opacity-20 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-accent/10 rounded-full blur-3xl opacity-20 pointer-events-none" />
+
       {/* Hero Section */}
-      <section className="w-full">
-        <div className="mx-auto max-w-5xl px-6 pt-20 pb-10 text-center">
-          <p className="text-xs tracking-wide text-sub mb-4">
-            Arc Testnet • USDC gas • Sub-second finality
-          </p>
+      <section className="relative w-full">
+        <div className="mx-auto max-w-6xl px-6 pt-32 pb-16 text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
+            <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span className="text-xs font-medium">Arc Testnet • USDC gas • Sub-second finality</span>
+          </div>
           
-          <h1 
-            className="font-semibold leading-tight mx-auto"
-            style={{ fontSize: "clamp(28px, 6vw, 48px)" }}
-          >
-            Stablecoin Treasury on Arc
+          {/* Main Headline */}
+          <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6 bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
+            Stablecoin Treasury
+            <br />
+            <span className="bg-gradient-to-r from-primary via-accent to-success bg-clip-text text-transparent">
+              on Arc Network
+            </span>
           </h1>
           
-          <p 
-            className="mx-auto max-w-3xl mt-3 text-sub"
-            style={{ fontSize: "clamp(14px, 2vw, 18px)" }}
-          >
-            AI allocations and automated rebalancing for USDC/EURC/XSGD — all in one dashboard.
+          {/* Subline */}
+          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
+            AI-powered allocations and automated rebalancing for USDC/EURC/XSGD.
+            <br />
+            One dashboard, zero complexity.
           </p>
           
-          <div className="mt-8 flex items-center justify-center gap-3">
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/dashboard">
-              <Button className="px-5 h-10 rounded-xl gap-2">
+              <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity px-8 h-12 rounded-xl text-base shadow-lg shadow-primary/20">
                 Launch App
-                <ArrowRight className="w-3.5 h-3.5" />
+                <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
             <a href="https://docs.arc.network" target="_blank" rel="noopener noreferrer">
-              <Button variant="outline" className="px-5 h-10 rounded-xl border gap-2">
-                <BookOpen className="w-3.5 h-3.5" />
+              <Button size="lg" variant="outline" className="gap-2 px-8 h-12 rounded-xl text-base hover:bg-primary/5">
+                <BookOpen className="w-4 h-4" />
                 View Docs
               </Button>
             </a>
+          </div>
+
+          {/* Trust indicators */}
+          <div className="flex items-center justify-center gap-6 mt-12 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-success" />
+              <span>Open Source</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-success" />
+              <span>Audited Libraries</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-success" />
+              <span>Arc Native</span>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Value Cards */}
-      <section className="mx-auto max-w-5xl px-6 pb-8">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {valueProps.map(({ icon: Icon, title, text }) => (
+      <section className="relative mx-auto max-w-6xl px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {valueProps.map(({ icon: Icon, title, text }, i) => (
             <div
               key={title}
-              className="rounded-2xl border border-border bg-transparent hover:border-white/20 transition-colors p-5"
+              className="group relative rounded-2xl border border-border bg-card/30 backdrop-blur-sm hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 p-6 hover:-translate-y-1"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="h-4 w-4 opacity-80" />
-                <h3 className="font-medium">{title}</h3>
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
+              <div className="relative">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{text}</p>
               </div>
-              <p className="text-sm text-sub">{text}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="mx-auto max-w-5xl px-6 py-12">
-        <h2 className="text-xl font-semibold text-center mb-8">How It Works</h2>
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+      <section className="relative mx-auto max-w-6xl px-6 py-16 bg-secondary/10 rounded-3xl my-8">
+        <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
+        <div className="grid md:grid-cols-3 gap-8 mb-10">
           {steps.map((step, i) => (
-            <div key={i} className="text-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-base font-semibold text-primary mx-auto">
+            <div key={i} className="relative text-center space-y-3">
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold text-white mx-auto shadow-lg shadow-primary/20">
                 {step.number}
               </div>
-              <h3 className="font-medium text-sm">{step.title}</h3>
-              <p className="text-xs text-sub">{step.description}</p>
+              <h3 className="font-semibold text-base">{step.title}</h3>
+              <p className="text-sm text-muted-foreground">{step.description}</p>
+              {i < steps.length - 1 && (
+                <div className="hidden md:block absolute top-8 -right-4 w-8 h-0.5 bg-gradient-to-r from-primary/50 to-transparent" />
+              )}
             </div>
           ))}
         </div>
         <div className="text-center">
           <Link to="/dashboard">
-            <Button variant="outline" size="sm" className="rounded-xl">
+            <Button variant="outline" className="rounded-xl hover:bg-primary/5 border-primary/30">
               Get Test Tokens
             </Button>
           </Link>
@@ -134,65 +166,73 @@ const Landing = () => {
       </section>
 
       {/* Proof Section */}
-      <section className="mx-auto max-w-5xl px-6 py-8 text-center">
-        <div className="flex items-center justify-center gap-6 text-sm">
-          <a 
-            className="opacity-80 hover:opacity-100 underline-offset-4 hover:underline flex items-center gap-1.5" 
-            href="https://github.com/vizzzix/arc_treasury" 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            <Github className="w-3.5 h-3.5" />
-            GitHub
-          </a>
-          <a 
-            className="opacity-80 hover:opacity-100 underline-offset-4 hover:underline flex items-center gap-1.5" 
-            href="https://testnet.arcscan.app/address/0x0B7950Ec78d5f7B53B120c889F83a6bd1fB0da59" 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            View demo tx on ArcScan
-          </a>
+      <section className="relative mx-auto max-w-5xl px-6 py-12">
+        <div className="text-center space-y-6">
+          <h2 className="text-2xl font-bold mb-8">Built with Transparency</h2>
+          <div className="flex items-center justify-center gap-8">
+            <a 
+              className="group flex items-center gap-2 px-6 py-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all" 
+              href="https://github.com/vizzzix/arc_treasury" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Github className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="font-medium">GitHub</span>
+              <ExternalLink className="w-3 h-3 opacity-50" />
+            </a>
+            <a 
+              className="group flex items-center gap-2 px-6 py-3 rounded-xl border border-border hover:border-primary/50 hover:bg-primary/5 transition-all" 
+              href="https://testnet.arcscan.app/address/0x0B7950Ec78d5f7B53B120c889F83a6bd1fB0da59" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <span className="font-medium">View on ArcScan</span>
+              <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            </a>
+          </div>
         </div>
       </section>
 
       {/* FAQ - 4 questions */}
-      <section className="mx-auto max-w-3xl px-6 py-12">
-        <h2 className="text-xl font-semibold text-center mb-8">FAQ</h2>
-        <Accordion type="single" collapsible className="space-y-2">
+      <section className="relative mx-auto max-w-4xl px-6 py-16">
+        <h2 className="text-3xl font-bold text-center mb-10">Frequently Asked Questions</h2>
+        <Accordion type="single" collapsible className="space-y-3">
           {faqs.map((faq, i) => (
             <AccordionItem 
               key={i} 
               value={`item-${i}`} 
-              className="border border-border rounded-xl px-4"
+              className="border border-border/50 rounded-2xl px-6 bg-card/20 hover:bg-card/30 transition-colors"
             >
-              <AccordionTrigger className="hover:no-underline text-left text-sm font-medium">
+              <AccordionTrigger className="hover:no-underline text-left font-semibold py-5">
                 {faq.q}
               </AccordionTrigger>
-              <AccordionContent className="text-sub text-sm">
+              <AccordionContent className="text-muted-foreground pb-5 leading-relaxed">
                 {faq.a}
               </AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
-        <div className="text-center mt-6">
-          <Link to="/faq" className="text-sm text-primary hover:underline">
-            View all FAQs →
+        <div className="text-center mt-8">
+          <Link to="/faq" className="inline-flex items-center gap-2 text-primary hover:gap-3 transition-all font-medium">
+            View all FAQs
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
 
-      {/* Minimal Footer */}
-      <footer className="py-8 px-6 border-t border-border">
-        <div className="mx-auto max-w-5xl">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-sub">
-            <div>© 2025 Arc Treasury. Built on Arc Network Testnet.</div>
-            <div className="flex items-center gap-4">
-              <Link to="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
-              <a href="https://docs.arc.network" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Docs</a>
-              <a href="https://github.com/vizzzix/arc_treasury" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">GitHub</a>
-              <a href="https://x.com/claimpilot" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">Twitter</a>
+      {/* Footer */}
+      <footer className="relative py-12 px-6 border-t border-border/50 mt-16">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="Arc Treasury" className="w-6 h-6" />
+              <span>© 2025 Arc Treasury. Built on Arc Network Testnet.</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+              <a href="https://docs.arc.network" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Docs</a>
+              <a href="https://github.com/vizzzix/arc_treasury" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">GitHub</a>
+              <a href="https://x.com/claimpilot" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
             </div>
           </div>
         </div>
