@@ -36,39 +36,45 @@ const Landing = () => {
 
       {/* Hero Section */}
       <section className="relative w-full">
-        <div className="mx-auto max-w-6xl px-6 pt-32 pb-16 text-center">
+        <div className="mx-auto max-w-5xl px-6 pt-32 pb-20 text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
-            <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-            <span className="text-xs font-medium">Arc Testnet • USDC gas • Sub-second finality</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/5 border border-primary/10 mb-10 backdrop-blur-sm">
+            <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+            <span className="text-xs font-medium tracking-wide">Arc Testnet • USDC gas • Sub-second finality</span>
           </div>
           
           {/* Main Headline */}
-          <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6 bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
-            Stablecoin Treasury
-            <br />
-            <span className="bg-gradient-to-r from-primary via-accent to-success bg-clip-text text-transparent">
-              on Arc Network
-            </span>
-          </h1>
+          <div className="space-y-4 mb-8">
+            <h1 className="text-5xl md:text-7xl font-bold leading-[1.1] tracking-tight">
+              <span className="block">Stablecoin Treasury</span>
+              <span className="block bg-gradient-to-r from-primary via-accent to-success bg-clip-text text-transparent">
+                on Arc Network
+              </span>
+            </h1>
+          </div>
           
           {/* Subline */}
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            AI-powered allocations and automated rebalancing for USDC/EURC/XSGD.
-            <br />
-            One dashboard, zero complexity.
-          </p>
+          <div className="max-w-2xl mx-auto mb-12 space-y-3">
+            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+              AI-powered allocations and automated rebalancing
+              <br className="hidden md:block" />
+              {" "}for USDC/EURC/XSGD.
+            </p>
+            <p className="text-base text-muted-foreground/80">
+              One dashboard, zero complexity.
+            </p>
+          </div>
           
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <Link to="/dashboard">
-              <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity px-8 h-12 rounded-xl text-base shadow-lg shadow-primary/20">
+              <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent hover:opacity-90 hover:scale-105 transition-all px-8 h-12 rounded-xl text-base shadow-lg shadow-primary/20">
                 Launch App
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
             <a href="https://docs.arc.network" target="_blank" rel="noopener noreferrer">
-              <Button size="lg" variant="outline" className="gap-2 px-8 h-12 rounded-xl text-base hover:bg-primary/5">
+              <Button size="lg" variant="outline" className="gap-2 px-8 h-12 rounded-xl text-base hover:bg-primary/5 hover:border-primary/30">
                 <BookOpen className="w-4 h-4" />
                 View Docs
               </Button>
@@ -76,16 +82,16 @@ const Landing = () => {
           </div>
 
           {/* Trust indicators */}
-          <div className="flex items-center justify-center gap-6 mt-12 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-8 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground/80">
               <CheckCircle2 className="w-4 h-4 text-success" />
               <span>Open Source</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-muted-foreground/80">
               <CheckCircle2 className="w-4 h-4 text-success" />
               <span>Audited Libraries</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 text-muted-foreground/80">
               <CheckCircle2 className="w-4 h-4 text-success" />
               <span>Arc Native</span>
             </div>
@@ -115,25 +121,36 @@ const Landing = () => {
       </section>
 
       {/* How It Works */}
-      <section className="relative mx-auto max-w-6xl px-6 py-16 bg-secondary/10 rounded-3xl my-8">
-        <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
-        <div className="grid md:grid-cols-3 gap-8 mb-10">
+      <section className="relative mx-auto max-w-6xl px-6 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-3">How It Works</h2>
+          <p className="text-muted-foreground">Get started in minutes</p>
+        </div>
+        
+        <div className="grid md:grid-cols-3 gap-8 relative">
+          {/* Connecting line */}
+          <div className="hidden md:block absolute top-10 left-[16.666%] right-[16.666%] h-0.5 bg-gradient-to-r from-primary/0 via-primary/30 to-primary/0" />
+          
           {steps.map((step, i) => (
-            <div key={i} className="relative text-center space-y-3">
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold text-white mx-auto shadow-lg shadow-primary/20">
-                {step.number}
+            <div key={i} className="relative group">
+              <div className="relative p-8 rounded-2xl border border-border/50 bg-card/20 hover:bg-card/40 hover:border-primary/30 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/5">
+                {/* Number badge */}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+                  {step.number}
+                </div>
+                
+                <div className="pt-6 text-center space-y-3">
+                  <h3 className="font-semibold text-lg">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
+                </div>
               </div>
-              <h3 className="font-semibold text-base">{step.title}</h3>
-              <p className="text-sm text-muted-foreground">{step.description}</p>
-              {i < steps.length - 1 && (
-                <div className="hidden md:block absolute top-8 -right-4 w-8 h-0.5 bg-gradient-to-r from-primary/50 to-transparent" />
-              )}
             </div>
           ))}
         </div>
-        <div className="text-center">
+        
+        <div className="text-center mt-12">
           <Link to="/dashboard">
-            <Button variant="outline" className="rounded-xl hover:bg-primary/5 border-primary/30">
+            <Button variant="outline" className="rounded-xl hover:bg-primary/5 hover:border-primary/30 hover:scale-105 transition-all px-6">
               Get Test Tokens
             </Button>
           </Link>
