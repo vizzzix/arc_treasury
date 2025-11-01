@@ -1,11 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Wallet, LayoutDashboard, PlusCircle, BarChart3, LogOut, Copy, Check, DollarSign, Sun, Moon, Settings, Star, Users, HelpCircle } from "lucide-react";
+import { Wallet, LayoutDashboard, PlusCircle, BarChart3, LogOut, Copy, Check, DollarSign, Sun, Moon, Settings, Star, Users, HelpCircle, Gift } from "lucide-react";
 import { useWallet } from "@/contexts/WalletContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { usePoints } from "@/contexts/PointsContext";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ethers, Contract } from "ethers";
+import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -159,6 +161,40 @@ const Navbar = () => {
                   )}
                   {copied ? "Copied!" : "Copy Address"}
                 </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
+                <DropdownMenuItem 
+                  onClick={async () => {
+                    try {
+                      toast.info("Minting 1000 test tokens...");
+                      const provider = new ethers.BrowserProvider(window.ethereum);
+                      const signer = await provider.getSigner();
+                      const mintABI = ["function mint(address to, uint256 amount) public"];
+                      
+                      const usdc = new Contract(CONTRACT_ADDRESSES.USDC, mintABI, signer);
+                      await (await usdc.mint(address, ethers.parseUnits("1000", 6))).wait();
+                      
+                      const eurc = new Contract(CONTRACT_ADDRESSES.EURC, mintABI, signer);
+                      await (await eurc.mint(address, ethers.parseUnits("1000", 6))).wait();
+                      
+                      const xsgd = new Contract(CONTRACT_ADDRESSES.XSGD, mintABI, signer);
+                      await (await xsgd.mint(address, ethers.parseUnits("1000", 6))).wait();
+                      
+                      toast.success("1000 tokens minted for each currency!");
+                    } catch (error) {
+                      console.error("Mint error:", error);
+                      toast.error("Failed to mint tokens");
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  <Gift className="w-4 h-4 mr-2 text-success" />
+                  Get Test Tokens
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                
                 <DropdownMenuItem asChild className="cursor-pointer">
                   <Link to="/referrals" className="flex items-center">
                     <Users className="w-4 h-4 mr-2" />

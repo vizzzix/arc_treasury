@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet, PlusCircle, Copy, ArrowRight, Trash2 } from "lucide-react";
 import DepositWithdrawModal from "@/components/DepositWithdrawModal";
-import TokenBalance from "@/components/TokenBalance";
 import TreasuryBalance from "@/components/TreasuryBalance";
+import AIPortfolioInsights from "@/components/AIPortfolioInsights";
 import { useTreasury } from "@/contexts/TreasuryContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePoints } from "@/contexts/PointsContext";
 import { TreasuryMetadata } from "@/types/treasury";
+import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
 import { toast } from "sonner";
 
 const Dashboard = () => {
@@ -201,17 +202,21 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* Balances Grid */}
-        {treasuryAddress ? (
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Wallet Balance (кошелёк) */}
-            <TokenBalance />
+        {/* Main Grid */}
+        {treasuryAddress && (
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Treasury Balance */}
+            <div className="lg:col-span-2">
+              <TreasuryBalance treasuryAddress={treasuryAddress} />
+            </div>
             
-            {/* Treasury Balance (контракт) */}
-            <TreasuryBalance treasuryAddress={treasuryAddress} />
+            {/* AI Insights */}
+            <AIPortfolioInsights 
+              currentAllocations={{ USDC: 50, EURC: 30, XSGD: 20 }}
+              targetAllocations={{ USDC: 50, EURC: 30, XSGD: 20 }}
+              totalValue={parseFloat(totalValueLocked || "0")}
+            />
           </div>
-        ) : (
-          <TokenBalance />
         )}
 
         {/* Quick Actions */}
