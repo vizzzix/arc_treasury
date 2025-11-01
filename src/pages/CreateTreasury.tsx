@@ -249,7 +249,23 @@ const CreateTreasuryNew = () => {
             <div className="mb-6">
               <AIRecommendation 
                 onApplyStrategy={(newAllocations) => {
-                  setAllocations(newAllocations);
+                  // Normalize allocations to ensure they sum to 100%
+                  const total = newAllocations.USDC + newAllocations.EURC + newAllocations.XSGD;
+                  if (total !== 100) {
+                    const normalized = {
+                      USDC: Math.round((newAllocations.USDC / total) * 100),
+                      EURC: Math.round((newAllocations.EURC / total) * 100),
+                      XSGD: Math.round((newAllocations.XSGD / total) * 100),
+                    };
+                    // Adjust rounding errors
+                    const newTotal = normalized.USDC + normalized.EURC + normalized.XSGD;
+                    if (newTotal !== 100) {
+                      normalized.USDC += (100 - newTotal);
+                    }
+                    setAllocations(normalized);
+                  } else {
+                    setAllocations(newAllocations);
+                  }
                   setSelectedTemplate("ai-custom");
                   toast.success("AI strategy applied!");
                 }}

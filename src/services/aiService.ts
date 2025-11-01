@@ -50,14 +50,18 @@ Recommend ONE of these strategies:
 2. Balanced (50% USDC, 30% EURC, 20% XSGD) - Medium risk, 5-8% APY
 3. Aggressive (30% USDC, 40% EURC, 30% XSGD) - Higher risk, 8-12% APY
 
-Respond in JSON format:
+CRITICAL: Allocations MUST sum to exactly 100. No decimals.
+
+Respond in JSON format (ONLY JSON, no markdown):
 {
   "strategy": "Balanced",
   "allocations": {"USDC": 50, "EURC": 30, "XSGD": 20},
   "reasoning": "Short explanation (max 2 sentences)",
   "riskLevel": "Balanced",
   "expectedAPY": "5-8%"
-}`;
+}
+
+Verify: USDC + EURC + XSGD must equal exactly 100.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
