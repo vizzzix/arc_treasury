@@ -31,6 +31,11 @@ const Landing = () => {
       {/* Hero Section */}
       <section className="relative w-full min-h-[85vh] flex items-center justify-center">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
+          {/* Tagline */}
+          <p className="text-sm font-medium tracking-wide text-muted-foreground/60 mb-6 uppercase">
+            Circle-powered DeFi automation
+          </p>
+          
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/8 border border-primary/15 mb-12 backdrop-blur-sm">
             <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -47,10 +52,10 @@ const Landing = () => {
           </h1>
           
           {/* Subline */}
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-4 leading-relaxed font-light">
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-3 leading-relaxed font-light">
             AI-powered allocations and automated rebalancing for USDC/EURC/XSGD.
           </p>
-          <p className="text-lg text-muted-foreground/70 mb-12 font-light">
+          <p className="text-base text-muted-foreground/60 mb-12 italic">
             One dashboard, zero complexity.
           </p>
           
@@ -151,8 +156,28 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Footer CTA */}
+      <section className="relative mx-auto max-w-6xl px-6 py-16">
+        <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-12 text-center overflow-hidden">
+          <div className="absolute inset-0 bg-grid-white/5 [mask-image:radial-gradient(white,transparent_85%)]" />
+          <div className="relative">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to get started?</h2>
+            <p className="text-muted-foreground mb-8">Create your treasury on Arc Testnet in minutes</p>
+            <Link to="/dashboard">
+              <Button 
+                size="lg" 
+                className="gap-2 bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/30 hover:scale-105 transition-all px-10 h-14 rounded-2xl text-base font-semibold"
+              >
+                Get started on Arc Testnet
+                <ArrowRight className="w-5 h-5" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="relative py-12 px-6 border-t border-border/50 mt-16">
+      <footer className="relative py-12 px-6 border-t border-border/50">
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
