@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
 import { useTreasury } from "@/contexts/TreasuryContext";
 import { usePoints } from "@/contexts/PointsContext";
+import { useWallet } from "@/contexts/WalletContext";
+import { getSponsorshipMessage, updateGasStats } from "@/services/gasSponsorService";
 import { toast } from "sonner";
-import { RefreshCw, Star } from "lucide-react";
+import { RefreshCw, Star, Gift } from "lucide-react";
 
 interface DepositWithdrawModalProps {
   open: boolean;
@@ -20,10 +22,12 @@ interface DepositWithdrawModalProps {
 const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: DepositWithdrawModalProps) => {
   const { deposit, withdraw, approveToken, getTokenBalance, loading } = useTreasury();
   const { addDepositPoints, addWithdrawPoints } = usePoints();
+  const { address } = useWallet();
   const [selectedToken, setSelectedToken] = useState<string>("USDC");
   const [amount, setAmount] = useState<string>("");
   const [tokenBalance, setTokenBalance] = useState<string>("0");
   const [loadingBalance, setLoadingBalance] = useState(false);
+  const [sponsorMessage, setSponsorMessage] = useState<string | null>(null);
 
   const tokens = [
     { symbol: "USDC", address: CONTRACT_ADDRESSES.USDC },
@@ -31,12 +35,18 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
     { symbol: "XSGD", address: CONTRACT_ADDRESSES.XSGD },
   ];
 
-  // Load balance when modal opens or token changes
+  // Load balance and check gas sponsorship when modal opens
   useEffect(() => {
     if (open && selectedToken) {
       loadBalance();
+      
+      // Check if gas is sponsored
+      if (address) {
+        const message = getSponsorshipMessage(address, mode);
+        setSponsorMessage(message);
+      }
     }
-  }, [open, selectedToken]);
+  }, [open, selectedToken, address, mode]);
 
   const loadBalance = async () => {
     console.log("🔄 Modal: Loading balance for", selectedToken);
@@ -109,12 +119,21 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
       // Then deposit
       const success = await deposit(treasuryAddress, tokenInfo.address, amount);
       if (success) {
+        // Update gas stats
+        if (address) {
+          updateGasStats(address, "deposit");
+        }
+        
         // Award points for deposit
         const amountNum = parseFloat(amount);
         addDepositPoints(amountNum);
         
         const pointsEarned = Math.floor(amountNum * 0.01);
-        toast.success(`Deposit successful! +${pointsEarned} points earned! ⭐`);
+        const message = sponsorMessage 
+          ? `${sponsorMessage} • +${pointsEarned} points earned! ⭐`
+          : `Deposit successful! +${pointsEarned} points earned! ⭐`;
+        
+        toast.success(message);
         
         onOpenChange(false);
         setAmount("");
@@ -122,6 +141,11 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
     } else {
       const success = await withdraw(treasuryAddress, tokenInfo.address, amount);
       if (success) {
+        // Update gas stats
+        if (address) {
+          updateGasStats(address, "withdraw");
+        }
+        
         // Award points for withdrawal
         const amountNum = parseFloat(amount);
         addWithdrawPoints(amountNum);
@@ -197,7 +221,16 @@ const DepositWithdrawModal = ({ open, onOpenChange, mode, treasuryAddress }: Dep
             </div>
           </div>
 
-          {mode === "deposit" && (
+          {mode === "deposit" && sponsorMessage && (
+            <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-sm flex items-start gap-2">
+              <Gift className="w-4 h-4 text-success flex-shrink-0 mt-0.5" />
+              <p className="text-success font-medium">
+                {sponsorMessage}
+              </p>
+            </div>
+          )}
+          
+          {mode === "deposit" && !sponsorMessage && (
             <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm">
               <p className="text-muted-foreground">
                 💡 Tip: Deposits under $100 have zero fees!

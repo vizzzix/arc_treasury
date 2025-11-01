@@ -5,6 +5,9 @@ import { ArrowUpRight, ArrowDownLeft, RefreshCw, Wallet, PlusCircle, Copy, Arrow
 import DepositWithdrawModal from "@/components/DepositWithdrawModal";
 import TreasuryBalance from "@/components/TreasuryBalance";
 import AIPortfolioInsights from "@/components/AIPortfolioInsights";
+import CrossChainBridge from "@/components/CrossChainBridge";
+import ScheduledPayments from "@/components/ScheduledPayments";
+import AIChatAssistant from "@/components/AIChatAssistant";
 import { useTreasury } from "@/contexts/TreasuryContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePoints } from "@/contexts/PointsContext";
@@ -204,20 +207,32 @@ const Dashboard = () => {
 
         {/* Main Grid */}
         {treasuryAddress && (
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid lg:grid-cols-3 gap-4">
             {/* Treasury Balance */}
             <div className="lg:col-span-2">
               <TreasuryBalance treasuryAddress={treasuryAddress} />
             </div>
             
-            {/* AI Insights */}
-            <AIPortfolioInsights 
-              currentAllocations={{ USDC: 50, EURC: 30, XSGD: 20 }}
-              targetAllocations={{ USDC: 50, EURC: 30, XSGD: 20 }}
-              totalValue={parseFloat(totalValueLocked || "0")}
-            />
+            {/* Right Sidebar */}
+            <div className="space-y-4">
+              {/* AI Insights */}
+              <AIPortfolioInsights 
+                currentAllocations={{ USDC: 50, EURC: 30, XSGD: 20 }}
+                targetAllocations={{ USDC: 50, EURC: 30, XSGD: 20 }}
+                totalValue={parseFloat(totalValueLocked || "0")}
+              />
+              
+              {/* Cross-Chain Bridge */}
+              <CrossChainBridge />
+              
+              {/* Scheduled Payments */}
+              <ScheduledPayments />
+            </div>
           </div>
         )}
+
+        {/* AI Chat Assistant */}
+        <AIChatAssistant />
 
         {/* Quick Actions */}
         {treasuryAddress && (
