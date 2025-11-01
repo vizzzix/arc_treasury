@@ -1,0 +1,19 @@
+// Auto-generated contract addresses - DO NOT EDIT MANUALLY
+// Generated on: 2025-10-31T13:06:45.934Z
+
+export const CONTRACT_ADDRESSES = {
+  USDC: "0x260c4725760ecB414f2a4b7f191DdE36A0797483",
+  EURC: "0xb0a3f4d67BB1EFBf4a9C506226c5d705e1CdBbBD",
+  XSGD: "0xE5a859A422ee4570D713b98Bb8cC99ee277b021a",
+  SwapRouter: "0xB6bdf5FCB0b17bB1b75CFF664d9eb311F8B977D7",
+  YieldAggregator: "0x87E9EB8f48D147e2E15F81bE1a158eF61262CffC",
+  AITreasury: "0x0B7950Ec78d5f7B53B120c889F83a6bd1fB0da59",
+  StrategyManager: "0xEB3F374404048C2fE852a978bB390EE67d7f8500",
+  network: "arcTestnet",
+  chainId: 5042002
+};
+
+export const SUPPORTED_NETWORKS = {
+  localhost: 31337,
+  arcTestnet: 5042002,
+};

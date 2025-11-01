@@ -1,0 +1,39 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FACFE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10B981;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4FACFE;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Base circle -->
+  <circle cx="32" cy="32" r="30" fill="url(#grad1)"/>
+  
+  <!-- Vault/Safe body -->
+  <rect x="20" y="22" width="24" height="22" rx="2" fill="#1a1f3a"/>
+  
+  <!-- Vault door -->
+  <circle cx="32" cy="33" r="8" fill="#0f1729"/>
+  <circle cx="32" cy="33" r="6" stroke="url(#grad2)" stroke-width="1.5" fill="none"/>
+  
+  <!-- Lock center -->
+  <circle cx="32" cy="33" r="3" fill="url(#grad2)"/>
+  <rect x="31" y="33" width="2" height="4" fill="#1a1f3a" rx="0.5"/>
+  
+  <!-- Hinges -->
+  <rect x="18" y="25" width="2" height="4" fill="#4FACFE" rx="0.5"/>
+  <rect x="18" y="35" width="2" height="4" fill="#4FACFE" rx="0.5"/>
+  
+  <!-- Currency symbols -->
+  <text x="24" y="28" font-family="Arial, sans-serif" font-size="5" font-weight="bold" fill="#10B981">$</text>
+  <text x="36" y="28" font-family="Arial, sans-serif" font-size="5" font-weight="bold" fill="#10B981">€</text>
+  
+  <!-- Arc on top -->
+  <path d="M 24 19 Q 32 16 40 19" stroke="#4FACFE" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>
+

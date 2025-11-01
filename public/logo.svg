@@ -1,0 +1,59 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with gradient -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FACFE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10B981;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4FACFE;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer ring -->
+  <circle cx="60" cy="60" r="55" fill="url(#gradient1)" opacity="0.1"/>
+  <circle cx="60" cy="60" r="55" stroke="url(#gradient1)" stroke-width="2" fill="none" opacity="0.5"/>
+  
+  <!-- Middle ring -->
+  <circle cx="60" cy="60" r="45" fill="url(#gradient2)" opacity="0.15"/>
+  
+  <!-- Center icon - Treasury symbol (stylized safe/vault) -->
+  <g filter="url(#glow)">
+    <!-- Vault body -->
+    <rect x="35" y="40" width="50" height="45" rx="4" fill="url(#gradient1)"/>
+    
+    <!-- Vault door -->
+    <circle cx="60" cy="62" r="15" fill="#1a1f3a" opacity="0.8"/>
+    <circle cx="60" cy="62" r="12" stroke="url(#gradient2)" stroke-width="2" fill="none"/>
+    
+    <!-- Lock mechanism -->
+    <circle cx="60" cy="62" r="6" fill="url(#gradient2)"/>
+    <rect x="58" y="62" width="4" height="8" fill="#1a1f3a" rx="1"/>
+    
+    <!-- Vault hinges -->
+    <rect x="32" y="45" width="3" height="8" fill="#4FACFE" rx="1"/>
+    <rect x="32" y="67" width="3" height="8" fill="#4FACFE" rx="1"/>
+    
+    <!-- Money symbols -->
+    <text x="43" y="52" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#10B981">$</text>
+    <text x="71" y="52" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#10B981">€</text>
+    
+    <!-- Arc symbol (small arc on top) -->
+    <path d="M 45 35 Q 60 30 75 35" stroke="#4FACFE" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Decorative dots -->
+  <circle cx="25" cy="30" r="2" fill="#4FACFE" opacity="0.6"/>
+  <circle cx="95" cy="30" r="2" fill="#10B981" opacity="0.6"/>
+  <circle cx="25" cy="90" r="2" fill="#10B981" opacity="0.6"/>
+  <circle cx="95" cy="90" r="2" fill="#4FACFE" opacity="0.6"/>
+</svg>
+
