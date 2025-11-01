@@ -81,6 +81,18 @@ const Dashboard = () => {
     }
   };
 
+  const handleHideTreasury = () => {
+    if (!address) return;
+    
+    if (confirm("Hide this Treasury from dashboard? It will remain on-chain, you can re-add it later.")) {
+      localStorage.removeItem(`treasury_${address}`);
+      localStorage.removeItem(`treasury_metadata_${address}`);
+      setTreasuryAddress("");
+      setTreasuryMetadata(null);
+      toast.success("Treasury hidden from dashboard");
+    }
+  };
+
   const portfolioData = [
     { name: "USDC", percentage: 45, color: "bg-primary" },
     { name: "EURC", percentage: 35, color: "bg-accent" },
@@ -194,6 +206,16 @@ const Dashboard = () => {
                 >
                   <PlusCircle className="w-4 h-4" />
                   New Treasury
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleHideTreasury}
+                  className="gap-2 hover:bg-warning/10"
+                >
+                  <Wallet className="w-4 h-4" />
+                  Hide
                 </Button>
                 
                 <Button
