@@ -74,57 +74,6 @@ const FAQ = () => {
             ))}
           </Accordion>
         </Card>
-
-        {/* Additional Help */}
-        <Card className="modern-card p-6 border-2 border-primary/30">
-          <h2 className="text-xl font-bold mb-4">Still have questions?</h2>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <ExternalLink className="w-5 h-5 text-primary" />
-              <a
-                href="https://docs.arc.network"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Arc Network Documentation
-              </a>
-            </div>
-            <div className="flex items-center gap-3">
-              <ExternalLink className="w-5 h-5 text-primary" />
-              <a
-                href="https://testnet.arcscan.app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Arc Testnet Explorer
-              </a>
-            </div>
-            <div className="flex items-center gap-3">
-              <ExternalLink className="w-5 h-5 text-primary" />
-              <a
-                href="https://x.com/claimpilot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Follow us on Twitter
-              </a>
-            </div>
-            <div className="flex items-center gap-3">
-              <ExternalLink className="w-5 h-5 text-primary" />
-              <a
-                href="https://github.com/vizzzix/arc_treasury"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                View on GitHub
-              </a>
-            </div>
-          </div>
-        </Card>
       </div>
     </div>
   );
