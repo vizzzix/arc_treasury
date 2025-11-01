@@ -31,11 +31,6 @@ const Landing = () => {
       {/* Hero Section */}
       <section className="relative w-full min-h-[85vh] flex items-center justify-center">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
-          {/* Tagline */}
-          <p className="text-sm font-medium tracking-wide text-muted-foreground/60 mb-6 uppercase">
-            Circle-powered DeFi automation
-          </p>
-          
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/8 border border-primary/15 mb-12 backdrop-blur-sm">
             <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -43,7 +38,7 @@ const Landing = () => {
           </div>
           
           {/* Main Headline */}
-          <h1 className="text-6xl md:text-8xl font-bold leading-[1.05] tracking-tight mb-8">
+          <h1 className="text-5xl md:text-6xl font-bold leading-[1.1] tracking-tight mb-8">
             Stablecoin Treasury
             <br />
             <span className="bg-gradient-to-r from-primary via-accent to-success bg-clip-text text-transparent">
@@ -128,34 +123,6 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Proof Section */}
-      <section className="relative mx-auto max-w-5xl px-6 py-16">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-10">Open Source & Verified</h2>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <a 
-              className="group flex items-center gap-3 px-8 py-4 rounded-2xl border border-border/50 hover:border-primary/50 hover:bg-card/40 hover:shadow-lg hover:shadow-primary/5 transition-all w-full sm:w-auto" 
-              href="https://github.com/vizzzix/arc_treasury" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <Github className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              <span className="font-semibold">View on GitHub</span>
-              <ExternalLink className="w-4 h-4 opacity-50 ml-auto" />
-            </a>
-            <a 
-              className="group flex items-center gap-3 px-8 py-4 rounded-2xl border border-border/50 hover:border-primary/50 hover:bg-card/40 hover:shadow-lg hover:shadow-primary/5 transition-all w-full sm:w-auto" 
-              href="https://testnet.arcscan.app/address/0x0B7950Ec78d5f7B53B120c889F83a6bd1fB0da59" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <span className="font-semibold">Live on ArcScan</span>
-              <ExternalLink className="w-5 h-5 group-hover:scale-110 transition-transform" />
-            </a>
-          </div>
-        </div>
-      </section>
-
       {/* Footer CTA */}
       <section className="relative mx-auto max-w-6xl px-6 py-16">
         <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-12 text-center overflow-hidden">
@@ -191,8 +158,43 @@ const Landing = () => {
               <a href="https://x.com/claimpilot" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
             </div>
           </div>
+          
+          {/* Circle tagline */}
+          <div className="text-center mt-8 pt-6 border-t border-border/30">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground/50 uppercase">
+              Circle-powered DeFi automation
+            </p>
+          </div>
         </div>
       </footer>
+
+      {/* Proof Section - Last element */}
+      <section className="relative mx-auto max-w-5xl px-6 py-12 pb-16">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-8 text-muted-foreground">Open Source & Verified</h2>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+            <a 
+              className="group flex items-center gap-3 px-8 py-4 rounded-2xl border border-border/50 hover:border-primary/50 hover:bg-card/40 hover:shadow-lg hover:shadow-primary/5 transition-all w-full sm:w-auto" 
+              href="https://github.com/vizzzix/arc_treasury" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Github className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold">View on GitHub</span>
+              <ExternalLink className="w-4 h-4 opacity-50 ml-auto" />
+            </a>
+            <a 
+              className="group flex items-center gap-3 px-8 py-4 rounded-2xl border border-border/50 hover:border-primary/50 hover:bg-card/40 hover:shadow-lg hover:shadow-primary/5 transition-all w-full sm:w-auto" 
+              href="https://testnet.arcscan.app/address/0x0B7950Ec78d5f7B53B120c889F83a6bd1fB0da59" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <span className="font-semibold">Live on ArcScan</span>
+              <ExternalLink className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
