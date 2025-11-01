@@ -14,11 +14,12 @@ export default {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
+        border: "rgba(255, 255, 255, 0.1)",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        sub: "rgba(255, 255, 255, 0.65)",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -44,7 +45,7 @@ export default {
           foreground: "hsl(var(--popover-foreground))",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
+          DEFAULT: "transparent",
           foreground: "hsl(var(--card-foreground))",
         },
         success: "hsl(var(--success))",
@@ -61,12 +62,12 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji'],
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "16px",
+        md: "calc(16px - 2px)",
+        sm: "calc(16px - 4px)",
       },
       keyframes: {
         "accordion-down": {

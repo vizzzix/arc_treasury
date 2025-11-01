@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
     --background: 222 47% 11%;
@@ -44,7 +40,7 @@ All colors MUST be HSL.
     --chart-4: 280 65% 60%;
     --chart-5: 340 82% 52%;
 
-    --radius: 0.75rem;
+    --radius: 16px;
     
     --gradient-primary: linear-gradient(135deg, hsl(216 100% 50%) 0%, hsl(180 100% 42%) 100%);
     --gradient-card: linear-gradient(135deg, hsl(228 35% 17% / 0.6) 0%, hsl(228 35% 20% / 0.4) 100%);
@@ -67,6 +63,48 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .light {
+    --background: 220 20% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 14% 93%;
+    --muted-foreground: 215 16% 42%;
+
+    --accent: 142 76% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 95%;
+    --ring: 217 91% 55%;
+
+    --success: 142 76% 40%;
+    --warning: 38 92% 50%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 217 91% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 88%;
+    --sidebar-ring: 217 91% 55%;
   }
 
   .dark {
@@ -120,32 +158,151 @@ All colors MUST be HSL.
   }
   
   .glass-card {
-    @apply bg-card/60 backdrop-blur-xl border border-border/50;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37),
-                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    @apply bg-card/80 backdrop-blur-sm border border-border/50;
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.1);
   }
-  
+
   .gradient-text {
-    background: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(142 76% 36%) 100%);
+    background: linear-gradient(135deg, #4FACFE 0%, #00D4AA 50%, #10B981 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-  
+
   .glow-effect {
-    box-shadow: 0 0 20px rgba(79, 172, 254, 0.3),
-                0 0 40px rgba(79, 172, 254, 0.1);
+    box-shadow: 0 2px 12px rgba(79, 172, 254, 0.1);
   }
-  
+
   .modern-card {
     @apply glass-card;
-    background: linear-gradient(135deg, rgba(79, 172, 254, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);
-    transition: all 0.3s ease;
+    background: linear-gradient(135deg, 
+      rgba(79, 172, 254, 0.03) 0%, 
+      rgba(0, 212, 170, 0.02) 50%, 
+      rgba(16, 185, 129, 0.03) 100%);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
   }
-  
+
   .modern-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5),
-                0 0 0 1px rgba(79, 172, 254, 0.2) inset;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
+    border-color: rgba(79, 172, 254, 0.3);
+  }
+
+  /* Minimal glow for focus states */
+  .glow-on-hover:hover {
+    box-shadow: 0 2px 12px rgba(79, 172, 254, 0.2);
+  }
+
+  /* Floating animation for particles */
+  @keyframes float {
+    0%, 100% { 
+      transform: translateY(0px) rotate(0deg); 
+    }
+    25% { 
+      transform: translateY(-20px) rotate(5deg); 
+    }
+    50% { 
+      transform: translateY(-10px) rotate(-5deg); 
+    }
+    75% { 
+      transform: translateY(-15px) rotate(3deg); 
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  /* Slide up animation */
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Shimmer effect */
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 3s linear infinite;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(79, 172, 254, 0.2) 50%, 
+      transparent 100%);
+    background-size: 1000px 100%;
+  }
+
+  /* Scale pulse */
+  @keyframes scalePulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  .animate-scale-pulse {
+    animation: scalePulse 2s ease-in-out infinite;
+  }
+
+  /* Accessibility: Respect user's motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    
+    .animate-float,
+    .animate-shimmer,
+    .animate-pulse,
+    .animate-scale-pulse,
+    .animate-slide-up {
+      animation: none !important;
+    }
+  }
+
+  /* Focus styles for keyboard navigation */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Skip to main content link (accessibility) */
+  .skip-to-main {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: hsl(var(--primary));
+    color: white;
+    padding: 8px 16px;
+    text-decoration: none;
+    z-index: 100;
+  }
+
+  .skip-to-main:focus {
+    top: 0;
   }
 }
