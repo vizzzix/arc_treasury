@@ -12,6 +12,7 @@ import { useTreasury } from "@/contexts/TreasuryContext";
 import { useWallet } from "@/contexts/WalletContext";
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
 import { TREASURY_AVATARS, TreasuryMetadata } from "@/types/treasury";
+import AIRecommendation from "@/components/AIRecommendation";
 import { toast } from "sonner";
 
 const CreateTreasuryNew = () => {
@@ -245,31 +246,13 @@ const CreateTreasuryNew = () => {
             <h2 className="text-2xl font-bold mb-6">Step 2: Choose Strategy</h2>
             
             {/* AI Recommendation */}
-            <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xl">🤖</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold">AI Recommendation</h3>
-                    <div className="px-2 py-0.5 rounded-full bg-purple-500/20 text-xs font-semibold text-purple-400">
-                      BETA
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Based on current market conditions and your wallet history, we recommend:
-                  </p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-semibold">Balanced Strategy</span>
-                    <span className="text-muted-foreground">—</span>
-                    <span className="text-success">60% USDC / 25% EURC / 15% XSGD</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    💡 This provides optimal diversification for current testnet conditions
-                  </p>
-                </div>
-              </div>
+            <div className="mb-6">
+              <AIRecommendation 
+                onApplyStrategy={(newAllocations) => {
+                  setAllocations(newAllocations);
+                  toast.success("AI strategy applied!");
+                }}
+              />
             </div>
             
             <div className="grid md:grid-cols-3 gap-4 mb-6">
