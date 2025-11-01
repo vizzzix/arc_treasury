@@ -250,6 +250,7 @@ const CreateTreasuryNew = () => {
               <AIRecommendation 
                 onApplyStrategy={(newAllocations) => {
                   setAllocations(newAllocations);
+                  setSelectedTemplate("ai-custom");
                   toast.success("AI strategy applied!");
                 }}
               />
