@@ -21,12 +21,6 @@ const Landing = () => {
     },
   ];
 
-  const steps = [
-    { number: "1", title: "Connect Wallet", description: "MetaMask to Arc Testnet" },
-    { number: "2", title: "Create Treasury", description: "Choose your strategy" },
-    { number: "3", title: "Deposit & Rebalance", description: "AI manages allocations" }
-  ];
-
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Animated gradient background */}
@@ -56,9 +50,7 @@ const Landing = () => {
           {/* Subline */}
           <div className="max-w-2xl mx-auto mb-12 space-y-3">
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
-              AI-powered allocations and automated rebalancing
-              <br className="hidden md:block" />
-              {" "}for USDC/EURC/XSGD.
+              AI-powered allocations and automated rebalancing for USDC/EURC/XSGD.
             </p>
             <p className="text-base text-muted-foreground/80">
               One dashboard, zero complexity.
@@ -117,43 +109,6 @@ const Landing = () => {
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="relative mx-auto max-w-6xl px-6 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-3">How It Works</h2>
-          <p className="text-muted-foreground">Get started in minutes</p>
-        </div>
-        
-        <div className="grid md:grid-cols-3 gap-8 relative">
-          {/* Connecting line */}
-          <div className="hidden md:block absolute top-10 left-[16.666%] right-[16.666%] h-0.5 bg-gradient-to-r from-primary/0 via-primary/30 to-primary/0" />
-          
-          {steps.map((step, i) => (
-            <div key={i} className="relative group">
-              <div className="relative p-8 rounded-2xl border border-border/50 bg-card/20 hover:bg-card/40 hover:border-primary/30 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:shadow-primary/5">
-                {/* Number badge */}
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
-                  {step.number}
-                </div>
-                
-                <div className="pt-6 text-center space-y-3">
-                  <h3 className="font-semibold text-lg">{step.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="text-center mt-12">
-          <Link to="/dashboard">
-            <Button variant="outline" className="rounded-xl hover:bg-primary/5 hover:border-primary/30 hover:scale-105 transition-all px-6">
-              Get Test Tokens
-            </Button>
-          </Link>
         </div>
       </section>
 
