@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePoints } from "@/contexts/PointsContext";
-import { Users, Copy, Check, Star, TrendingUp, Gift } from "lucide-react";
+import { Users, Copy, Check, Star, TrendingUp, Gift, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 const Referrals = () => {
@@ -45,6 +45,35 @@ const Referrals = () => {
           <h1 className="text-4xl font-bold mb-2">Referral Program</h1>
           <p className="text-muted-foreground">Invite friends and earn rewards together</p>
         </div>
+
+        {/* Total Points - Prominent */}
+        <Card className="modern-card p-8 text-center border-2 border-primary/20">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 mb-4">
+            <Trophy className="w-8 h-8 text-primary" />
+          </div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">Total Points</h3>
+          <div className="text-5xl font-bold gradient-text mb-6">
+            {points.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border/30">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Deposits</div>
+              <div className="text-lg font-semibold text-success">{points.depositPoints.toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Withdrawals</div>
+              <div className="text-lg font-semibold text-primary">{points.withdrawPoints.toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Referrals</div>
+              <div className="text-lg font-semibold text-accent">{points.referralPoints.toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Holding</div>
+              <div className="text-lg font-semibold text-warning">{points.holdingPoints.toLocaleString()}</div>
+            </div>
+          </div>
+        </Card>
 
         {/* Stats Overview */}
         <div className="grid md:grid-cols-3 gap-6">

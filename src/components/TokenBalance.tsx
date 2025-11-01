@@ -29,28 +29,18 @@ const TokenBalance = () => {
     if (!isConnected || !address) return;
 
     try {
-      toast.info("Minting 1000 test tokens...");
+      toast.info("Minting 10,000 USDC test tokens...");
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
       const mintABI = ["function mint(address to, uint256 amount) public"];
       
-      // Mint USDC
+      // Mint USDC only
       const usdc = new Contract(CONTRACT_ADDRESSES.USDC, mintABI, signer);
-      const tx1 = await usdc.mint(address, ethers.parseUnits("1000", 6));
+      const tx1 = await usdc.mint(address, ethers.parseUnits("10000", 6));
       await tx1.wait();
 
-      // Mint EURC
-      const eurc = new Contract(CONTRACT_ADDRESSES.EURC, mintABI, signer);
-      const tx2 = await eurc.mint(address, ethers.parseUnits("1000", 6));
-      await tx2.wait();
-
-      // Mint XSGD
-      const xsgd = new Contract(CONTRACT_ADDRESSES.XSGD, mintABI, signer);
-      const tx3 = await xsgd.mint(address, ethers.parseUnits("1000", 6));
-      await tx3.wait();
-
-      toast.success("1000 tokens minted for each currency!");
+      toast.success("10,000 USDC test tokens minted!");
       fetchBalances();
     } catch (error: any) {
       console.error("Error minting:", error);

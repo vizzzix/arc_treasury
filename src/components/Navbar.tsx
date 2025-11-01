@@ -167,21 +167,15 @@ const Navbar = () => {
                 <DropdownMenuItem 
                   onClick={async () => {
                     try {
-                      toast.info("Minting 1000 test tokens...");
+                      toast.info("Minting 10,000 USDC test tokens...");
                       const provider = new ethers.BrowserProvider(window.ethereum);
                       const signer = await provider.getSigner();
                       const mintABI = ["function mint(address to, uint256 amount) public"];
                       
                       const usdc = new Contract(CONTRACT_ADDRESSES.USDC, mintABI, signer);
-                      await (await usdc.mint(address, ethers.parseUnits("1000", 6))).wait();
+                      await (await usdc.mint(address, ethers.parseUnits("10000", 6))).wait();
                       
-                      const eurc = new Contract(CONTRACT_ADDRESSES.EURC, mintABI, signer);
-                      await (await eurc.mint(address, ethers.parseUnits("1000", 6))).wait();
-                      
-                      const xsgd = new Contract(CONTRACT_ADDRESSES.XSGD, mintABI, signer);
-                      await (await xsgd.mint(address, ethers.parseUnits("1000", 6))).wait();
-                      
-                      toast.success("1000 tokens minted for each currency!");
+                      toast.success("10,000 USDC test tokens minted!");
                     } catch (error) {
                       console.error("Mint error:", error);
                       toast.error("Failed to mint tokens");
@@ -190,7 +184,7 @@ const Navbar = () => {
                   className="cursor-pointer"
                 >
                   <Gift className="w-4 h-4 mr-2 text-success" />
-                  Get Test Tokens
+                  Get Test Tokens (10K USDC)
                 </DropdownMenuItem>
                 
                 <DropdownMenuSeparator />
