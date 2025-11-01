@@ -96,7 +96,7 @@ const Landing = () => {
       </section>
 
       {/* Value Cards */}
-      <section className="relative mx-auto max-w-7xl px-6 py-24">
+      <section className="relative mx-auto max-w-7xl px-6 py-12">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Arc Treasury</h2>
           <p className="text-muted-foreground/70">Purpose-built for stablecoin finance</p>
@@ -126,7 +126,6 @@ const Landing = () => {
       {/* Footer CTA */}
       <section className="relative mx-auto max-w-6xl px-6 py-16">
         <div className="relative rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-accent/5 p-12 text-center overflow-hidden">
-          <div className="absolute inset-0 bg-grid-white/5 [mask-image:radial-gradient(white,transparent_85%)]" />
           <div className="relative">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to get started?</h2>
             <p className="text-muted-foreground mb-8">Create your treasury on Arc Testnet in minutes</p>
@@ -143,32 +142,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative py-12 px-6 border-t border-border/50">
-        <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <img src="/logo.svg" alt="Arc Treasury" className="w-6 h-6" />
-              <span>© 2025 Arc Treasury. Built on Arc Network Testnet.</span>
-            </div>
-            <div className="flex items-center gap-6">
-              <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
-              <a href="https://docs.arc.network" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Docs</a>
-              <a href="https://github.com/vizzzix/arc_treasury" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">GitHub</a>
-              <a href="https://x.com/claimpilot" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
-            </div>
-          </div>
-          
-          {/* Circle tagline */}
-          <div className="text-center mt-8 pt-6 border-t border-border/30">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground/50 uppercase">
-              Circle-powered DeFi automation
-            </p>
-          </div>
-        </div>
-      </footer>
-
-      {/* Proof Section - Last element */}
+      {/* Proof Section */}
       <section className="relative mx-auto max-w-5xl px-6 py-12 pb-16">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-8 text-muted-foreground">Open Source & Verified</h2>
@@ -195,6 +169,24 @@ const Landing = () => {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="relative py-12 px-6 border-t border-border/50">
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <img src="/logo.svg" alt="Arc Treasury" className="w-6 h-6" />
+              <span>© 2025 Arc Treasury. Built on Arc Network Testnet.</span>
+            </div>
+            <div className="flex items-center gap-6">
+              <Link to="/faq" className="hover:text-primary transition-colors">FAQ</Link>
+              <a href="https://docs.arc.network" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Docs</a>
+              <a href="https://github.com/vizzzix/arc_treasury" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">GitHub</a>
+              <a href="https://x.com/claimpilot" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Twitter</a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
