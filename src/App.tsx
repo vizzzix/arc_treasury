@@ -17,7 +17,25 @@ import { TreasuryProvider } from "./contexts/TreasuryContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { PointsProvider } from "./contexts/PointsContext";
 
-const queryClient = new QueryClient();
+// Оптимизированная конфигурация QueryClient с настройками производительности
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 минут - данные считаются актуальными
+      gcTime: 1000 * 60 * 10, // 10 минут - время хранения в кеше (раньше cacheTime)
+      retry: 3, // Повторять неудачные запросы 3 раза
+      refetchOnWindowFocus: false, // Не перезагружать при фокусе окна (для Web3)
+      refetchOnReconnect: true, // Перезагружать при восстановлении соединения
+      refetchOnMount: true, // Перезагружать при монтировании
+    },
+    mutations: {
+      retry: 1, // Повторять неудачные мутации 1 раз
+      onError: (error) => {
+        console.error("Mutation error:", error);
+      },
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

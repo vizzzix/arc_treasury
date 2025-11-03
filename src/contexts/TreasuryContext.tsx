@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { ethers, BrowserProvider, Contract } from "ethers";
 import { useWallet } from "./WalletContext";
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
@@ -57,18 +57,18 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
   const [totalTreasuries, setTotalTreasuries] = useState("0");
   const [totalYieldGenerated, setTotalYieldGenerated] = useState("0");
 
-  const getProvider = (): BrowserProvider | null => {
+  // Кешируем provider для избежания повторного создания
+  const provider = useMemo(() => {
     if (typeof window.ethereum === "undefined") return null;
     return new ethers.BrowserProvider(window.ethereum);
-  };
+  }, []);
 
-  const getSigner = async () => {
-    const provider = getProvider();
+  const getSigner = useCallback(async () => {
     if (!provider) return null;
     return await provider.getSigner();
-  };
+  }, [provider]);
 
-  const getContract = async (contractAddress: string, abi: any[]) => {
+  const getContract = useCallback(async (contractAddress: string, abi: any[]) => {
     try {
       if (!contractAddress || contractAddress === "0x0000000000000000000000000000000000000000") {
         console.error("Invalid contract address:", contractAddress);
@@ -84,9 +84,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error creating contract:", error);
       return null;
     }
-  };
+  }, [getSigner]);
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async () => {
     if (!isConnected || !address) return;
 
     try {
@@ -111,9 +111,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isConnected, address, getContract]);
 
-  const createTreasury = async (
+  const createTreasury = useCallback(async (
     tokens: string[],
     allocations: number[],
     rebalanceThreshold: number,
@@ -147,7 +147,6 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
 
       toast.success("Treasury created successfully!");
       await refreshData();
-      await loadUserTreasuries();
       
       return treasuryAddress;
     } catch (error: any) {
@@ -157,9 +156,55 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getContract, refreshData]);
 
-  const deposit = async (treasuryAddr: string, token: string, amount: string): Promise<boolean> => {
+  const loadUserTreasuries = useCallback(async () => {
+    if (!isConnected || !address) return;
+
+    try {
+      setLoading(true);
+      const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
+      if (!contract) return;
+
+      console.log("📊 Loading user treasuries from contract...");
+      const treasuryAddresses = await contract.getUserTreasuries(address);
+      console.log("✅ Found treasuries:", treasuryAddresses);
+
+      // Load details for each treasury
+      const loadedTreasuries: Treasury[] = [];
+      for (const treasuryAddr of treasuryAddresses) {
+        try {
+          const details = await contract.getTreasuryDetails(treasuryAddr);
+          
+          // Load balances for each token
+          const balances: { [token: string]: string } = {};
+          for (const token of details[1]) {
+            const balance = await contract.getTokenBalance(treasuryAddr, token);
+            balances[token] = ethers.formatUnits(balance, 6);
+          }
+
+          loadedTreasuries.push({
+            address: treasuryAddr,
+            owner: details[0],
+            tokens: details[1],
+            totalValue: ethers.formatUnits(details[2], 6),
+            balances,
+          });
+        } catch (error) {
+          console.error(`Failed to load treasury ${treasuryAddr}:`, error);
+        }
+      }
+
+      setTreasuries(loadedTreasuries);
+      console.log("✅ Loaded", loadedTreasuries.length, "treasuries");
+    } catch (error: any) {
+      console.error("❌ Error loading user treasuries:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isConnected, address, getContract]);
+
+  const deposit = useCallback(async (treasuryAddr: string, token: string, amount: string): Promise<boolean> => {
     try {
       setLoading(true);
       console.log("💰 Starting deposit...");
@@ -232,9 +277,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getContract, refreshData]);
 
-  const withdraw = async (treasuryAddr: string, token: string, amount: string): Promise<boolean> => {
+  const withdraw = useCallback(async (treasuryAddr: string, token: string, amount: string): Promise<boolean> => {
     try {
       setLoading(true);
       console.log("💸 Starting withdrawal...");
@@ -298,9 +343,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getContract, refreshData]);
 
-  const rebalance = async (treasuryAddr: string): Promise<boolean> => {
+  const rebalance = useCallback(async (treasuryAddr: string): Promise<boolean> => {
     try {
       setLoading(true);
       const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
@@ -324,9 +369,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getContract, refreshData]);
 
-  const getTokenBalance = async (token: string): Promise<string> => {
+  const getTokenBalance = useCallback(async (token: string): Promise<string> => {
     console.log("🔍 getTokenBalance called with:", { token, address, isConnected });
     
     try {
@@ -363,9 +408,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
       console.error("Error details:", error.message);
       return "0";
     }
-  };
+  }, [address, getContract]);
 
-  const approveToken = async (token: string, spender: string, amount: string): Promise<boolean> => {
+  const approveToken = useCallback(async (token: string, spender: string, amount: string): Promise<boolean> => {
     try {
       console.log("🔐 Approving token...");
       console.log("  Token:", token);
@@ -410,55 +455,9 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
       toast.error(error.message || "Failed to approve token");
       return false;
     }
-  };
+  }, [address, getContract]);
 
-  const loadUserTreasuries = async () => {
-    if (!isConnected || !address) return;
-
-    try {
-      setLoading(true);
-      const contract = await getContract(CONTRACT_ADDRESSES.AITreasury, AI_TREASURY_ABI);
-      if (!contract) return;
-
-      console.log("📊 Loading user treasuries from contract...");
-      const treasuryAddresses = await contract.getUserTreasuries(address);
-      console.log("✅ Found treasuries:", treasuryAddresses);
-
-      // Load details for each treasury
-      const loadedTreasuries: Treasury[] = [];
-      for (const treasuryAddr of treasuryAddresses) {
-        try {
-          const details = await contract.getTreasuryDetails(treasuryAddr);
-          
-          // Load balances for each token
-          const balances: { [token: string]: string } = {};
-          for (const token of details[1]) {
-            const balance = await contract.getTokenBalance(treasuryAddr, token);
-            balances[token] = ethers.formatUnits(balance, 6);
-          }
-
-          loadedTreasuries.push({
-            address: treasuryAddr,
-            owner: details[0],
-            tokens: details[1],
-            totalValue: ethers.formatUnits(details[2], 6),
-            balances,
-          });
-        } catch (error) {
-          console.error(`Failed to load treasury ${treasuryAddr}:`, error);
-        }
-      }
-
-      setTreasuries(loadedTreasuries);
-      console.log("✅ Loaded", loadedTreasuries.length, "treasuries");
-    } catch (error: any) {
-      console.error("❌ Error loading user treasuries:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteTreasury = async (treasuryAddr: string): Promise<boolean> => {
+  const deleteTreasury = useCallback(async (treasuryAddr: string): Promise<boolean> => {
     try {
       setLoading(true);
       console.log("🗑️ Deleting treasury:", treasuryAddr);
@@ -523,31 +522,51 @@ export const TreasuryProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [address, getContract, loadUserTreasuries]);
 
+  // Обновляем treasuries после создания нового
   useEffect(() => {
     if (isConnected && address) {
       refreshData();
       loadUserTreasuries();
     }
-  }, [isConnected, address]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, address]); // Намеренно не включаем функции в зависимости для избежания лишних вызовов
 
-  const value = {
-    treasuries,
-    loading,
-    createTreasury,
-    deposit,
-    withdraw,
-    rebalance,
-    deleteTreasury,
-    getTokenBalance,
-    approveToken,
-    loadUserTreasuries,
-    totalValueLocked,
-    totalTreasuries,
-    totalYieldGenerated,
-    refreshData,
-  };
+  const value = useMemo(
+    () => ({
+      treasuries,
+      loading,
+      createTreasury,
+      deposit,
+      withdraw,
+      rebalance,
+      deleteTreasury,
+      getTokenBalance,
+      approveToken,
+      loadUserTreasuries,
+      totalValueLocked,
+      totalTreasuries,
+      totalYieldGenerated,
+      refreshData,
+    }),
+    [
+      treasuries,
+      loading,
+      createTreasury,
+      deposit,
+      withdraw,
+      rebalance,
+      deleteTreasury,
+      getTokenBalance,
+      approveToken,
+      loadUserTreasuries,
+      totalValueLocked,
+      totalTreasuries,
+      totalYieldGenerated,
+      refreshData,
+    ]
+  );
 
   return <TreasuryContext.Provider value={value}>{children}</TreasuryContext.Provider>;
 };

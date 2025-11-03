@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
 import { ethers, Contract } from "ethers";
 import { toast } from "sonner";
 import { CONTRACT_ADDRESSES } from "@/contracts/contractAddresses";
@@ -29,7 +29,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
 
-  const connectWallet = async () => {
+  const connectWallet = useCallback(async () => {
     if (typeof window.ethereum === "undefined") {
       toast.error("Please install MetaMask or another Web3 wallet");
       return;
@@ -71,14 +71,14 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsConnecting(false);
     }
-  };
+  }, []);
 
-  const disconnectWallet = () => {
+  const disconnectWallet = useCallback(() => {
     setAddress(null);
     setBalance(null);
     localStorage.removeItem("walletAddress");
     toast.success("Wallet disconnected");
-  };
+  }, []);
 
   // Check for previously connected wallet on mount
   useEffect(() => {
@@ -136,14 +136,17 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [address]);
 
-  const value = {
-    address,
-    isConnected: !!address,
-    isConnecting,
-    connectWallet,
-    disconnectWallet,
-    balance,
-  };
+  const value = useMemo(
+    () => ({
+      address,
+      isConnected: !!address,
+      isConnecting,
+      connectWallet,
+      disconnectWallet,
+      balance,
+    }),
+    [address, isConnecting, connectWallet, disconnectWallet, balance]
+  );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 };
