@@ -13,10 +13,15 @@ build/
 
 # Environment variables
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.key
+*.pem
+*_secret*
+*_private*
 
 # IDE
 .vscode/
@@ -66,3 +71,6 @@ setup-*.ps1
 
 # Vercel
 .vercel/
+
+# AI Assistant rules (local only)
+.cursorrules
