@@ -1,0 +1,20 @@
+{
+  "name": "arc-treasury-indexer",
+  "version": "1.0.0",
+  "description": "Ponder indexer for Arc Treasury events",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "ponder dev",
+    "start": "ponder start",
+    "codegen": "ponder codegen"
+  },
+  "dependencies": {
+    "@ponder/core": "^0.7.17",
+    "dotenv": "^17.2.3",
+    "viem": "^2.40.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

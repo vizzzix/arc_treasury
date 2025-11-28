@@ -1,0 +1,33 @@
+{
+  "name": "arc-treasury-contracts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "hardhat test nodejs",
+    "test:all": "hardhat test",
+    "compile": "hardhat compile",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network arcTestnet",
+    "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
+    "check:contracts": "hardhat run scripts/checkContracts.ts --network arcTestnet",
+    "check:tx": "hardhat run scripts/checkTransaction.ts --network arcTestnet",
+    "test:mint": "hardhat run scripts/testMintUSYC.ts --network arcTestnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.3",
+    "@nomicfoundation/hardhat-network-helpers": "^3.0.0",
+    "@nomicfoundation/hardhat-node-test-runner": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^3.0.7",
+    "@nomicfoundation/hardhat-viem": "^3.0.0",
+    "@nomicfoundation/hardhat-viem-assertions": "^3.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "dotenv": "^17.2.3",
+    "ethers": "^6.15.0",
+    "hardhat": "^3.0.0",
+    "typescript": "^5.8.3",
+    "viem": "^2.21.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^5.4.0"
+  }
+}

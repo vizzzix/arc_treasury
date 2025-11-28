@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "types": ["node", "mocha"]
+  },
+  "include": [
+    "hardhat.config.ts",
+    "test/**/*.ts",
+    "scripts/**/*.ts",
+    "typechain-types/**/*.ts"
+  ]
+}
+

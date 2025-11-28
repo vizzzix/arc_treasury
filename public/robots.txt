@@ -1,0 +1,32 @@
+# Arc Treasury Robots.txt
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://arctreasury.biz/sitemap.xml
+
+# Crawl-delay (optional, be nice to smaller sites)
+Crawl-delay: 1
+
+# Disallow API routes
+Disallow: /api/
+
+# Allow all social media bots
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
