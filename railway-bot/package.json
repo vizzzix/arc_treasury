@@ -1,0 +1,16 @@
+{
+  "name": "arc-treasury-telegram-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx telegramBot.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
