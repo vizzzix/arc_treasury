@@ -73,3 +73,61 @@ test/
 *_CHECKLIST.md
 *_REPORT.md
 CLAUDE.md
+*PLAN*.md
+
+# Sensitive configs
+supabase.json
+firebase.json
+*.secret.*
+
+# Build artifacts & cache
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.turbo/
+*.tsbuildinfo
+.vercel/
+.netlify/
+out/
+build/
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+.tmp/
+temp/
+
+# Package managers
+.pnpm-store/
+.yarn/
+.npm/
+package-lock.json.bak
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Debug & profiling
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+
+# Misc
+.eslintcache
+.stylelintcache
+*.pid
+*.seed
+*.pid.lock
+
+# Lockfiles (keep package-lock.json for Vercel stability)
+yarn.lock
+pnpm-lock.yaml
+# package-lock.json  # needed for Vercel builds
+
+# Source maps
+*.map
