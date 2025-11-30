@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Gift, LogOut, Wallet, ChevronDown, ArrowLeftRight, Coins, LayoutDashboard } from "lucide-react";
+import { User, Gift, LogOut, Wallet, ChevronDown, ArrowLeftRight, ArrowDownUp, Coins, LayoutDashboard } from "lucide-react";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { TOKEN_ADDRESSES } from "@/lib/constants";
 
@@ -74,6 +74,10 @@ export const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate("/dashboard")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
           <LayoutDashboard className="w-4 h-4 mr-2" />
           Dashboard
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/swap")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
+          <ArrowDownUp className="w-4 h-4 mr-2" />
+          Swap USDC/EURC
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/bridge")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
           <ArrowLeftRight className="w-4 h-4 mr-2" />

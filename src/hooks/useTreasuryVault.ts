@@ -38,6 +38,19 @@ const TREASURY_VAULT_ABI = [
     type: 'function',
   },
   {
+    inputs: [{ name: '', type: 'address' }],
+    name: 'userInfo',
+    outputs: [
+      { name: 'permanentPoints', type: 'uint256' },
+      { name: 'lastPointsUpdate', type: 'uint256' },
+      { name: 'totalDeposited', type: 'uint256' },
+      { name: 'referrer', type: 'address' },
+      { name: 'referralPoints', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [{ name: 'user', type: 'address' }],
     name: 'getUserShareValue',
     outputs: [{ name: '', type: 'uint256' }],
@@ -309,6 +322,19 @@ export const useTreasuryVault = () => {
     },
   });
 
+  // Read user info (for totalDeposited to calculate flexible yield)
+  const { data: userInfoData, refetch: refetchUserInfo } = useReadContract({
+    address: TREASURY_CONTRACTS.TreasuryVault,
+    abi: TREASURY_VAULT_ABI,
+    functionName: 'userInfo',
+    args: address ? [address] : undefined,
+    chainId: arcTestnet.id,
+    query: {
+      enabled: isConnected && isArcTestnet && !!address,
+      ...commonQueryOptions,
+    },
+  });
+
   // Formatted values
   const formattedTotalPoolValue = useMemo(() => {
     if (!totalPoolValue) return '0.00';
@@ -370,6 +396,20 @@ export const useTreasuryVault = () => {
     const value = (userEURCShares * totalEURC) / totalEURCShares;
     return parseFloat(formatUnits(value, 6)).toFixed(2);
   }, [userEURCShares, totalEURC, totalEURCShares]);
+
+  // Calculate flexible yield from totalDeposited vs current share value
+  // userInfoData: [permanentPoints, lastPointsUpdate, totalDeposited, referrer, referralPoints]
+  const flexibleYield = useMemo(() => {
+    if (!userInfoData || !userShareValue) return 0;
+    // totalDeposited is stored in 6 decimals in the contract
+    const totalDeposited = userInfoData[2] as bigint;
+    const depositedNum = parseFloat(formatUnits(totalDeposited, 6));
+    // userShareValue is already in 6 decimals from getUserShareValue
+    const currentValue = parseFloat(formatUnits(userShareValue, 6));
+    // Yield = current value - total deposited (can be negative if withdrawn more than deposited)
+    const yield_ = currentValue - depositedNum;
+    return yield_ > 0 ? yield_ : 0;
+  }, [userInfoData, userShareValue]);
 
   // DEBUG: Log queries after mount
   useEffect(() => {
@@ -667,8 +707,39 @@ export const useTreasuryVault = () => {
       if (refetchUserEURCShares) {
         setTimeout(() => refetchUserEURCShares(), 1200);
       }
+      if (refetchUserInfo) {
+        setTimeout(() => refetchUserInfo(), 1400);
+      }
       refetchTimeoutRef.current = null;
     }, 500); // Reduced to 500ms for faster update after transaction
+  };
+
+  // Read fresh user shares directly from contract (bypasses cache)
+  // Use this before MAX withdrawal to avoid race conditions
+  const getFreshUserShares = async (currency: "USDC" | "EURC" = "USDC"): Promise<bigint> => {
+    if (!address) {
+      return 0n;
+    }
+
+    try {
+      // Create a fresh client to bypass any caching
+      const freshClient = createPublicClient({
+        chain: arcTestnet,
+        transport: http('https://rpc.testnet.arc.network'),
+      });
+
+      const shares = await freshClient.readContract({
+        address: TREASURY_CONTRACTS.TreasuryVault,
+        abi: TREASURY_VAULT_ABI,
+        functionName: currency === "USDC" ? 'userShares' : 'userEURCShares',
+        args: [address],
+      });
+      console.log('[getFreshUserShares] Fresh shares from contract:', shares?.toString());
+      return shares as bigint || 0n;
+    } catch (error) {
+      console.error('[getFreshUserShares] Error reading shares:', error);
+      return currency === "USDC" ? (userShares || 0n) : (userEURCShares || 0n);
+    }
   };
 
   return {
@@ -690,6 +761,9 @@ export const useTreasuryVault = () => {
     userEURCShares: formattedUserEURCShares,
     userEURCShareValue: formattedUserEURCShareValue,
 
+    // Flexible yield (yield earned from flexible deposits)
+    flexibleYield,
+
     // Raw shares for full withdrawal (avoid rounding to 0)
     userSharesRaw: userShares || 0n,
     userEURCSharesRaw: userEURCShares || 0n,
@@ -708,6 +782,7 @@ export const useTreasuryVault = () => {
 
     // Utils
     refetchAll,
+    getFreshUserShares,
     isArcTestnet,
   };
 };

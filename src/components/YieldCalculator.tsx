@@ -147,11 +147,11 @@ export const YieldCalculator: React.FC<YieldCalculatorProps> = ({
 
       {/* Calculator Content */}
       <div className="space-y-4 rounded-b-2xl overflow-hidden bg-card/90 backdrop-blur-sm border border-border/30 p-5">
-        {/* Input Fields */}
-        <div className="space-y-3">
+        {/* Input Fields - side by side */}
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor="usdc" className="text-sm text-muted-foreground mb-1.5 block font-medium">
-              USDC Deposit
+              USDC
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-base">
@@ -167,7 +167,7 @@ export const YieldCalculator: React.FC<YieldCalculatorProps> = ({
                 }}
                 onFocus={handleUserInput}
                 className="pl-7 h-11 text-base bg-background/60 border-border/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
-                placeholder="25000"
+                placeholder="100000"
                 min="0"
                 step="100"
               />
@@ -176,7 +176,7 @@ export const YieldCalculator: React.FC<YieldCalculatorProps> = ({
 
           <div>
             <Label htmlFor="eurc" className="text-sm text-muted-foreground mb-1.5 block font-medium">
-              EURC Deposit
+              EURC
             </Label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-base">
@@ -192,7 +192,7 @@ export const YieldCalculator: React.FC<YieldCalculatorProps> = ({
                 }}
                 onFocus={handleUserInput}
                 className="pl-7 h-11 text-base bg-background/60 border-border/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
-                placeholder="15000"
+                placeholder="100000"
                 min="0"
                 step="100"
               />

@@ -1,6 +1,9 @@
 import { createConfig, http, fallback } from 'wagmi'
 import { mainnet, sepolia, base, baseSepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains'
-import { injected } from 'wagmi/connectors'
+import { injected, walletConnect } from 'wagmi/connectors'
+
+// Get your free Project ID at https://cloud.walletconnect.com/
+const WALLETCONNECT_PROJECT_ID = '396138e333541ea7c840e5ebc7102499'
 
 // Re-export official Arc Testnet chain from viem/chains
 export const arcTestnet = arcTestnetChain
@@ -30,6 +33,16 @@ export const config = createConfig({
   chains: [mainnet, sepolia, base, baseSepolia, arcTestnetChain],
   connectors: [
     injected(), // Supports MetaMask, Rabby, and other injected wallets
+    walletConnect({
+      projectId: WALLETCONNECT_PROJECT_ID,
+      metadata: {
+        name: 'Arc Treasury',
+        description: 'Earn yield from US Treasury Bills',
+        url: 'https://arctreasury.biz',
+        icons: ['https://arctreasury.biz/arc-logo.png'],
+      },
+      showQrModal: true, // Shows QR code modal for mobile
+    }),
   ],
   transports: {
     [mainnet.id]: http(),

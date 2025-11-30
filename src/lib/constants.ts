@@ -27,8 +27,9 @@ export const CCTP_CONTRACTS = {
     TokenMinter: '0xb43db544E2c27092c107639Ad201b3dEfAbcF192' as `0x${string}`,
   },
   ethereumSepolia: {
-    MessageTransmitter: '0xaCF1ceeF35caAc005e15888dDb8A3515C41B4872' as `0x${string}`,
-    TokenMessenger: '0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5' as `0x${string}`,
+    // CCTP V2 contracts for Sepolia
+    MessageTransmitter: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275' as `0x${string}`,
+    TokenMessenger: '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA' as `0x${string}`,
   },
 } as const;
 
@@ -88,6 +89,9 @@ export const TREASURY_CONTRACTS = {
   TreasuryVault: '0x17ca5232415430bC57F646A72fD15634807bF729' as `0x${string}`, // V8 Proxy: Upgradeable vault with permanent points
   TreasuryVaultV4: '0x34d504dda5bcd436d4d86ef9b3930ea8c0cd8b2f' as `0x${string}`, // V4: Deprecated, funds returned to users
   EarlySupporterBadge: '0xb26a5b1d783646a7236ca956f2e954e002bf8d13' as `0x${string}`, // Early Supporter Badge + 1.2x multiplier (max 5000)
+  // Swap Pool contracts - deployed 2025-11-29
+  SwapEURC: '0x742b2d045d430fe718b57046645ba33295914b69' as `0x${string}`, // Mintable EURC for swap pool
+  StablecoinSwap: '0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf' as `0x${string}`, // USDC/EURC AMM swap pool
 } as const;
 
 // Guild.xyz configuration for sybil protection
@@ -124,6 +128,15 @@ export const TRANSFER_SPEED = {
   FAST: 'FAST' as const,
   SLOW: 'SLOW' as const,
 } as const;
+
+// Circle CCTP Domain IDs (for attestation API)
+export const CCTP_DOMAINS = {
+  ethereumSepolia: 0, // Ethereum Sepolia domain
+  arcTestnet: 26, // Arc Testnet domain
+} as const;
+
+// Circle Attestation API (Testnet)
+export const CIRCLE_ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages' as const;
 
 // Estimated bridge times (in minutes)
 export const BRIDGE_ESTIMATED_TIME = {

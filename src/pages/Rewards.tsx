@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
 import { UserMenu } from "@/components/UserMenu";
-import { ArrowLeft, Copy, Check, Twitter, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Copy, Check, Twitter, Send, Loader2, Trophy, Crown, Medal, ChevronDown, ChevronUp } from "lucide-react";
 import { useUserPoints } from "@/hooks/useUserPoints";
 import { useReferral } from "@/hooks/useReferral";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { TREASURY_CONTRACTS } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +44,8 @@ const fireConfetti = () => {
   });
 };
 
+const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
 const Rewards = () => {
   const navigate = useNavigate();
   const account = useAccount();
@@ -50,12 +53,14 @@ const Rewards = () => {
   const { formattedPoints, isLoading: isLoadingPoints } = useUserPoints();
   const { referralUrl, stats, isLoading: isLoadingReferral, error: referralError } = useReferral();
   const { apy } = useUSYCPrice();
+  const { leaderboard, isLoading: isLoadingLeaderboard, userRank, totalDepositors } = useLeaderboard(account?.address);
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const isConnected = account?.isConnected ?? false;
   const address = account?.address;
   const isArcTestnet = account?.chainId === ARC_TESTNET_CHAIN_ID;
   const [copied, setCopied] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
 
   // Badge data
   const { data: totalSupply } = useReadContract({
@@ -150,7 +155,7 @@ const Rewards = () => {
 
       {/* Header */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button onClick={() => navigate("/dashboard")} variant="ghost" size="sm" className="gap-2 hover:bg-white/5">
@@ -165,7 +170,7 @@ const Rewards = () => {
         </div>
       </nav>
 
-      <div className="pt-24 pb-20 container mx-auto px-6 max-w-4xl">
+      <div className="pt-24 pb-20 container mx-auto px-4 sm:px-6 max-w-4xl overflow-x-hidden">
         {/* Wrong Network */}
         {isConnected && !isArcTestnet && (
           <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-sm">
@@ -196,19 +201,19 @@ const Rewards = () => {
               </p>
 
               {/* Stats */}
-              <div className="inline-flex items-center gap-6 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
+              <div className="inline-flex items-center gap-3 sm:gap-6 px-4 sm:px-6 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{totalSupply?.toString() ?? '0'}</p>
+                  <p className="text-xl sm:text-2xl font-bold">{totalSupply?.toString() ?? '0'}</p>
                   <p className="text-xs text-muted-foreground">Minted</p>
                 </div>
                 <div className="w-px h-8 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{maxSupply ? (Number(maxSupply) - Number(totalSupply || 0)).toLocaleString() : '5,000'}</p>
+                  <p className="text-xl sm:text-2xl font-bold">{maxSupply ? (Number(maxSupply) - Number(totalSupply || 0)).toLocaleString() : '5,000'}</p>
                   <p className="text-xs text-muted-foreground">Left</p>
                 </div>
                 <div className="w-px h-8 bg-white/10" />
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-green-400">FREE</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-400">FREE</p>
                   <p className="text-xs text-muted-foreground">Mint</p>
                 </div>
               </div>
@@ -223,131 +228,211 @@ const Rewards = () => {
             <WalletConnect />
           </div>
         ) : isArcTestnet && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Points Card */}
-            <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Your Points</h3>
-                <div className="px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                  +10% referrals
-                </div>
+          <div className="space-y-4">
+            {/* Top Row: Points + Badge + Referral Stats */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Points Card - Compact */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <p className="text-xs text-muted-foreground mb-1">Your Points</p>
+                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/50 bg-clip-text text-transparent">
+                  {isLoadingPoints ? "..." : formattedPoints}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">1pt / $10/day</p>
               </div>
-              <p className="text-5xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/50 bg-clip-text text-transparent">
-                {isLoadingPoints ? "..." : formattedPoints}
-              </p>
-              <p className="text-sm text-muted-foreground">1 point per $10/day deposited</p>
-            </div>
 
-            {/* Badge Mint Card */}
-            <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Badge Status</h3>
-                {hasDeposit && (
-                  <div className="px-2 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-medium">
-                    Eligible
-                  </div>
+              {/* Badge Status - Compact */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <p className="text-xs text-muted-foreground mb-1">Badge</p>
+                {alreadyOwns || showSuccess ? (
+                  <>
+                    <p className="text-2xl sm:text-3xl font-bold text-green-400">1.2x</p>
+                    <p className="text-[10px] sm:text-xs text-green-400/80 mt-1">Active</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl sm:text-3xl font-bold text-muted-foreground">{hasDeposit ? '✓' : '—'}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">{hasDeposit ? 'Eligible' : 'Need $10+'}</p>
+                  </>
                 )}
               </div>
 
-              {alreadyOwns || showSuccess ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse" />
-                    <span className="text-lg font-semibold text-green-400">1.2x Multiplier Active</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Your points earn 20% bonus!</p>
-                  <Button
-                    onClick={shareOnTwitter}
-                    variant="outline"
-                    className="w-full gap-3 rounded-xl h-12"
-                  >
-                    <Twitter className="w-5 h-5" />
-                    Share on Twitter
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${hasDeposit ? 'bg-green-500 text-white' : 'bg-white/10 text-muted-foreground'}`}>
-                      {hasDeposit ? '✓' : '1'}
-                    </div>
-                    <span className={hasDeposit ? 'text-green-400' : ''}>Deposit $10+ USDC/EURC</span>
+              {/* Referrals Count - Compact */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <p className="text-xs text-muted-foreground mb-1">Referrals</p>
+                <p className="text-2xl sm:text-3xl font-bold">{totalReferrals}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">+10% bonus</p>
+              </div>
+
+              {/* Your Rank - Compact */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <p className="text-xs text-muted-foreground mb-1">Your Rank</p>
+                <p className="text-2xl sm:text-3xl font-bold">
+                  {userRank ? `#${userRank}` : '—'}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
+                  {userRank ? `of ${totalDepositors}` : 'Deposit to rank'}
+                </p>
+              </div>
+            </div>
+
+            {/* Badge Mint Action (if not owned) */}
+            {!alreadyOwns && !showSuccess && (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-primary/5 to-purple-500/5 border border-primary/20 backdrop-blur-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-sm">Claim Early Supporter Badge</p>
+                    <p className="text-xs text-muted-foreground">Get 1.2x points multiplier</p>
                   </div>
                   <Button
                     onClick={hasDeposit ? handleMint : () => navigate('/dashboard')}
                     disabled={hasDeposit && (isMinting || isConfirming || !canMint)}
-                    className="w-full rounded-xl h-11"
+                    size="sm"
+                    className="rounded-xl"
                   >
                     {isMinting || isConfirming ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : hasDeposit ? (
                       'Mint Badge'
                     ) : (
-                      'Go to Deposit'
+                      'Deposit First'
                     )}
                   </Button>
                 </div>
-              )}
-            </div>
-
-            {/* Referral Card - Full Width */}
-            <div className="lg:col-span-2 p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Referral Program</h3>
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="text-center">
-                    <span className="font-bold">{totalReferrals}</span>
-                    <span className="text-muted-foreground ml-1">refs</span>
-                  </div>
-                  <div className="text-center">
-                    <span className="font-bold text-green-400">+{bonusPoints.toLocaleString()}</span>
-                    <span className="text-muted-foreground ml-1">pts</span>
-                  </div>
-                </div>
               </div>
+            )}
 
-              {/* Referral Link */}
-              <div className="flex gap-2 mb-4">
-                <div className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 font-mono text-sm truncate flex items-center">
+            {/* Referral Section - Compact */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+              <p className="text-xs text-muted-foreground mb-3">Share & Earn</p>
+              <div className="flex gap-2">
+                <div className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 font-mono text-xs truncate flex items-center">
                   {isLoadingReferral ? (
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading...
-                    </span>
+                    <Loader2 className="w-3 h-3 animate-spin" />
                   ) : referralUrl ? (
                     referralUrl
                   ) : referralError ? (
-                    <span className="text-amber-400 text-xs">API unavailable (localhost)</span>
+                    <span className="text-amber-400">Unavailable</span>
                   ) : (
-                    <span className="text-muted-foreground">Generating link...</span>
+                    '...'
                   )}
                 </div>
-                <Button onClick={copyToClipboard} variant="outline" size="icon" className="shrink-0 rounded-xl" disabled={!referralUrl || isLoadingReferral}>
+                <Button onClick={copyToClipboard} variant="outline" size="icon" className="shrink-0 rounded-xl h-10 w-10" disabled={!referralUrl}>
                   {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                 </Button>
+                <Button onClick={shareOnTwitter} variant="outline" size="icon" className="shrink-0 rounded-xl h-10 w-10" disabled={!referralUrl}>
+                  <Twitter className="w-4 h-4" />
+                </Button>
+                <Button onClick={shareOnTelegram} variant="outline" size="icon" className="shrink-0 rounded-xl h-10 w-10" disabled={!referralUrl}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Leaderboard */}
+            <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-500" />
+                  <h3 className="font-semibold">Leaderboard</h3>
+                </div>
+                <span className="text-xs text-muted-foreground">{totalDepositors} depositors</span>
               </div>
 
-              {/* Share Buttons */}
-              <div className="flex gap-3">
-                <Button
-                  onClick={shareOnTwitter}
-                  variant="outline"
-                  disabled={!referralUrl || isLoadingReferral}
-                  className="flex-1 gap-2 rounded-xl h-11"
-                >
-                  <Twitter className="w-4 h-4" />
-                  Twitter
-                </Button>
-                <Button
-                  onClick={shareOnTelegram}
-                  variant="outline"
-                  disabled={!referralUrl || isLoadingReferral}
-                  className="flex-1 gap-2 rounded-xl h-11"
-                >
-                  <Send className="w-4 h-4" />
-                  Telegram
-                </Button>
-              </div>
+              {isLoadingLeaderboard ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : leaderboard.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8 text-sm">No deposits yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {leaderboard.slice(0, showAllLeaderboard ? 15 : 5).map((entry) => {
+                    const isCurrentUser = address?.toLowerCase() === entry.address.toLowerCase();
+                    return (
+                      <div
+                        key={entry.address}
+                        className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                          isCurrentUser
+                            ? 'bg-primary/10 border border-primary/30'
+                            : 'bg-white/[0.02] hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        {/* Rank */}
+                        <div className="w-8 flex justify-center">
+                          {entry.rank === 1 ? (
+                            <Crown className="w-5 h-5 text-yellow-500" />
+                          ) : entry.rank === 2 ? (
+                            <Medal className="w-5 h-5 text-gray-400" />
+                          ) : entry.rank === 3 ? (
+                            <Medal className="w-5 h-5 text-amber-600" />
+                          ) : (
+                            <span className="text-sm font-medium text-muted-foreground">#{entry.rank}</span>
+                          )}
+                        </div>
+
+                        {/* Address */}
+                        <div className="flex-1 min-w-0">
+                          <span className={`font-mono text-sm ${isCurrentUser ? 'text-primary font-semibold' : ''}`}>
+                            {isCurrentUser ? 'You' : formatAddress(entry.address)}
+                          </span>
+                        </div>
+
+                        {/* Amount */}
+                        <div className="text-right">
+                          <span className="font-semibold text-sm">
+                            ${parseFloat(entry.formattedAmount).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Show user's position if not in visible list */}
+                  {userRank && userRank > (showAllLeaderboard ? 15 : 5) && (
+                    <>
+                      <div className="text-center text-muted-foreground text-xs py-1">• • •</div>
+                      {leaderboard.filter(e => e.address.toLowerCase() === address?.toLowerCase()).map((entry) => (
+                        <div
+                          key={entry.address}
+                          className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30"
+                        >
+                          <div className="w-8 flex justify-center">
+                            <span className="text-sm font-medium">#{entry.rank}</span>
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-mono text-sm text-primary font-semibold">You</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-semibold text-sm">
+                              ${parseFloat(entry.formattedAmount).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Expand/Collapse button */}
+                  {leaderboard.length > 5 && (
+                    <button
+                      onClick={() => setShowAllLeaderboard(!showAllLeaderboard)}
+                      className="w-full flex items-center justify-center gap-2 py-3 mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-white/[0.02]"
+                    >
+                      {showAllLeaderboard ? (
+                        <>
+                          <ChevronUp className="w-4 h-4" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="w-4 h-4" />
+                          Show all ({leaderboard.length})
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

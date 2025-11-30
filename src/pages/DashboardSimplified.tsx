@@ -10,12 +10,13 @@ import { LockPeriod } from "@/components/LockPeriodSelector";
 import { DepositModal } from "@/components/DepositModal";
 import { WithdrawModal } from "@/components/WithdrawModal";
 import { LockPositionModal } from "@/components/LockPositionModal";
-import { TrendingUp, Wallet as WalletIcon, Lock, User, ArrowLeft, XCircle, Shield, Trophy, DollarSign, Vault, AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
+import { TrendingUp, Wallet as WalletIcon, Lock, User, ArrowLeft, XCircle, Shield, Trophy, DollarSign, Vault, AlertTriangle, CheckCircle2, ExternalLink, ArrowLeftRight, ArrowDownUp } from "lucide-react";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
 import { useLockedPositions, useWithdrawLocked, useEarlyWithdrawLocked, useClaimLockedYield, useDepositLocked } from "@/hooks/useLockedPositions";
 import { useTreasuryVault } from "@/hooks/useTreasuryVault";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
+import { useTVL } from "@/hooks/useTVL";
 import { TOKEN_ADDRESSES, TOKEN_DECIMALS, MIGRATION_IN_PROGRESS, SHOW_MIGRATION_SUCCESS, USYC_WHITELIST_PENDING, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import arcLogo from "@/assets/arc-logo.png";
@@ -28,6 +29,7 @@ const DashboardSimplified = () => {
   const isArcTestnet = chainId === 5042002;
   const { switchChainAsync } = useSwitchChain();
   const { apy, price: usycPrice, lastUpdated: priceLastUpdated } = useUSYCPrice();
+  const { tvl } = useTVL();
   const { toast } = useToast();
 
   // Get real wallet balances from Arc Testnet
@@ -98,9 +100,11 @@ const DashboardSimplified = () => {
     eurcPricePerShare,
     userSharesRaw,
     userEURCSharesRaw,
+    flexibleYield,
     isPending: isFlexiblePending,
     isConfirming: isFlexibleConfirming,
-    refetchAll
+    refetchAll,
+    getFreshUserShares
   } = useTreasuryVault();
 
   // Handle deposit success (locked) - refetch data when tx is mined
@@ -198,16 +202,21 @@ const DashboardSimplified = () => {
     const dollarAmount = parseFloat(amount);
     const currentShareValue = tokenType === "USDC" ? userShareValue : userEURCShareValue;
     const currentPrice = tokenType === "USDC" ? pricePerShare : eurcPricePerShare;
-    const rawShares = tokenType === "USDC" ? userSharesRaw : userEURCSharesRaw;
 
     // If withdrawing full balance (MAX button), use raw bigint shares to avoid rounding to 0
     const fullBalance = parseFloat(currentShareValue) || 0;
 
     if (Math.abs(dollarAmount - fullBalance) < 0.01) {
-      // User wants to withdraw everything - use raw bigint shares directly
-      // This avoids the issue where formatted shares "0.000000" converts back to 0n
-      console.log('[handleWithdraw] Full withdrawal, using raw shares:', rawShares.toString());
-      const txHash = await withdraw(rawShares, tokenType);
+      // User wants to withdraw everything - read FRESH shares directly from contract
+      // This prevents race conditions where cached shares are stale after a recent deposit
+      const freshShares = await getFreshUserShares(tokenType);
+      console.log('[handleWithdraw] Full withdrawal, using fresh shares from contract:', freshShares.toString());
+
+      if (freshShares === 0n) {
+        throw new Error('No shares available to withdraw');
+      }
+
+      const txHash = await withdraw(freshShares, tokenType);
       refetchAll();
       return txHash;
     } else {
@@ -243,8 +252,10 @@ const DashboardSimplified = () => {
   // Calculate totals
   const totalFlexible = flexibleBalance.usdc + flexibleBalance.eurc;
   const totalLocked = lockedPositions.reduce((sum, pos) => sum + pos.amount, 0);
-  const totalYield = lockedPositions.reduce((sum, pos) => sum + pos.earnedYield, 0);
-  const totalBalance = totalFlexible + totalLocked + totalYield;
+  const lockedYield = lockedPositions.reduce((sum, pos) => sum + pos.earnedYield, 0);
+  // Total yield = flexible yield (from share value growth) + locked yield (from locked positions)
+  const totalYield = (flexibleYield || 0) + lockedYield;
+  const totalBalance = totalFlexible + totalLocked + lockedYield;
 
   return (
     <div className="min-h-screen bg-background">
@@ -267,7 +278,25 @@ const DashboardSimplified = () => {
             </div>
 
             {/* Right: Navigation & Wallet */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/swap")}
+                className="hidden sm:flex gap-2 border-white/10 bg-white/5 hover:bg-white/10"
+              >
+                <ArrowDownUp className="w-4 h-4" />
+                Swap
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/bridge")}
+                className="hidden sm:flex gap-2 border-white/10 bg-white/5 hover:bg-white/10"
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+                Bridge
+              </Button>
               {isConnected ? (
                 <UserMenu />
               ) : (
@@ -321,28 +350,25 @@ const DashboardSimplified = () => {
         {/* Wrong Network Warning */}
         {!isArcTestnet && isConnected && (
           <div className="max-w-7xl mx-auto mb-8">
-            <Card className="p-6 border-red-500/50 bg-red-500/10 animate-in fade-in slide-in-from-top-2 duration-500">
-              <div className="flex flex-col md:flex-row items-start gap-6">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/30 animate-pulse">
-                    <XCircle className="w-6 h-6 text-red-500" />
+            <Card className="p-4 border-red-500/50 bg-red-500/10 animate-in fade-in slide-in-from-top-2 duration-500">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="p-2 rounded-lg bg-red-500/20 border border-red-500/30 animate-pulse">
+                    <XCircle className="w-5 h-5 text-red-500" />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-2 text-red-600">⚠️ Wrong Network Detected</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      You're currently on <span className="font-mono font-semibold text-red-600">Chain ID: {chainId}</span>
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Arc Treasury only works on <span className="font-semibold text-primary">Arc Testnet (Chain ID: 5042002)</span>.
+                  <div>
+                    <h3 className="text-sm font-semibold text-red-500">Wrong Network</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Switch to Arc Testnet to use Treasury
                     </p>
                   </div>
                 </div>
                 <Button
                   onClick={handleSwitchNetwork}
-                  className="bg-red-600 hover:bg-red-700 text-white font-semibold shadow-lg whitespace-nowrap"
-                  size="lg"
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm h-9"
+                  size="sm"
                 >
-                  Switch to Arc Testnet
+                  Switch Network
                 </Button>
               </div>
             </Card>
@@ -438,63 +464,48 @@ const DashboardSimplified = () => {
         ) : (
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Quick Stats Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="p-6 border-border/50 bg-gradient-to-br from-card to-primary/5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+              <Card className="p-3 sm:p-6 border-border/50 bg-gradient-to-br from-card to-primary/5">
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
                     Total Balance
                   </span>
-                  <TrendingUp className="w-4 h-4 text-primary" />
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                 </div>
-                <p className="text-3xl font-bold text-primary">
-                  ${totalBalance.toLocaleString("en-US")}
+                <p className="text-xl sm:text-3xl font-bold text-primary">
+                  ${Math.floor(totalBalance).toLocaleString("en-US")}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">
                   Flexible + Locked + Yield
                 </p>
               </Card>
 
-              <Card className="p-6 border-border/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">
+              <Card className="p-3 sm:p-6 border-border/50">
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
                     Total Yield
                   </span>
-                  <TrendingUp className="w-4 h-4 text-green-500" />
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
                 </div>
-                <p className="text-3xl font-bold text-green-500">
+                <p className="text-xl sm:text-3xl font-bold text-green-500">
                   {totalYield >= 0 ? "+" : ""}${Math.abs(totalYield).toLocaleString("en-US", {
                     minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
+                    maximumFractionDigits: totalYield > 0 && totalYield < 0.01 ? 4 : 2,
                   })}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Earned across all locks
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">
+                  Flex + Locked positions
                 </p>
               </Card>
 
-              <Card className="p-6 border-border/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">
-                    Active Locks
-                  </span>
-                  <Lock className="w-4 h-4 text-primary" />
-                </div>
-                <p className="text-3xl font-bold">
-                  {lockedPositions.length}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Positions locked
-                </p>
-              </Card>
-
-              <Card className="p-6 border-border/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-muted-foreground">
+              <Card className="p-3 sm:p-6 border-border/50">
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
                     Avg APY
                   </span>
-                  <TrendingUp className="w-4 h-4 text-green-500" />
+                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
                 </div>
-                <p className="text-3xl font-bold text-green-500">
+                <p className="text-xl sm:text-3xl font-bold text-green-500">
                   {lockedPositions.length > 0
                     ? (
                         lockedPositions.reduce(
@@ -505,8 +516,23 @@ const DashboardSimplified = () => {
                     : apy.toFixed(2)}
                   %
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">
                   Weighted average
+                </p>
+              </Card>
+
+              <Card className="p-3 sm:p-6 border-border/50">
+                <div className="flex items-center justify-between mb-1 sm:mb-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">
+                    Total TVL
+                  </span>
+                  <Vault className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                </div>
+                <p className="text-xl sm:text-3xl font-bold">
+                  ${Math.floor(tvl).toLocaleString("en-US")}
+                </p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">
+                  All depositors
                 </p>
               </Card>
             </div>
@@ -542,11 +568,11 @@ const DashboardSimplified = () => {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 rounded bg-background/60 border border-border/40">
                     <span className="text-[10px] text-muted-foreground">USDC</span>
-                    <p className="text-lg font-bold">${flexibleBalance.usdc.toLocaleString("en-US")}</p>
+                    <p className="text-lg font-bold">${Math.floor(flexibleBalance.usdc).toLocaleString("en-US")}</p>
                   </div>
                   <div className="p-2 rounded bg-background/60 border border-border/40">
                     <span className="text-[10px] text-muted-foreground">EURC</span>
-                    <p className="text-lg font-bold">€{flexibleBalance.eurc.toLocaleString("en-US")}</p>
+                    <p className="text-lg font-bold">€{Math.floor(flexibleBalance.eurc).toLocaleString("en-US")}</p>
                   </div>
                 </div>
               </Card>

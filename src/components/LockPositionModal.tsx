@@ -18,9 +18,6 @@ interface LockPositionModalProps {
   isPending: boolean;
 }
 
-// Testnet Teller limit - max deposit per conversion transaction
-const TESTNET_DEPOSIT_LIMIT = 90;
-
 // Lock periods - APY is same for all, only Points multiplier differs
 const LOCK_PERIODS = [
   {
@@ -70,8 +67,7 @@ export function LockPositionModal({ open, onOpenChange, onLock, isPending }: Loc
     : (isLoadingEURC ? "0" : eurcBalance);
 
   const handleMaxClick = () => {
-    const maxAmount = Math.min(parseFloat(availableBalance) || 0, TESTNET_DEPOSIT_LIMIT);
-    setAmount(maxAmount.toString());
+    setAmount(availableBalance);
   };
 
   const handleLock = async () => {
@@ -90,15 +86,6 @@ export function LockPositionModal({ open, onOpenChange, onLock, isPending }: Loc
       toast({
         title: "Minimum Deposit Required",
         description: `Minimum deposit is ${tokenType === "USDC" ? "$" : "€"}10`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (amountNum > TESTNET_DEPOSIT_LIMIT) {
-      toast({
-        title: "Testnet Limit",
-        description: `Maximum ${TESTNET_DEPOSIT_LIMIT} ${tokenType} per deposit on testnet`,
         variant: "destructive",
       });
       return;
@@ -162,18 +149,18 @@ export function LockPositionModal({ open, onOpenChange, onLock, isPending }: Loc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-w-[95vw] sm:max-w-lg md:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Lock className="w-5 h-5" />
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
             Create Lock Position
           </DialogTitle>
-          <DialogDescription>
-            Lock your stablecoins to earn more Points for future ARC token rewards
+          <DialogDescription className="text-xs sm:text-sm">
+            Lock stablecoins to earn more Points
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 sm:space-y-6 py-2 sm:py-4">
           {/* Token Selection */}
           <div className="space-y-2">
             <Label>Select Token</Label>
@@ -242,24 +229,20 @@ export function LockPositionModal({ open, onOpenChange, onLock, isPending }: Loc
             </div>
             <div className="text-xs text-muted-foreground">
               Available: {availableBalance} {tokenType}
-              {" · "}
-              <span className="text-amber-600 dark:text-amber-400">
-                Testnet limit: {TESTNET_DEPOSIT_LIMIT} {tokenType}
-              </span>
             </div>
           </div>
 
           {/* Lock Period Selection */}
-          <div className="space-y-3">
-            <Label>Lock Period (same APY, more Points)</Label>
-            <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-2 sm:space-y-3">
+            <Label className="text-xs sm:text-sm">Lock Period (same APY, more Points)</Label>
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
               {LOCK_PERIODS.map((period) => (
                 <button
                   key={period.months}
                   onClick={() => setSelectedPeriod(period.months)}
                   disabled={isPending}
                   className={cn(
-                    "relative p-4 rounded-lg border-2 text-left transition-all",
+                    "relative p-2 sm:p-4 rounded-lg border-2 text-left transition-all",
                     "hover:border-primary/50",
                     selectedPeriod === period.months
                       ? "border-primary bg-primary/5"
@@ -268,20 +251,20 @@ export function LockPositionModal({ open, onOpenChange, onLock, isPending }: Loc
                   )}
                 >
                   {period.badge && (
-                    <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full font-semibold">
+                    <div className="absolute -top-1.5 -right-1 sm:-top-2 sm:-right-2 bg-primary text-primary-foreground text-[9px] sm:text-xs px-1 sm:px-2 py-0.5 rounded-full font-semibold">
                       {period.badge}
                     </div>
                   )}
-                  <div className="space-y-1">
-                    <div className="font-semibold">{period.label}</div>
-                    <div className="text-2xl font-bold text-primary">
+                  <div className="space-y-0.5 sm:space-y-1">
+                    <div className="text-xs sm:text-base font-semibold">{period.label}</div>
+                    <div className="text-lg sm:text-2xl font-bold text-primary">
                       {period.pointsMultiplier}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                       {period.description}
                     </div>
-                    <div className="text-xs text-green-600 dark:text-green-400">
-                      ~{baseAPY.toFixed(2)}% APY
+                    <div className="text-[10px] sm:text-xs text-green-600 dark:text-green-400">
+                      ~{baseAPY.toFixed(1)}%
                     </div>
                   </div>
                 </button>
@@ -291,61 +274,60 @@ export function LockPositionModal({ open, onOpenChange, onLock, isPending }: Loc
 
           {/* Summary */}
           {selectedPeriodData && (
-            <div className="rounded-lg bg-gradient-to-br from-primary/10 to-green-500/10 border border-primary/20 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                Position Summary
+            <div className="rounded-lg bg-gradient-to-br from-primary/10 to-green-500/10 border border-primary/20 p-3 sm:p-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold">
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                Summary
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                 <div>
-                  <div className="text-muted-foreground">Lock Period</div>
+                  <div className="text-muted-foreground text-[10px] sm:text-xs">Lock Period</div>
                   <div className="font-semibold">{selectedPeriodData.label}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground">APY</div>
+                  <div className="text-muted-foreground text-[10px] sm:text-xs">APY</div>
                   <div className="font-semibold text-green-600 dark:text-green-400">
-                    ~{baseAPY.toFixed(2)}%*
+                    ~{baseAPY.toFixed(2)}%
                   </div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground">Points Multiplier</div>
+                  <div className="text-muted-foreground text-[10px] sm:text-xs">Points</div>
                   <div className="font-semibold text-primary">{selectedPeriodData.pointsMultiplier}</div>
                 </div>
                 <div>
-                  <div className="text-muted-foreground">Early Withdrawal</div>
-                  <div className="font-semibold text-orange-500">25% penalty</div>
+                  <div className="text-muted-foreground text-[10px] sm:text-xs">Early Exit</div>
+                  <div className="font-semibold text-orange-500">-25%</div>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground pt-2 border-t border-border/30">
-                *APY is variable based on USYC T-Bill yield. Same APY for all lock periods.
-              </p>
             </div>
           )}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 sm:gap-3">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isPending}
-            className="flex-1"
+            className="flex-1 text-sm sm:text-base"
           >
             Cancel
           </Button>
           <Button
             onClick={handleLock}
             disabled={isPending || !amount || parseFloat(amount) < 10}
-            className="flex-1 bg-primary hover:bg-primary/90"
+            className="flex-1 bg-primary hover:bg-primary/90 text-sm sm:text-base"
           >
             {isPending ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating Lock...
+                <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
+                <span className="hidden sm:inline">Creating...</span>
+                <span className="sm:hidden">...</span>
               </>
             ) : (
               <>
-                <Lock className="w-4 h-4 mr-2" />
-                Create Lock Position
+                <Lock className="w-4 h-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Create Lock</span>
+                <span className="sm:hidden">Lock</span>
               </>
             )}
           </Button>

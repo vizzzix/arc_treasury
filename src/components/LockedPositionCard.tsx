@@ -167,7 +167,7 @@ export const LockedPositionCard = ({
               {position.token === "USDC" ? "$" : "€"}
               {Math.abs(position.earnedYield).toLocaleString("en-US", {
                 minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                maximumFractionDigits: position.earnedYield > 0 && position.earnedYield < 0.01 ? 4 : 2,
               })}
             </span>
           </div>

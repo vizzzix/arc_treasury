@@ -12,15 +12,23 @@
  *   2. Deploy this folder
  */
 
-import { createPublicClient, createWalletClient, http, formatUnits, parseAbiItem } from "viem";
+import { createPublicClient, createWalletClient, http, formatUnits, parseAbiItem, decodeAbiParameters } from "viem";
 import { defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { createClient } from "@supabase/supabase-js";
 
 // Config from environment
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours for auto-alerts
 const POLL_INTERVAL_MS = 3000; // 3 seconds for command polling
+const FIXER_API_KEY = process.env.FIXER_API_KEY || "80f6690ad5c8e6aafe4373f4a0ce6e96";
+const EXCHANGE_RATE_UPDATE_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours - update exchange rate twice a day
+
+// Supabase for tracking bridge users
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://tclvgmhluhayiflwvkfq.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjbHZnbWhsdWhheWlmbHd2a2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNTEyNTIsImV4cCI6MjA3ODkyNzI1Mn0.oiLvKlLj-vvD7wRT70RLiBrCvJQYosDPIGDyV6NzXuU";
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const arcTestnet = defineChain({
   id: 5042002,
@@ -29,11 +37,25 @@ const arcTestnet = defineChain({
   rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
 });
 
+// Ethereum Sepolia for bridge monitoring
+const sepoliaChain = defineChain({
+  id: 11155111,
+  name: "Sepolia",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: ["https://sepolia.infura.io/v3/6a6be3ad3b88435bb380f1e6f613a13d"] } },
+});
+
 // Contract addresses
 const PROXY_ADDRESS = "0x17ca5232415430bC57F646A72fD15634807bF729" as `0x${string}`;
 const USYC_ORACLE = "0x4b4b1dad50f07def930ba2b17fdcb0e565dae4e9" as `0x${string}`;
 const BADGE_ADDRESS = "0xb26a5b1d783646a7236ca956f2e954e002bf8d13" as `0x${string}`;
 const TELLER = "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A" as `0x${string}`;
+const STABLECOIN_SWAP = "0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf" as `0x${string}`;
+
+// CCTP Bridge contracts for monitoring
+const CCTP_MESSAGE_TRANSMITTER_ARC = "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275" as `0x${string}`;
+const CCTP_MESSAGE_TRANSMITTER_SEPOLIA = "0x7865fAfC2db2093669d92c0F33AeEF291086BEFD" as `0x${string}`;
+const USDC_ARC = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" as `0x${string}`; // USDC on Arc Testnet
 
 // Auto USDC->USYC conversion settings
 const AUTO_CONVERT_ENABLED = !!process.env.PRIVATE_KEY_OPERATOR;
@@ -50,7 +72,11 @@ let lastUpdateId = 0;
 let lastContractAPY = 0;
 let lastBlockChecked = 0n;
 let lastBadgeBlockChecked = 0n;
+let lastBridgeBlockChecked = 0n;
+let lastSepoliaBridgeBlockChecked = 0n;
+let lastSwapBlockChecked = 0n;
 let lastConvertCheck = Date.now();
+let lastExchangeRateUpdate = 0; // Force update on startup
 
 // Operator wallet for auto-conversion
 let operatorWalletClient: ReturnType<typeof createWalletClient> | null = null;
@@ -83,6 +109,7 @@ const TELLER_ABI = [
 ] as const;
 
 const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+const sepoliaPublicClient = createPublicClient({ chain: sepoliaChain, transport: http() });
 
 // Initialize operator wallet for auto-conversion
 function initOperatorWallet(): boolean {
@@ -99,6 +126,92 @@ function initOperatorWallet(): boolean {
   operatorWalletClient = createWalletClient({ account, chain: arcTestnet, transport: http() });
   console.log("✅ Operator wallet initialized:", operatorAddress);
   return true;
+}
+
+// ============ Bridge User Tracking (Supabase) ============
+
+interface BridgeUserResult {
+  isNew: boolean;
+  bridgeCount: number;
+  totalVolume: number;
+}
+
+async function trackBridgeUser(walletAddress: string, amountUsd: number): Promise<BridgeUserResult> {
+  const defaultResult: BridgeUserResult = { isNew: true, bridgeCount: 1, totalVolume: amountUsd };
+
+  if (!supabase) {
+    console.log("⚠️ Supabase not configured - user tracking disabled");
+    return defaultResult;
+  }
+
+  const wallet = walletAddress.toLowerCase();
+
+  try {
+    // Check if user exists
+    const { data: existing, error: selectError } = await supabase
+      .from('bridge_users')
+      .select('bridge_count, total_volume_usd')
+      .eq('wallet_address', wallet)
+      .single();
+
+    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = not found
+      console.error("Supabase select error:", selectError);
+      return defaultResult;
+    }
+
+    if (existing) {
+      // Returning user - update stats
+      const newCount = (existing.bridge_count || 0) + 1;
+      const newVolume = (parseFloat(existing.total_volume_usd) || 0) + amountUsd;
+
+      await supabase
+        .from('bridge_users')
+        .update({
+          last_bridge_at: new Date().toISOString(),
+          bridge_count: newCount,
+          total_volume_usd: newVolume,
+        })
+        .eq('wallet_address', wallet);
+
+      return { isNew: false, bridgeCount: newCount, totalVolume: newVolume };
+    } else {
+      // New user - insert
+      await supabase
+        .from('bridge_users')
+        .insert({
+          wallet_address: wallet,
+          total_volume_usd: amountUsd,
+        });
+
+      return { isNew: true, bridgeCount: 1, totalVolume: amountUsd };
+    }
+  } catch (e) {
+    console.error("Bridge user tracking error:", e);
+    return defaultResult;
+  }
+}
+
+// Save bridge transaction for live feed
+async function saveBridgeTransaction(
+  walletAddress: string,
+  amountUsd: number,
+  direction: 'to_arc' | 'to_sepolia',
+  txHash: string
+): Promise<void> {
+  if (!supabase) return;
+
+  try {
+    await supabase
+      .from('bridge_transactions')
+      .upsert({
+        wallet_address: walletAddress.toLowerCase(),
+        amount_usd: amountUsd,
+        direction,
+        tx_hash: txHash,
+      }, { onConflict: 'tx_hash' });
+  } catch (e) {
+    console.error("Save bridge transaction error:", e);
+  }
 }
 
 // ============ Telegram API ============
@@ -664,6 +777,252 @@ Supply: ${totalSupply.toString()} / ${maxSupply.toString()}
   }
 }
 
+// ============ Bridge Event Monitoring ============
+
+async function checkBridgeEvents() {
+  if (!TELEGRAM_CHAT_ID) return;
+
+  try {
+    // === Monitor Arc Testnet (incoming from Sepolia) ===
+    const arcCurrentBlock = await publicClient.getBlockNumber();
+
+    if (lastBridgeBlockChecked === 0n) {
+      lastBridgeBlockChecked = arcCurrentBlock;
+      console.log(`[${new Date().toISOString()}] Arc bridge monitoring started from block ${arcCurrentBlock}`);
+    }
+
+    if (arcCurrentBlock > lastBridgeBlockChecked) {
+      // Monitor MessageReceived events on Arc (Sepolia → Arc completed)
+      const arcMessageLogs = await publicClient.getLogs({
+        address: CCTP_MESSAGE_TRANSMITTER_ARC,
+        event: parseAbiItem("event MessageReceived(address indexed caller, uint32 sourceDomain, bytes32 indexed messageId, bytes32 sender, uint32 finalityThreshold, bytes messageBody)"),
+        fromBlock: lastBridgeBlockChecked + 1n,
+        toBlock: arcCurrentBlock,
+      });
+
+      for (const log of arcMessageLogs) {
+        const args = log.args as any;
+        const sourceDomain = Number(args.sourceDomain ?? 0);
+        const caller = args.caller as string;
+        const callerShort = caller ? `${caller.slice(0, 6)}...${caller.slice(-4)}` : "Unknown";
+        const sourceChain = sourceDomain === 0 ? "Sepolia" : `Domain ${sourceDomain}`;
+
+        // Get amount from USDC Transfer event
+        let amount = 0;
+        try {
+          const receipt = await publicClient.getTransactionReceipt({ hash: log.transactionHash });
+          const transferLog = receipt.logs.find(l =>
+            l.address.toLowerCase() === "0x3600000000000000000000000000000000000000" &&
+            l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" &&
+            l.topics[1] === "0x0000000000000000000000000000000000000000000000000000000000000000"
+          );
+          if (transferLog && transferLog.data) {
+            amount = Number(formatUnits(BigInt(transferLog.data), 6));
+          }
+        } catch (e) {
+          console.error("Failed to get Arc bridge amount:", e);
+        }
+
+        const amountStr = amount > 0 ? `*$${amount.toFixed(2)} USDC*` : "USDC";
+
+        // Track user and save transaction in Supabase
+        const userStatus = await trackBridgeUser(caller, amount);
+        await saveBridgeTransaction(caller, amount, 'to_arc', log.transactionHash);
+        const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
+
+        const message = `🌉 *Bridge Completed* ${userBadge}
+
+\`${callerShort}\` received ${amountStr}
+${sourceChain} → Arc Testnet ✅
+
+[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+
+        await sendMessage(TELEGRAM_CHAT_ID, message);
+        console.log(`[${new Date().toISOString()}] Bridge to Arc: ${amount} USDC from ${callerShort} (${userStatus.isNew ? 'NEW' : 'returning'})`);
+      }
+
+      lastBridgeBlockChecked = arcCurrentBlock;
+    }
+
+    // === Monitor Sepolia (incoming from Arc) ===
+    // Monitor USDC mint events directly (more reliable than MessageReceived)
+    const sepoliaCurrentBlock = await sepoliaPublicClient.getBlockNumber();
+
+    if (lastSepoliaBridgeBlockChecked === 0n) {
+      lastSepoliaBridgeBlockChecked = sepoliaCurrentBlock;
+      console.log(`[${new Date().toISOString()}] Sepolia USDC mint monitoring started from block ${sepoliaCurrentBlock}`);
+    }
+
+    if (sepoliaCurrentBlock > lastSepoliaBridgeBlockChecked) {
+      // Sepolia USDC address (Circle)
+      const USDC_SEPOLIA = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238" as `0x${string}`;
+
+      // Monitor USDC Transfer events where from=0x0 (mint = bridge arrived)
+      const usdcMintLogs = await sepoliaPublicClient.getLogs({
+        address: USDC_SEPOLIA,
+        event: parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)"),
+        args: {
+          from: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+        },
+        fromBlock: lastSepoliaBridgeBlockChecked + 1n,
+        toBlock: sepoliaCurrentBlock,
+      });
+
+      console.log(`[${new Date().toISOString()}] Sepolia: checked blocks ${lastSepoliaBridgeBlockChecked + 1n}-${sepoliaCurrentBlock}, found ${usdcMintLogs.length} USDC mints`);
+
+      for (const log of usdcMintLogs) {
+        const args = log.args as any;
+        const recipient = args.to as string;
+        const recipientShort = recipient ? `${recipient.slice(0, 6)}...${recipient.slice(-4)}` : "Unknown";
+        const amount = Number(formatUnits(args.value || 0n, 6));
+
+        // Track user and save transaction in Supabase
+        const userStatus = await trackBridgeUser(recipient, amount);
+        await saveBridgeTransaction(recipient, amount, 'to_sepolia', log.transactionHash);
+        const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
+
+        const amountStr = `*$${amount.toFixed(2)} USDC*`;
+
+        const message = `🌉 *Bridge Completed* ${userBadge}
+
+\`${recipientShort}\` received ${amountStr}
+Arc Testnet → Sepolia ✅
+
+[View Tx](https://sepolia.etherscan.io/tx/${log.transactionHash})`;
+
+        await sendMessage(TELEGRAM_CHAT_ID, message);
+        console.log(`[${new Date().toISOString()}] Bridge to Sepolia: ${amount} USDC to ${recipientShort} (${userStatus.isNew ? 'NEW' : 'returning'})`);
+      }
+
+      lastSepoliaBridgeBlockChecked = sepoliaCurrentBlock;
+    }
+
+  } catch (e) {
+    console.error("Bridge event check error:", e);
+  }
+}
+
+// ============ Swap Pool Event Monitoring ============
+
+async function checkSwapEvents() {
+  if (!TELEGRAM_CHAT_ID) return;
+
+  try {
+    const currentBlock = await publicClient.getBlockNumber();
+
+    // On first run, start from current block
+    if (lastSwapBlockChecked === 0n) {
+      lastSwapBlockChecked = currentBlock;
+      console.log(`[${new Date().toISOString()}] Swap monitoring started from block ${currentBlock}`);
+      return;
+    }
+
+    if (currentBlock <= lastSwapBlockChecked) return;
+
+    // Monitor Swap events
+    const swapLogs = await publicClient.getLogs({
+      address: STABLECOIN_SWAP,
+      event: parseAbiItem("event Swap(address indexed user, bool indexed usdcToEurc, uint256 amountIn, uint256 amountOut, uint256 fee)"),
+      fromBlock: lastSwapBlockChecked + 1n,
+      toBlock: currentBlock,
+    });
+
+    for (const log of swapLogs) {
+      const args = log.args as any;
+      const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
+      const usdcToEurc = args.usdcToEurc;
+
+      // USDC uses 18 decimals, EURC uses 6 decimals
+      const amountIn = usdcToEurc
+        ? Number(formatUnits(args.amountIn || 0n, 18))
+        : Number(formatUnits(args.amountIn || 0n, 6));
+      const amountOut = usdcToEurc
+        ? Number(formatUnits(args.amountOut || 0n, 6))
+        : Number(formatUnits(args.amountOut || 0n, 18));
+      const fee = usdcToEurc
+        ? Number(formatUnits(args.fee || 0n, 6))
+        : Number(formatUnits(args.fee || 0n, 18));
+
+      const fromToken = usdcToEurc ? "USDC" : "EURC";
+      const toToken = usdcToEurc ? "EURC" : "USDC";
+      const fromSymbol = usdcToEurc ? "$" : "€";
+      const toSymbol = usdcToEurc ? "€" : "$";
+
+      const message = `🔄 *Swap Executed*
+
+From: *${fromSymbol}${amountIn.toFixed(2)} ${fromToken}*
+To: *${toSymbol}${amountOut.toFixed(2)} ${toToken}*
+Fee: ${toSymbol}${fee.toFixed(4)}
+User: \`${user}\`
+
+[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+
+      await sendMessage(TELEGRAM_CHAT_ID, message);
+      console.log(`[${new Date().toISOString()}] Swap: ${amountIn} ${fromToken} → ${amountOut} ${toToken} by ${user}`);
+    }
+
+    // Monitor LiquidityAdded events
+    const addLiqLogs = await publicClient.getLogs({
+      address: STABLECOIN_SWAP,
+      event: parseAbiItem("event LiquidityAdded(address indexed provider, uint256 usdcAmount, uint256 eurcAmount, uint256 lpTokensMinted)"),
+      fromBlock: lastSwapBlockChecked + 1n,
+      toBlock: currentBlock,
+    });
+
+    for (const log of addLiqLogs) {
+      const args = log.args as any;
+      const provider = args.provider ? `${args.provider.slice(0, 6)}...${args.provider.slice(-4)}` : "Unknown";
+      const usdcAmount = Number(formatUnits(args.usdcAmount || 0n, 18));
+      const eurcAmount = Number(formatUnits(args.eurcAmount || 0n, 6));
+      const lpTokens = Number(formatUnits(args.lpTokensMinted || 0n, 18));
+
+      const message = `💧 *Liquidity Added*
+
+USDC: *$${usdcAmount.toFixed(2)}*
+EURC: *€${eurcAmount.toFixed(2)}*
+LP Tokens: ${lpTokens.toFixed(4)}
+Provider: \`${provider}\`
+
+[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+
+      await sendMessage(TELEGRAM_CHAT_ID, message);
+      console.log(`[${new Date().toISOString()}] Add liquidity: $${usdcAmount} + €${eurcAmount} by ${provider}`);
+    }
+
+    // Monitor LiquidityRemoved events
+    const removeLiqLogs = await publicClient.getLogs({
+      address: STABLECOIN_SWAP,
+      event: parseAbiItem("event LiquidityRemoved(address indexed provider, uint256 usdcAmount, uint256 eurcAmount, uint256 lpTokensBurned)"),
+      fromBlock: lastSwapBlockChecked + 1n,
+      toBlock: currentBlock,
+    });
+
+    for (const log of removeLiqLogs) {
+      const args = log.args as any;
+      const provider = args.provider ? `${args.provider.slice(0, 6)}...${args.provider.slice(-4)}` : "Unknown";
+      const usdcAmount = Number(formatUnits(args.usdcAmount || 0n, 18));
+      const eurcAmount = Number(formatUnits(args.eurcAmount || 0n, 6));
+      const lpTokens = Number(formatUnits(args.lpTokensBurned || 0n, 18));
+
+      const message = `🔥 *Liquidity Removed*
+
+USDC: *$${usdcAmount.toFixed(2)}*
+EURC: *€${eurcAmount.toFixed(2)}*
+LP Tokens Burned: ${lpTokens.toFixed(4)}
+Provider: \`${provider}\`
+
+[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+
+      await sendMessage(TELEGRAM_CHAT_ID, message);
+      console.log(`[${new Date().toISOString()}] Remove liquidity: $${usdcAmount} + €${eurcAmount} by ${provider}`);
+    }
+
+    lastSwapBlockChecked = currentBlock;
+  } catch (e) {
+    console.error("Swap event check error:", e);
+  }
+}
+
 // ============ Auto USDC -> USYC Conversion ============
 
 async function autoConvertUSDCtoUSYC() {
@@ -719,6 +1078,102 @@ New totalUSYC: ${formatUnits(totalUSYC, 6)} USYC
 
   } catch (e: any) {
     console.error("[Auto-Convert] Error:", e.message?.slice(0, 150));
+  }
+}
+
+// ============ Auto Exchange Rate Update ============
+
+const SWAP_ABI = [
+  { name: "exchangeRate", type: "function", inputs: [], outputs: [{ type: "uint256" }], stateMutability: "view" },
+  { name: "setExchangeRate", type: "function", inputs: [{ name: "newRate", type: "uint256" }], outputs: [], stateMutability: "nonpayable" },
+  { name: "owner", type: "function", inputs: [], outputs: [{ type: "address" }], stateMutability: "view" },
+] as const;
+
+async function fetchFixerRate(): Promise<number | null> {
+  try {
+    const response = await fetch(`https://data.fixer.io/api/latest?access_key=${FIXER_API_KEY}&symbols=USD`);
+    const data = await response.json() as any;
+    if (data.success && data.rates?.USD) {
+      return data.rates.USD;
+    }
+    console.error("[Fixer] API error:", data.error?.info || "Unknown error");
+    return null;
+  } catch (e: any) {
+    console.error("[Fixer] Fetch error:", e.message);
+    return null;
+  }
+}
+
+async function updateSwapExchangeRate() {
+  if (!operatorWalletClient || !operatorAddress || !TELEGRAM_CHAT_ID) {
+    return;
+  }
+
+  try {
+    // Fetch current rate from Fixer.io
+    const fixerRate = await fetchFixerRate();
+    if (!fixerRate) {
+      console.log("[ExchangeRate] Failed to fetch Fixer rate");
+      return;
+    }
+
+    // Get current contract rate
+    const currentRate = await publicClient.readContract({
+      address: STABLECOIN_SWAP,
+      abi: SWAP_ABI,
+      functionName: "exchangeRate",
+    });
+    const currentRateNum = Number(currentRate) / 1e6;
+
+    // Check if we are the owner
+    const owner = await publicClient.readContract({
+      address: STABLECOIN_SWAP,
+      abi: SWAP_ABI,
+      functionName: "owner",
+    });
+
+    if (owner.toLowerCase() !== operatorAddress.toLowerCase()) {
+      console.log(`[ExchangeRate] Not owner. Owner: ${owner}, Operator: ${operatorAddress}`);
+      return;
+    }
+
+    // Only update if rate changed by more than 0.1%
+    const drift = Math.abs(fixerRate - currentRateNum) / currentRateNum;
+    if (drift < 0.001) {
+      console.log(`[ExchangeRate] Rate unchanged: ${currentRateNum.toFixed(4)} (drift ${(drift * 100).toFixed(3)}%)`);
+      return;
+    }
+
+    // Convert to 6 decimals (e.g., 1.1595 -> 1159500)
+    const newRateRaw = Math.round(fixerRate * 1e6);
+
+    console.log(`[ExchangeRate] Updating rate: ${currentRateNum.toFixed(4)} -> ${fixerRate.toFixed(4)}`);
+
+    // Send transaction
+    const hash = await operatorWalletClient.writeContract({
+      address: STABLECOIN_SWAP,
+      abi: SWAP_ABI,
+      functionName: "setExchangeRate",
+      args: [BigInt(newRateRaw)],
+      chain: arcTestnet,
+    });
+
+    console.log(`[ExchangeRate] Tx: ${hash}`);
+    await publicClient.waitForTransactionReceipt({ hash });
+
+    const message = `💱 *Exchange Rate Updated*
+
+Old: 1 EUR = $${currentRateNum.toFixed(4)}
+New: 1 EUR = $${fixerRate.toFixed(4)}
+Change: ${((fixerRate - currentRateNum) / currentRateNum * 100).toFixed(2)}%
+
+[View Tx](https://testnet.arcscan.app/tx/${hash})`;
+
+    await sendMessage(TELEGRAM_CHAT_ID, message);
+    console.log(`[ExchangeRate] Success! New rate: ${fixerRate.toFixed(4)}`);
+
+  } catch (e: any) {
+    console.error("[ExchangeRate] Error:", e.message?.slice(0, 150));
   }
 }
 
@@ -897,11 +1352,6 @@ async function main() {
 
   console.log("🚀 Starting bot...\n");
 
-  // Send startup message
-  if (TELEGRAM_CHAT_ID) {
-    await sendMessage(TELEGRAM_CHAT_ID, "🟢 *Bot Started*\nArc Treasury monitor is online.", mainKeyboard());
-  }
-
   // Main loop
   let lastAlertCheck = Date.now();
   let lastEventCheck = Date.now();
@@ -911,10 +1361,12 @@ async function main() {
       // Process incoming commands (long polling)
       await processUpdates();
 
-      // Check for deposit events and badge mints (every 30 seconds)
+      // Check for deposit events, badge mints, bridge events, and swaps (every 30 seconds)
       if (Date.now() - lastEventCheck > EVENT_CHECK_INTERVAL_MS) {
         await checkDepositEvents();
         await checkBadgeMints();
+        await checkBridgeEvents();
+        await checkSwapEvents();
         lastEventCheck = Date.now();
       }
 
@@ -922,6 +1374,13 @@ async function main() {
       if (AUTO_CONVERT_ENABLED && operatorWalletClient && Date.now() - lastConvertCheck > CONVERT_CHECK_INTERVAL_MS) {
         await autoConvertUSDCtoUSYC();
         lastConvertCheck = Date.now();
+      }
+
+      // Auto exchange rate update (every 12 hours)
+      if (operatorWalletClient && Date.now() - lastExchangeRateUpdate > EXCHANGE_RATE_UPDATE_INTERVAL_MS) {
+        console.log(`[${new Date().toISOString()}] Checking exchange rate...`);
+        await updateSwapExchangeRate();
+        lastExchangeRateUpdate = Date.now();
       }
 
       // Periodic APY alert check (every 6 hours)

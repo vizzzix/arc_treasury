@@ -16,6 +16,7 @@ import Rewards from "./pages/Rewards";
 import Support from "./pages/Support";
 import Litepaper from "./pages/Litepaper";
 import LockDesignPreview from "./pages/LockDesignPreview";
+import Swap from "./pages/Swap";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const AppRoutes = () => {
         <Route path="/support" element={<Support />} />
         <Route path="/litepaper" element={<Litepaper />} />
         <Route path="/lock-preview" element={<LockDesignPreview />} />
+        <Route path="/swap" element={<Swap />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
