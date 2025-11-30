@@ -12,14 +12,21 @@ export default defineConfig({
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 10,
       },
+      viaIR: true,
     },
   },
   networks: {
     arcTestnet: {
       url: "https://rpc.blockdaemon.testnet.arc.network",
       chainId: 5042002,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      type: "http" as const,
+    },
+    ethereumSepolia: {
+      url: "https://ethereum-sepolia-rpc.publicnode.com",
+      chainId: 11155111,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       type: "http" as const,
     },

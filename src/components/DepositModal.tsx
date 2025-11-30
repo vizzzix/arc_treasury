@@ -10,9 +10,6 @@ import { TOKEN_ADDRESSES, SUPPORTED_NETWORKS, EURC_DEPOSITS_DISABLED } from "@/l
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
 import { useNavigate } from "react-router-dom";
 
-// Testnet Teller limit - max deposit per conversion transaction
-const TESTNET_DEPOSIT_LIMIT = 90;
-
 interface DepositModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -45,8 +42,7 @@ export function DepositModal({ open, onOpenChange, onDeposit, isPending }: Depos
     : (isLoadingEURC ? "0" : eurcBalance);
 
   const handleMaxClick = () => {
-    const maxAmount = Math.min(parseFloat(availableBalance) || 0, TESTNET_DEPOSIT_LIMIT);
-    setAmount(maxAmount.toString());
+    setAmount(availableBalance);
   };
 
   const handleDeposit = async () => {
@@ -54,15 +50,6 @@ export function DepositModal({ open, onOpenChange, onDeposit, isPending }: Depos
       toast({
         title: "Invalid Amount",
         description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (parseFloat(amount) > TESTNET_DEPOSIT_LIMIT) {
-      toast({
-        title: "Testnet Limit",
-        description: `Maximum ${TESTNET_DEPOSIT_LIMIT} ${tokenType} per deposit on testnet`,
         variant: "destructive",
       });
       return;
@@ -217,10 +204,6 @@ export function DepositModal({ open, onOpenChange, onDeposit, isPending }: Depos
             </div>
             <div className="text-xs text-muted-foreground">
               Available: {availableBalance} {tokenType}
-              {" · "}
-              <span className="text-amber-600 dark:text-amber-400">
-                Testnet limit: {TESTNET_DEPOSIT_LIMIT} {tokenType}
-              </span>
             </div>
           </div>
 

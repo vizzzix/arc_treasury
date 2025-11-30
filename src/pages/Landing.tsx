@@ -1,27 +1,90 @@
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
 import { WhitelistForm } from "@/components/WhitelistForm";
-import { Vault, Coins, TrendingUp, ArrowRight, Github, Twitter, Shield, Zap } from "lucide-react";
+import { Vault, Coins, TrendingUp, ArrowRight, Github, Twitter, Shield, Zap, Menu, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import arcLogo from "@/assets/arc-logo.png";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
 const Landing = () => {
   const navigate = useNavigate();
   const { apy, isLoading: isLoadingAPY } = useUSYCPrice();
-  const [depositAmount, setDepositAmount] = useState("100000");
+  const { eurToUsd } = useExchangeRate();
+  const [usdcAmount, setUsdcAmount] = useState("");
+  const [eurcAmount, setEurcAmount] = useState("");
+  const [userInteracted, setUserInteracted] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const animationDone = useRef(false);
+
+  // Auto-typing animation - slow and smooth like real typing
+  useEffect(() => {
+    if (animationDone.current || userInteracted) return;
+
+    const targetUsdc = "100000";
+    const targetEurc = "50000";
+    let cancelled = false;
+
+    const typeCharacter = (
+      target: string,
+      setter: (val: string) => void,
+      index: number,
+      onComplete: () => void
+    ) => {
+      if (cancelled || userInteracted) return;
+
+      if (index <= target.length) {
+        setter(target.slice(0, index));
+        // Random delay between 80-180ms per character for natural feel
+        const delay = 100 + Math.random() * 100;
+        setTimeout(() => typeCharacter(target, setter, index + 1, onComplete), delay);
+      } else {
+        onComplete();
+      }
+    };
+
+    // Start after 1 second delay
+    const startTimer = setTimeout(() => {
+      if (cancelled || userInteracted) return;
+
+      // Type USDC first
+      typeCharacter(targetUsdc, setUsdcAmount, 1, () => {
+        // Pause 600ms, then type EURC
+        setTimeout(() => {
+          if (cancelled || userInteracted) return;
+          typeCharacter(targetEurc, setEurcAmount, 1, () => {
+            animationDone.current = true;
+          });
+        }, 600);
+      });
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(startTimer);
+    };
+  }, [userInteracted]);
+
+  const handleUserInput = () => {
+    if (!animationDone.current) {
+      setUserInteracted(true);
+      animationDone.current = true;
+    }
+  };
 
   const earnings = useMemo(() => {
-    const amount = parseFloat(depositAmount) || 0;
-    const annual = amount * (apy / 100);
+    const usdc = parseFloat(usdcAmount) || 0;
+    const eurc = parseFloat(eurcAmount) || 0;
+    const totalUsd = usdc + (eurc * eurToUsd);
+    const annual = totalUsd * (apy / 100);
     return {
       monthly: annual / 12,
       annual,
-      total: amount + annual
+      total: totalUsd + annual
     };
-  }, [depositAmount, apy]);
+  }, [usdcAmount, eurcAmount, eurToUsd, apy]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -34,13 +97,15 @@ const Landing = () => {
 
       {/* Navigation Header */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src={arcLogo} alt="Arc Treasury" className="w-10 h-10" />
-              <span className="text-2xl font-bold">Arc Treasury</span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <img src={arcLogo} alt="Arc Treasury" className="w-8 h-8 sm:w-10 sm:h-10" />
+              <span className="text-xl sm:text-2xl font-bold">Arc Treasury</span>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-3">
               <Button
                 onClick={() => navigate("/dashboard")}
                 variant="ghost"
@@ -48,15 +113,69 @@ const Landing = () => {
               >
                 Dashboard
               </Button>
+              <Button
+                onClick={() => navigate("/swap")}
+                variant="ghost"
+                className="hover:bg-white/10 font-medium"
+              >
+                Swap
+              </Button>
+              <Button
+                onClick={() => navigate("/bridge")}
+                variant="ghost"
+                className="hover:bg-white/10 font-medium"
+              >
+                Bridge
+              </Button>
               <WalletConnect />
             </div>
+
+            {/* Mobile Menu Button */}
+            <div className="flex md:hidden items-center gap-2">
+              <WalletConnect />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="hover:bg-white/10"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            </div>
           </div>
+
+          {/* Mobile Menu */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 pb-2 border-t border-border/20 pt-4 space-y-2">
+              <Button
+                onClick={() => { navigate("/dashboard"); setMobileMenuOpen(false); }}
+                variant="ghost"
+                className="w-full justify-start hover:bg-white/10 font-medium"
+              >
+                Dashboard
+              </Button>
+              <Button
+                onClick={() => { navigate("/swap"); setMobileMenuOpen(false); }}
+                variant="ghost"
+                className="w-full justify-start hover:bg-white/10 font-medium"
+              >
+                Swap
+              </Button>
+              <Button
+                onClick={() => { navigate("/bridge"); setMobileMenuOpen(false); }}
+                variant="ghost"
+                className="w-full justify-start hover:bg-white/10 font-medium"
+              >
+                Bridge
+              </Button>
+            </div>
+          )}
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32">
-        <div className="container mx-auto px-6">
+      <section className="relative pt-24 pb-16 sm:pt-32 sm:pb-20 lg:pt-40 lg:pb-32">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             {/* Left: Content */}
             <div className="space-y-8">
@@ -65,7 +184,7 @@ const Landing = () => {
                   <Zap className="w-4 h-4" />
                   Live on Arc Testnet
                 </div>
-                <h1 className="text-5xl lg:text-6xl xl:text-7xl font-bold leading-tight tracking-tight">
+                <h1 className="text-3xl sm:text-4xl lg:text-6xl xl:text-7xl font-bold leading-tight tracking-tight">
                   A digital vault for your{" "}
                   <span className="bg-gradient-to-r from-primary to-green-400 bg-clip-text text-transparent">
                     stablecoins
@@ -104,17 +223,34 @@ const Landing = () => {
                 <h3 className="text-lg font-semibold mb-4">Calculate Earnings</h3>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm text-muted-foreground mb-2 block">Deposit Amount</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                      <Input
-                        type="number"
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                        className="pl-8 h-12 text-lg bg-white/5 border-white/10 rounded-xl"
-                        placeholder="10000"
-                      />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-2 block">USDC</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input
+                          type="number"
+                          value={usdcAmount}
+                          onChange={(e) => { handleUserInput(); setUsdcAmount(e.target.value); }}
+                          onFocus={handleUserInput}
+                          className="pl-8 h-12 text-lg bg-white/5 border-white/10 rounded-xl"
+                          placeholder="100000"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground mb-2 block">EURC</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+                        <Input
+                          type="number"
+                          value={eurcAmount}
+                          onChange={(e) => { handleUserInput(); setEurcAmount(e.target.value); }}
+                          onFocus={handleUserInput}
+                          className="pl-8 h-12 text-lg bg-white/5 border-white/10 rounded-xl"
+                          placeholder="50000"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -150,33 +286,33 @@ const Landing = () => {
       </section>
 
       {/* Features Section */}
-      <section className="relative py-20 lg:py-32">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
+      <section className="relative py-12 sm:py-20 lg:py-32">
+        <div className="container mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4">
               Why Arc Treasury?
             </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
               Real yield from US Treasury Bills, tokenized on-chain
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 max-w-5xl mx-auto">
             {[
-              { icon: Shield, title: "Secure", desc: "Audited smart contracts" },
+              { icon: Shield, title: "Secure", desc: "Audited contracts" },
               { icon: TrendingUp, title: `${apy.toFixed(1)}% APY`, desc: "Real T-Bill yield" },
               { icon: Coins, title: "USDC/EURC", desc: "Multi-stablecoin" },
               { icon: Vault, title: "Instant", desc: "Withdraw anytime" },
             ].map((feature, i) => (
               <div
                 key={i}
-                className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm hover:border-primary/30 transition-all group"
+                className="p-3 sm:p-5 rounded-xl sm:rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm hover:border-primary/30 transition-all group"
               >
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <feature.icon className="w-5 h-5 text-primary" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform">
+                  <feature.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-1">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.desc}</p>
+                <h3 className="text-sm sm:text-base font-semibold mb-0.5 sm:mb-1">{feature.title}</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">{feature.desc}</p>
               </div>
             ))}
           </div>
@@ -184,47 +320,47 @@ const Landing = () => {
       </section>
 
       {/* How It Works */}
-      <section className="relative py-20 lg:py-32">
-        <div className="container mx-auto px-6">
+      <section className="relative py-12 sm:py-20 lg:py-32">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl lg:text-4xl font-bold mb-4">How It Works</h2>
-              <p className="text-muted-foreground">Your stablecoins → USYC (tokenized T-Bills) → Real yield</p>
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 sm:mb-4">How It Works</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">Your stablecoins → USYC → Real yield</p>
             </div>
 
-            <div className="p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm space-y-6">
+            <div className="p-4 sm:p-6 rounded-xl sm:rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm space-y-4 sm:space-y-6">
               {/* Flow diagram */}
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <div className="px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 font-medium">
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                <div className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs sm:text-base font-medium">
                   USDC/EURC
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                <div className="px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 font-medium">
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                <div className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs sm:text-base font-medium">
                   Arc Treasury
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                <div className="px-4 py-2 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 font-medium">
-                  USYC (T-Bills)
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                <div className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs sm:text-base font-medium">
+                  USYC
                 </div>
-                <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                <div className="px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold">
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                <div className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-primary/10 border border-primary/20 text-primary text-xs sm:text-base font-bold">
                   ~{apy.toFixed(1)}% APY
                 </div>
               </div>
 
               {/* Info grid */}
-              <div className="grid md:grid-cols-3 gap-4 pt-4 border-t border-white/10">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4 border-t border-white/10">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-primary">{apy.toFixed(2)}%</p>
-                  <p className="text-xs text-muted-foreground">Net APY (after 5% fee)</p>
+                  <p className="text-lg sm:text-2xl font-bold text-primary">{apy.toFixed(2)}%</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Net APY</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">24/7</p>
-                  <p className="text-xs text-muted-foreground">Instant deposits & withdrawals</p>
+                  <p className="text-lg sm:text-2xl font-bold">24/7</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Instant access</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-green-400">0%</p>
-                  <p className="text-xs text-muted-foreground">Deposit/withdrawal fees</p>
+                  <p className="text-lg sm:text-2xl font-bold text-green-400">0%</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">No fees</p>
                 </div>
               </div>
             </div>
@@ -234,7 +370,7 @@ const Landing = () => {
 
       {/* Whitelist Section */}
       <section className="relative py-20 lg:py-32">
-        <div className="container mx-auto px-6">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="max-w-xl mx-auto">
             <div className="p-8 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
               <h3 className="text-2xl font-bold mb-2 text-center">
@@ -251,7 +387,7 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="relative py-8 border-t border-white/10">
-        <div className="container mx-auto px-6">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <button onClick={() => navigate("/faq")} className="hover:text-primary transition-colors">

@@ -11,17 +11,23 @@
 import { parseAbi } from 'viem';
 
 /**
- * TokenMessenger ABI
+ * TokenMessenger ABI (CCTP V2)
  *
  * Main contract for burning USDC on source chain.
  * depositForBurn() is the key function that initiates the bridge.
+ *
+ * V2 Parameters:
+ * - amount: USDC quantity to transfer (in smallest units)
+ * - destinationDomain: Target blockchain ID
+ * - mintRecipient: Receiving wallet address in bytes32 format
+ * - burnToken: Source chain USDC contract address
+ * - destinationCaller: Address authorized to call receiveMessage (use zero bytes32 for any caller)
+ * - maxFee: Maximum transfer fee (in smallest units)
+ * - minFinalityThreshold: 1000 or less for fast transfers
  */
 export const TOKEN_MESSENGER_ABI = parseAbi([
-  // Burn USDC and emit event for bridging
-  'function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken) external returns (uint64 nonce)',
-
-  // Burn USDC with caller-specified recipient
-  'function depositForBurnWithCaller(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller) external returns (uint64 nonce)',
+  // CCTP V2 - Burn USDC with fee and finality params
+  'function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold) external returns (uint64 nonce)',
 
   // Get local minter address
   'function localMinter() external view returns (address)',

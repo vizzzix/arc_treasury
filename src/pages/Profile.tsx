@@ -131,7 +131,7 @@ const Profile = () => {
     }
   };
 
-  // Email binding with verification code
+  // Email binding with verification code via Resend API
   const handleSendVerification = async () => {
     if (!isValidEmail(email)) {
       toast({ title: "Invalid Email", description: "Enter a valid email address", variant: "destructive" });
@@ -141,15 +141,21 @@ const Profile = () => {
 
     setIsVerifying(true);
     try {
-      // Generate 6-digit code
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const response = await fetch('/api/email/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, walletAddress: address }),
+      });
 
-      // For testnet, we'll simulate sending email and show the code
-      // In production, this would call a backend API to send real email
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send verification code');
+      }
+
       const emailData: EmailBindingData = {
         email,
         verified: false,
-        verificationCode: code,
         timestamp: Date.now(),
       };
 
@@ -157,37 +163,53 @@ const Profile = () => {
       setBoundEmail(emailData);
       setShowVerificationInput(true);
 
-      // For testnet demo - show the code in toast (remove in production)
       toast({
         title: "Verification Code Sent",
-        description: `Demo mode: Your code is ${code}. In production, this would be sent to ${email}`
+        description: `Check your inbox at ${email}`
       });
     } catch (error) {
-      toast({ title: "Failed", description: "Could not send verification", variant: "destructive" });
+      toast({ title: "Failed", description: error instanceof Error ? error.message : "Could not send verification", variant: "destructive" });
     } finally {
       setIsVerifying(false);
     }
   };
 
-  const handleVerifyEmail = () => {
-    if (!boundEmail || !verificationCode) return;
+  const handleVerifyEmail = async () => {
+    if (!boundEmail || !verificationCode || !address) return;
 
-    if (verificationCode === boundEmail.verificationCode) {
+    setIsVerifying(true);
+    try {
+      const response = await fetch('/api/email/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: boundEmail.email,
+          walletAddress: address,
+          code: verificationCode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid verification code');
+      }
+
       const verifiedData: EmailBindingData = {
         email: boundEmail.email,
         verified: true,
         timestamp: Date.now(),
       };
 
-      if (address) {
-        localStorage.setItem(`bound_email_${address}`, JSON.stringify(verifiedData));
-      }
+      localStorage.setItem(`bound_email_${address}`, JSON.stringify(verifiedData));
       setBoundEmail(verifiedData);
       setShowVerificationInput(false);
       setVerificationCode("");
       toast({ title: "Email Verified!", description: "Your email has been linked to your account" });
-    } else {
-      toast({ title: "Invalid Code", description: "The verification code is incorrect", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Invalid Code", description: error instanceof Error ? error.message : "The verification code is incorrect", variant: "destructive" });
+    } finally {
+      setIsVerifying(false);
     }
   };
 

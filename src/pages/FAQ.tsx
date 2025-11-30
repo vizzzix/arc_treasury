@@ -58,6 +58,27 @@ const FAQ = () => {
         },
       ],
     },
+    {
+      category: "Testnet Mode",
+      items: [
+        {
+          question: "How does yield work on testnet?",
+          answer: "On testnet, we simulate USYC yield due to Hashnote Teller limitations (90 USDC daily limit, ~10% testnet fee). Instead of real USYC conversion, the vault accrues yield from a USDC reserve pool at the same APY rate. Your experience mirrors mainnet behavior.",
+        },
+        {
+          question: "Why not use real USYC on testnet?",
+          answer: "Hashnote's testnet Teller has strict limits: 90 USDC/day max conversion, ~10% conversion fee (vs 0% on mainnet). This makes real conversion impractical for testing. We simulate yield to let you test the full deposit/withdraw/yield flow.",
+        },
+        {
+          question: "Will mainnet be different?",
+          answer: "Yes! On mainnet: real USYC conversion (0% mint fee, 0.1% redeem fee), actual T-Bill yield, no conversion limits. The yield simulation is testnet-only to provide a realistic testing experience.",
+        },
+        {
+          question: "Is my testnet balance real?",
+          answer: "No. All tokens on Arc Testnet (USDC, EURC, shares, points) have no real value. This is for testing only. Mainnet launch will require fresh deposits with real assets.",
+        },
+      ],
+    },
   ];
 
   return (
