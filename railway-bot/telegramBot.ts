@@ -42,7 +42,7 @@ const sepoliaChain = defineChain({
   id: 11155111,
   name: "Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: ["https://sepolia.infura.io/v3/6a6be3ad3b88435bb380f1e6f613a13d"] } },
+  rpcUrls: { default: { http: [process.env.SEPOLIA_RPC_URL || "https://rpc.sepolia.org"] } },
 });
 
 // Contract addresses
