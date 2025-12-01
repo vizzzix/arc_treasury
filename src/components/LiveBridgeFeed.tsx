@@ -35,13 +35,19 @@ const getTierBadge = (amount: number): string => {
   return '🦐';                       // Shrimp
 };
 
-const TransactionRow = ({ tx }: { tx: BridgeTransaction }) => {
+interface TransactionRowProps {
+  tx: BridgeTransaction;
+  isTop10: boolean;
+}
+
+const TransactionRow = ({ tx, isTop10 }: TransactionRowProps) => {
   const isToArc = tx.direction === 'to_arc';
   const timeAgo = formatDistanceToNow(new Date(tx.created_at), { addSuffix: false });
 
   return (
-    <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.05] transition-colors text-xs">
-      <span className="font-mono text-foreground/70">{formatAddress(tx.wallet_address)}</span>
+    <div className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${isTop10 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
+      {isTop10 && <span className="text-yellow-500">👑</span>}
+      <span className={`font-mono ${isTop10 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(tx.wallet_address)}</span>
       <span className="text-muted-foreground">{formatAmount(tx.amount_usd, true)}</span>
       <span>{getTierBadge(tx.amount_usd)}</span>
       <span className={`${isToArc ? 'text-green-400' : 'text-blue-400'}`}>
@@ -53,7 +59,7 @@ const TransactionRow = ({ tx }: { tx: BridgeTransaction }) => {
 };
 
 export const LiveBridgeFeed = () => {
-  const { transactions, stats, topBridgers, getUserRank, isLoading, refresh } = useBridgeFeed(20);
+  const { transactions, stats, topBridgers, allBridgersRanked, getUserRank, isLoading, refresh } = useBridgeFeed(20);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const { address } = useAccount();
@@ -61,6 +67,11 @@ export const LiveBridgeFeed = () => {
   // Check if user is in top 5
   const userRankData = getUserRank(address);
   const isUserInTop5 = userRankData && userRankData.rank && userRankData.rank <= 5;
+
+  // Get top 10 wallet addresses for highlighting
+  const top10Wallets = new Set(
+    allBridgersRanked.slice(0, 10).map(b => b.wallet_address.toLowerCase())
+  );
 
   // Filter out $0 transactions and take first 5
   const filteredTransactions = transactions
@@ -169,7 +180,11 @@ export const LiveBridgeFeed = () => {
       {filteredTransactions.length > 0 ? (
         <div className="space-y-1">
           {filteredTransactions.map((tx) => (
-            <TransactionRow key={tx.id} tx={tx} />
+            <TransactionRow
+              key={tx.id}
+              tx={tx}
+              isTop10={top10Wallets.has(tx.wallet_address.toLowerCase())}
+            />
           ))}
         </div>
       ) : (

@@ -14,7 +14,12 @@ const formatAmount = (amount: number) => {
   return `$${Math.round(amount).toLocaleString('en-US')}`;
 };
 
-const ActivityRow = ({ item }: { item: ActivityItem }) => {
+interface ActivityRowProps {
+  item: ActivityItem;
+  isTop10: boolean;
+}
+
+const ActivityRow = ({ item, isTop10 }: ActivityRowProps) => {
   const timeAgo = formatDistanceToNow(new Date(item.created_at), { addSuffix: false });
 
   const getIcon = () => {
@@ -30,9 +35,9 @@ const ActivityRow = ({ item }: { item: ActivityItem }) => {
   };
 
   return (
-    <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-white/[0.02] hover:bg-white/[0.05] transition-colors text-xs">
-      {getIcon()}
-      <span className="font-mono text-foreground/70">{formatAddress(item.wallet_address)}</span>
+    <div className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${isTop10 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
+      {isTop10 ? <span className="text-yellow-500">👑</span> : getIcon()}
+      <span className={`font-mono ${isTop10 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(item.wallet_address)}</span>
       <span className="text-muted-foreground">{formatAmount(item.amount_usd)}</span>
       <span className={getTypeColor()}>{item.details}</span>
       <span className="ml-auto text-muted-foreground/60">{timeAgo}</span>
@@ -49,7 +54,7 @@ const getTierBadge = (amount: number): string => {
 };
 
 export const LiveSwapFeed = () => {
-  const { activity, stats, topSwappers, getUserRank, isLoading, refresh } = useSwapFeed(10);
+  const { activity, stats, topSwappers, allSwappersRanked, getUserRank, isLoading, refresh } = useSwapFeed(10);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const { address } = useAccount();
@@ -57,6 +62,11 @@ export const LiveSwapFeed = () => {
   // Check if user is in top 5
   const userRankData = getUserRank(address);
   const isUserInTop5 = userRankData && userRankData.rank && userRankData.rank <= 5;
+
+  // Get top 10 wallet addresses for highlighting
+  const top10Wallets = new Set(
+    allSwappersRanked.slice(0, 10).map(s => s.wallet_address.toLowerCase())
+  );
 
   // Filter out tiny transactions and take first 5
   const filteredActivity = activity
@@ -168,7 +178,11 @@ export const LiveSwapFeed = () => {
       {filteredActivity.length > 0 ? (
         <div className="space-y-1">
           {filteredActivity.map((item) => (
-            <ActivityRow key={item.id} item={item} />
+            <ActivityRow
+              key={item.id}
+              item={item}
+              isTop10={top10Wallets.has(item.wallet_address.toLowerCase())}
+            />
           ))}
         </div>
       ) : (

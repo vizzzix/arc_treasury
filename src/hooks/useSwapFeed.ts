@@ -233,6 +233,7 @@ export const useSwapFeed = (limit: number = 10) => {
     activity,
     stats,
     topSwappers,
+    allSwappersRanked,
     getUserRank,
     isLoading,
     refresh,

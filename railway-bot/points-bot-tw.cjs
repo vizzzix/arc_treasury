@@ -102,7 +102,8 @@ async function getWalletBalances(wallet) {
       functionName: 'getUserShareValue',
       args: [wallet],
     });
-    vaultUsdc = Number(formatEther(usdcValue));
+    // getUserShareValue returns 6 decimals (USDC format), not 18!
+    vaultUsdc = Number(formatUnits(usdcValue, 6));
   } catch (e) {}
 
   try {
@@ -125,8 +126,12 @@ async function getWalletBalances(wallet) {
 
     for (const pos of positions) {
       if (!pos.withdrawn) {
-        const amount = Number(formatEther(pos.amount));
-        if (pos.token && pos.token.toLowerCase() === '0xf88ac22c2c276fb6f345d5f3a63f7b50cd1cf991') {
+        // Native USDC (0x3600...) uses 18 decimals, EURC uses 6 decimals
+        const isNativeUSDC = pos.token && pos.token.toLowerCase() === '0x3600000000000000000000000000000000000000';
+        const isEURC = pos.token && pos.token.toLowerCase() === '0xf88ac22c2c276fb6f345d5f3a63f7b50cd1cf991';
+        const decimals = isNativeUSDC ? 18 : 6;
+        const amount = Number(formatUnits(pos.amount, decimals));
+        if (isEURC) {
           lockedEurc += amount;
         } else {
           lockedUsdc += amount;
@@ -139,13 +144,20 @@ async function getWalletBalances(wallet) {
 }
 
 async function getLpBalance(wallet) {
+  // Calculate LP balance from liquidity_events (add - remove)
   const { data } = await supabase
-    .from('lp_positions')
-    .select('current_balance')
-    .eq('wallet_address', wallet.toLowerCase())
-    .single();
+    .from('liquidity_events')
+    .select('action, amount_usd')
+    .eq('wallet_address', wallet.toLowerCase());
 
-  return data?.current_balance || 0;
+  if (!data || data.length === 0) return 0;
+
+  let balance = 0;
+  for (const event of data) {
+    if (event.action === 'add') balance += event.amount_usd;
+    else if (event.action === 'remove') balance -= event.amount_usd;
+  }
+  return Math.max(0, balance); // Ensure non-negative
 }
 
 async function takeBalanceSnapshots() {
