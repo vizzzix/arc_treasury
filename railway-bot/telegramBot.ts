@@ -78,6 +78,10 @@ let lastSwapBlockChecked = 0n;
 let lastConvertCheck = Date.now();
 let lastExchangeRateUpdate = 0; // Force update on startup
 
+// Set to track sent notifications and prevent duplicates
+const sentNotifications = new Set<string>();
+const MAX_SENT_CACHE = 1000; // Limit memory usage
+
 // Operator wallet for auto-conversion
 let operatorWalletClient: ReturnType<typeof createWalletClient> | null = null;
 let operatorAddress: `0x${string}` | null = null;
@@ -211,6 +215,66 @@ async function saveBridgeTransaction(
       }, { onConflict: 'tx_hash' });
   } catch (e) {
     console.error("Save bridge transaction error:", e);
+  }
+}
+
+// Check if notification was already sent (to prevent duplicates)
+async function wasNotificationSent(txHash: string, eventType: string): Promise<boolean> {
+  const key = `${eventType}:${txHash}`;
+
+  // First check in-memory cache
+  if (sentNotifications.has(key)) {
+    return true;
+  }
+
+  // Then check Supabase
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('sent_notifications')
+        .select('tx_hash')
+        .eq('tx_hash', txHash)
+        .eq('event_type', eventType)
+        .single();
+
+      if (data) {
+        sentNotifications.add(key); // Cache it
+        return true;
+      }
+    } catch (e) {
+      // Not found or error - proceed with sending
+    }
+  }
+
+  return false;
+}
+
+// Mark notification as sent
+async function markNotificationSent(txHash: string, eventType: string): Promise<void> {
+  const key = `${eventType}:${txHash}`;
+
+  // Add to in-memory cache
+  sentNotifications.add(key);
+
+  // Limit cache size
+  if (sentNotifications.size > MAX_SENT_CACHE) {
+    const firstKey = sentNotifications.values().next().value;
+    if (firstKey) sentNotifications.delete(firstKey);
+  }
+
+  // Save to Supabase for persistence
+  if (supabase) {
+    try {
+      await supabase
+        .from('sent_notifications')
+        .upsert({
+          tx_hash: txHash,
+          event_type: eventType,
+          sent_at: new Date().toISOString(),
+        }, { onConflict: 'tx_hash,event_type' });
+    } catch (e) {
+      console.error("Mark notification sent error:", e);
+    }
   }
 }
 
@@ -589,6 +653,12 @@ async function checkDepositEvents() {
 
     // Send alerts for flexible deposits
     for (const log of depositLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'deposit')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate deposit: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const amount = Number(formatUnits(args.amount || 0n, 18));
       const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
@@ -598,14 +668,21 @@ async function checkDepositEvents() {
 User: \`${user}\`
 Amount: *$${amount.toFixed(2)} USDC*
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'deposit');
       console.log(`[${new Date().toISOString()}] Deposit alert: ${amount} USDC from ${user}`);
     }
 
     // Send alerts for flexible EURC deposits
     for (const log of eurcLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'deposit_eurc')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate EURC deposit: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const amount = Number(formatUnits(args.amount || 0n, 6)); // EURC uses 6 decimals
       const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
@@ -615,14 +692,21 @@ Amount: *$${amount.toFixed(2)} USDC*
 User: \`${user}\`
 Amount: *€${amount.toFixed(2)} EURC*
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'deposit_eurc');
       console.log(`[${new Date().toISOString()}] Deposit alert: ${amount} EURC from ${user}`);
     }
 
     // Send alerts for locked deposits
     for (const log of lockedLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'deposit_locked')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate locked deposit: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const tokenAddress = (args.token || "").toLowerCase();
       const isEURC = tokenAddress === "0x89b50855aa3be2f677cd6303cec089b5f319d72a";
@@ -642,9 +726,10 @@ Amount: *${currencySymbol}${amount.toFixed(2)} ${symbol}*
 Lock Period: *${lockMonths} months*
 Points Multiplier: *${multiplier}*
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'deposit_locked');
       console.log(`[${new Date().toISOString()}] Locked deposit alert: ${amount} ${symbol} for ${lockMonths}mo from ${user}`);
     }
 
@@ -658,6 +743,12 @@ Points Multiplier: *${multiplier}*
 
     // Send alerts for unlocked positions
     for (const log of unlockLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'unlock')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate unlock: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const amount = Number(formatUnits(args.amount || 0n, 18)); // USDC 18 decimals
       const yieldAmount = Number(formatUnits(args.yield || 0n, 18));
@@ -672,9 +763,10 @@ Principal: *$${amount.toFixed(2)}*
 Yield Earned: *+$${yieldAmount.toFixed(2)}*
 Total: *$${(amount + yieldAmount).toFixed(2)}*
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'unlock');
       console.log(`[${new Date().toISOString()}] Unlock alert: ${user} withdrew lock #${lockId}`);
     }
 
@@ -688,6 +780,12 @@ Total: *$${(amount + yieldAmount).toFixed(2)}*
 
     // Send alerts for early withdrawals
     for (const log of earlyWithdrawLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'early_withdraw')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate early withdrawal: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const penalty = Number(formatUnits(args.penaltyAmount || 0n, 18));
       const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
@@ -701,9 +799,10 @@ Penalty Paid: *-$${penalty.toFixed(2)}*
 
 _User broke lock early and paid 10% penalty_
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'early_withdraw');
       console.log(`[${new Date().toISOString()}] Early withdrawal: ${user} broke lock #${lockId}, penalty $${penalty.toFixed(2)}`);
     }
 
@@ -742,6 +841,12 @@ async function checkBadgeMints() {
     });
 
     for (const log of logs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'badge_mint')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate badge mint: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const minter = args.to;
       const tokenId = args.tokenId;
@@ -768,6 +873,7 @@ Supply: ${totalSupply.toString()} / ${maxSupply.toString()}
 [View on ArcScan](https://testnet.arcscan.app/address/${minter})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'badge_mint');
       console.log(`[${new Date().toISOString()}] Badge mint: ${shortAddr} minted #${tokenId}`);
     }
 
@@ -801,6 +907,12 @@ async function checkBridgeEvents() {
       });
 
       for (const log of arcMessageLogs) {
+        const txHash = log.transactionHash;
+        if (await wasNotificationSent(txHash, 'bridge_to_arc')) {
+          console.log(`[${new Date().toISOString()}] Skipping duplicate bridge to Arc: ${txHash}`);
+          continue;
+        }
+
         const args = log.args as any;
         const sourceDomain = Number(args.sourceDomain ?? 0);
         const caller = args.caller as string;
@@ -810,7 +922,7 @@ async function checkBridgeEvents() {
         // Get amount from USDC Transfer event
         let amount = 0;
         try {
-          const receipt = await publicClient.getTransactionReceipt({ hash: log.transactionHash });
+          const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
           const transferLog = receipt.logs.find(l =>
             l.address.toLowerCase() === "0x3600000000000000000000000000000000000000" &&
             l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" &&
@@ -827,7 +939,7 @@ async function checkBridgeEvents() {
 
         // Track user and save transaction in Supabase
         const userStatus = await trackBridgeUser(caller, amount);
-        await saveBridgeTransaction(caller, amount, 'to_arc', log.transactionHash);
+        await saveBridgeTransaction(caller, amount, 'to_arc', txHash);
         const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
 
         const message = `🌉 *Bridge Completed* ${userBadge}
@@ -835,9 +947,10 @@ async function checkBridgeEvents() {
 \`${callerShort}\` received ${amountStr}
 ${sourceChain} → Arc Testnet ✅
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
         await sendMessage(TELEGRAM_CHAT_ID, message);
+        await markNotificationSent(txHash, 'bridge_to_arc');
         console.log(`[${new Date().toISOString()}] Bridge to Arc: ${amount} USDC from ${callerShort} (${userStatus.isNew ? 'NEW' : 'returning'})`);
       }
 
@@ -871,6 +984,12 @@ ${sourceChain} → Arc Testnet ✅
       console.log(`[${new Date().toISOString()}] Sepolia: checked blocks ${lastSepoliaBridgeBlockChecked + 1n}-${sepoliaCurrentBlock}, found ${usdcMintLogs.length} USDC mints`);
 
       for (const log of usdcMintLogs) {
+        const txHash = log.transactionHash;
+        if (await wasNotificationSent(txHash, 'bridge_to_sepolia')) {
+          console.log(`[${new Date().toISOString()}] Skipping duplicate bridge to Sepolia: ${txHash}`);
+          continue;
+        }
+
         const args = log.args as any;
         const recipient = args.to as string;
         const recipientShort = recipient ? `${recipient.slice(0, 6)}...${recipient.slice(-4)}` : "Unknown";
@@ -878,7 +997,7 @@ ${sourceChain} → Arc Testnet ✅
 
         // Track user and save transaction in Supabase
         const userStatus = await trackBridgeUser(recipient, amount);
-        await saveBridgeTransaction(recipient, amount, 'to_sepolia', log.transactionHash);
+        await saveBridgeTransaction(recipient, amount, 'to_sepolia', txHash);
         const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
 
         const amountStr = `*$${amount.toFixed(2)} USDC*`;
@@ -888,9 +1007,10 @@ ${sourceChain} → Arc Testnet ✅
 \`${recipientShort}\` received ${amountStr}
 Arc Testnet → Sepolia ✅
 
-[View Tx](https://sepolia.etherscan.io/tx/${log.transactionHash})`;
+[View Tx](https://sepolia.etherscan.io/tx/${txHash})`;
 
         await sendMessage(TELEGRAM_CHAT_ID, message);
+        await markNotificationSent(txHash, 'bridge_to_sepolia');
         console.log(`[${new Date().toISOString()}] Bridge to Sepolia: ${amount} USDC to ${recipientShort} (${userStatus.isNew ? 'NEW' : 'returning'})`);
       }
 
@@ -928,6 +1048,12 @@ async function checkSwapEvents() {
     });
 
     for (const log of swapLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'swap')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate swap: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
       const usdcToEurc = args.usdcToEurc;
@@ -955,9 +1081,10 @@ To: *${toSymbol}${amountOut.toFixed(2)} ${toToken}*
 Fee: ${toSymbol}${fee.toFixed(4)}
 User: \`${user}\`
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'swap');
       console.log(`[${new Date().toISOString()}] Swap: ${amountIn} ${fromToken} → ${amountOut} ${toToken} by ${user}`);
     }
 
@@ -970,6 +1097,12 @@ User: \`${user}\`
     });
 
     for (const log of addLiqLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'liquidity_add')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate liquidity add: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const provider = args.provider ? `${args.provider.slice(0, 6)}...${args.provider.slice(-4)}` : "Unknown";
       const usdcAmount = Number(formatUnits(args.usdcAmount || 0n, 18));
@@ -983,9 +1116,10 @@ EURC: *€${eurcAmount.toFixed(2)}*
 LP Tokens: ${lpTokens.toFixed(4)}
 Provider: \`${provider}\`
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'liquidity_add');
       console.log(`[${new Date().toISOString()}] Add liquidity: $${usdcAmount} + €${eurcAmount} by ${provider}`);
     }
 
@@ -998,6 +1132,12 @@ Provider: \`${provider}\`
     });
 
     for (const log of removeLiqLogs) {
+      const txHash = log.transactionHash;
+      if (await wasNotificationSent(txHash, 'liquidity_remove')) {
+        console.log(`[${new Date().toISOString()}] Skipping duplicate liquidity remove: ${txHash}`);
+        continue;
+      }
+
       const args = log.args as any;
       const provider = args.provider ? `${args.provider.slice(0, 6)}...${args.provider.slice(-4)}` : "Unknown";
       const usdcAmount = Number(formatUnits(args.usdcAmount || 0n, 18));
@@ -1011,9 +1151,10 @@ EURC: *€${eurcAmount.toFixed(2)}*
 LP Tokens Burned: ${lpTokens.toFixed(4)}
 Provider: \`${provider}\`
 
-[View Tx](https://testnet.arcscan.app/tx/${log.transactionHash})`;
+[View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
+      await markNotificationSent(txHash, 'liquidity_remove');
       console.log(`[${new Date().toISOString()}] Remove liquidity: $${usdcAmount} + €${eurcAmount} by ${provider}`);
     }
 
