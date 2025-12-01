@@ -7,6 +7,7 @@ import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { formatEther, formatUnits, parseEther, parseUnits } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { toast } from 'sonner';
+import { useExchangeRate } from './useExchangeRate';
 
 // StablecoinSwap ABI (minimal)
 const SWAP_ABI = [
@@ -172,6 +173,7 @@ export function useSwapPool() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const { eurToUsd: liveRate } = useExchangeRate();
 
   const [poolStats, setPoolStats] = useState<PoolStats>({
     usdcReserve: '0',
@@ -219,9 +221,9 @@ export function useSwapPool() {
       const [usdcReserve, eurcReserve] = reserves;
       const rateNum = Number(rate) / 1e6;
 
-      // Calculate total liquidity in USD
+      // Calculate total liquidity in USD using live EUR/USD rate
       const usdcVal = Number(formatEther(usdcReserve));
-      const eurcVal = Number(formatUnits(eurcReserve, 6)) * rateNum;
+      const eurcVal = Number(formatUnits(eurcReserve, 6)) * liveRate; // Use live rate from Fixer.io
       const totalUsd = usdcVal + eurcVal;
 
       let userStats = {
@@ -280,7 +282,7 @@ export function useSwapPool() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [publicClient, address, swapAddress, eurcAddress]);
+  }, [publicClient, address, swapAddress, eurcAddress, liveRate]);
 
   // Get swap quote
   const getSwapQuote = useCallback(async (

@@ -2,6 +2,7 @@ import { useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
+import { useExchangeRate } from './useExchangeRate';
 
 const VAULT_ABI = [
   { name: 'totalUSDC', type: 'function', stateMutability: 'view', inputs: [], outputs: [{ name: '', type: 'uint256' }] },
@@ -21,6 +22,7 @@ interface UseTVLReturn {
 
 export function useTVL(): UseTVLReturn {
   const vaultAddress = TREASURY_CONTRACTS.TreasuryVault;
+  const { eurToUsd } = useExchangeRate();
 
   const { data: totalUSDC, isLoading: isLoadingUSDC } = useReadContract({
     address: vaultAddress,
@@ -58,7 +60,9 @@ export function useTVL(): UseTVLReturn {
   // const lockedEurcAmount = totalLockedEURC ? parseFloat(formatUnits(totalLockedEURC, 6)) : 0;
   const lockedEurcAmount = 0;
 
-  const tvl = usdcAmount + eurcAmount + lockedUsdcAmount + lockedEurcAmount;
+  // Convert EURC to USD using live exchange rate
+  const eurcInUsd = (eurcAmount + lockedEurcAmount) * eurToUsd;
+  const tvl = usdcAmount + eurcInUsd + lockedUsdcAmount;
 
   return {
     tvl,

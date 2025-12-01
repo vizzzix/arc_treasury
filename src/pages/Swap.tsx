@@ -526,7 +526,7 @@ const Swap = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Rate</span>
-                <span>1 {fromToken} = {fromToken === 'USDC' ? (1/poolStats.exchangeRate).toFixed(4) : poolStats.exchangeRate.toFixed(4)} {toToken}</span>
+                <span>1 {fromToken} = {fromToken === 'USDC' ? (1/liveRate).toFixed(4) : liveRate.toFixed(4)} {toToken}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Slippage</span>
@@ -676,7 +676,7 @@ const Swap = () => {
                   <div className="p-3 rounded-lg bg-white/5 text-center">
                     <span className="text-xs text-muted-foreground block">Your Value</span>
                     <p className="font-bold text-green-500">
-                      ${(parseFloat(poolStats.userUsdcShare) + parseFloat(poolStats.userEurcShare) * poolStats.exchangeRate).toFixed(2)}
+                      ${(parseFloat(poolStats.userUsdcShare) + parseFloat(poolStats.userEurcShare) * liveRate).toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -739,9 +739,9 @@ const Swap = () => {
                         onChange={(e) => {
                           const usdc = e.target.value;
                           setAddUsdcAmount(usdc);
-                          // Auto-calculate EURC based on exchange rate (fixed rate)
-                          if (usdc && parseFloat(usdc) > 0 && poolStats.exchangeRate > 0) {
-                            const eurc = parseFloat(usdc) / poolStats.exchangeRate;
+                          // Auto-calculate EURC based on live EUR/USD rate from Fixer.io
+                          if (usdc && parseFloat(usdc) > 0 && liveRate > 0) {
+                            const eurc = parseFloat(usdc) / liveRate;
                             setAddEurcAmount(eurc.toFixed(2));
                           } else {
                             setAddEurcAmount('');
@@ -754,8 +754,8 @@ const Swap = () => {
                           onClick={() => {
                             const max = Math.max(0, parseFloat(usdcBalance) - 1).toFixed(2);
                             setAddUsdcAmount(max);
-                            if (poolStats.exchangeRate > 0) {
-                              const eurc = parseFloat(max) / poolStats.exchangeRate;
+                            if (liveRate > 0) {
+                              const eurc = parseFloat(max) / liveRate;
                               setAddEurcAmount(eurc.toFixed(2));
                             }
                           }}
@@ -782,9 +782,9 @@ const Swap = () => {
                         onChange={(e) => {
                           const eurc = e.target.value;
                           setAddEurcAmount(eurc);
-                          // Auto-calculate USDC based on exchange rate (fixed rate)
-                          if (eurc && parseFloat(eurc) > 0 && poolStats.exchangeRate > 0) {
-                            const usdc = parseFloat(eurc) * poolStats.exchangeRate;
+                          // Auto-calculate USDC based on live EUR/USD rate from Fixer.io
+                          if (eurc && parseFloat(eurc) > 0 && liveRate > 0) {
+                            const usdc = parseFloat(eurc) * liveRate;
                             setAddUsdcAmount(usdc.toFixed(2));
                           } else {
                             setAddUsdcAmount('');
@@ -799,9 +799,9 @@ const Swap = () => {
                   </div>
 
                   {/* Exchange rate info */}
-                  {poolStats.exchangeRate > 0 && (
+                  {liveRate > 0 && (
                     <div className="p-2 rounded bg-white/5 text-xs text-muted-foreground text-center">
-                      1 USDC ≈ {(1 / poolStats.exchangeRate).toFixed(4)} EURC
+                      1 USDC ≈ {(1 / liveRate).toFixed(4)} EURC (live rate: 1 EUR = ${liveRate.toFixed(4)})
                     </div>
                   )}
 
