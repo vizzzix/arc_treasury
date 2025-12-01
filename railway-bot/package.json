@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"node --import tsx telegramBot.ts\" \"node points-bot.cjs --daemon --interval=60\" \"node rebalance-bot.cjs --daemon --interval=300\"",
+    "start": "concurrently \"node --import tsx telegramBot.ts\" \"node points-bot-tw.cjs --daemon --interval=60\" \"node rebalance-bot.cjs --daemon --interval=300\"",
     "telegram": "tsx telegramBot.ts",
-    "points": "node points-bot.cjs --daemon --interval=60",
-    "points-once": "node points-bot.cjs",
+    "points": "node points-bot-tw.cjs --daemon --interval=60",
+    "points-once": "node points-bot-tw.cjs",
     "rebalance": "node rebalance-bot.cjs --daemon --interval=300",
     "rebalance-once": "node rebalance-bot.cjs"
   },
