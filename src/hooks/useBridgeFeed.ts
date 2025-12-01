@@ -27,6 +27,7 @@ export interface TopBridger {
   rank?: number;
 }
 
+// Hook for bridge feed data with 24h leaderboard and all-time stats
 export const useBridgeFeed = (limit: number = 10) => {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
   const [stats, setStats] = useState<BridgeStats>({
