@@ -57,9 +57,9 @@ export const useBridgeFeed = (limit: number = 10) => {
 
   const fetchStats = async () => {
     try {
-      // Try to use RPC function first (faster, more reliable)
+      // Use ALL TIME stats function (not 24h) so stats accumulate
       const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_bridge_stats_24h');
+        .rpc('get_bridge_stats_all_time');
 
       if (!rpcError && rpcData && rpcData.length > 0) {
         setStats({
@@ -70,17 +70,15 @@ export const useBridgeFeed = (limit: number = 10) => {
         return;
       }
 
-      // Fallback: paginated fetch
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Fallback: fetch all transactions (no time filter)
       let allData: { wallet_address: string; amount_usd: number }[] = [];
       let offset = 0;
       const pageSize = 1000;
 
-      for (let i = 0; i < 10; i++) { // Max 10 pages (10k transactions)
+      for (let i = 0; i < 100; i++) { // Max 100 pages (100k transactions)
         const { data, error: fetchError } = await supabase
           .from('bridge_transactions')
           .select('wallet_address, amount_usd')
-          .gte('created_at', oneDayAgo)
           .range(offset, offset + pageSize - 1);
 
         if (fetchError) throw fetchError;
@@ -106,7 +104,8 @@ export const useBridgeFeed = (limit: number = 10) => {
 
   const fetchTopBridgers = async () => {
     try {
-      // Supabase default limit is 1000, need to fetch all with pagination
+      // Top bridgers are calculated for the last 24 hours only
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       let allData: { wallet_address: string; amount_usd: number }[] = [];
       let offset = 0;
       const pageSize = 1000;
@@ -115,6 +114,7 @@ export const useBridgeFeed = (limit: number = 10) => {
         const { data, error: fetchError } = await supabase
           .from('bridge_transactions')
           .select('wallet_address, amount_usd')
+          .gte('created_at', oneDayAgo)
           .range(offset, offset + pageSize - 1);
 
         if (fetchError) throw fetchError;
@@ -150,7 +150,8 @@ export const useBridgeFeed = (limit: number = 10) => {
 
     const load = async () => {
       setIsLoading(true);
-      await Promise.all([fetchTransactions(), fetchStats(), fetchTopBridgers()]);
+      // Load all data in parallel for faster initial load
+      await Promise.all([fetchTopBridgers(), fetchTransactions(), fetchStats()]);
       if (isMounted) setIsLoading(false);
     };
 
@@ -161,6 +162,7 @@ export const useBridgeFeed = (limit: number = 10) => {
       if (isMounted) {
         fetchTransactions();
         fetchStats();
+        fetchTopBridgers();
       }
     }, 30000);
 
@@ -171,7 +173,9 @@ export const useBridgeFeed = (limit: number = 10) => {
   }, []);
 
   const refresh = async () => {
-    await Promise.all([fetchTransactions(), fetchStats(), fetchTopBridgers()]);
+    // Load top bridgers first so gold status is ready
+    await fetchTopBridgers();
+    await Promise.all([fetchTransactions(), fetchStats()]);
   };
 
   // Get user rank by address
