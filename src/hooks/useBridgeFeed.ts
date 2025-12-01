@@ -57,14 +57,26 @@ export const useBridgeFeed = (limit: number = 10) => {
 
   const fetchStats = async () => {
     try {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Try to use RPC function first (faster, more reliable)
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_bridge_stats_24h');
 
-      // Supabase default limit is 1000, need to fetch all with pagination
+      if (!rpcError && rpcData && rpcData.length > 0) {
+        setStats({
+          totalVolume24h: Number(rpcData[0].total_volume) || 0,
+          transactionCount24h: Number(rpcData[0].tx_count) || 0,
+          uniqueUsers24h: Number(rpcData[0].unique_users) || 0,
+        });
+        return;
+      }
+
+      // Fallback: paginated fetch
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       let allData: { wallet_address: string; amount_usd: number }[] = [];
       let offset = 0;
       const pageSize = 1000;
 
-      while (true) {
+      for (let i = 0; i < 10; i++) { // Max 10 pages (10k transactions)
         const { data, error: fetchError } = await supabase
           .from('bridge_transactions')
           .select('wallet_address, amount_usd')
@@ -75,7 +87,7 @@ export const useBridgeFeed = (limit: number = 10) => {
         if (!data || data.length === 0) break;
 
         allData = [...allData, ...data];
-        if (data.length < pageSize) break; // Last page
+        if (data.length < pageSize) break;
         offset += pageSize;
       }
 

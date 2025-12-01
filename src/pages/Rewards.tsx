@@ -50,10 +50,10 @@ const Rewards = () => {
   const navigate = useNavigate();
   const account = useAccount();
   const { toast } = useToast();
-  const { formattedPoints, isLoading: isLoadingPoints } = useUserPoints();
+  const { formattedPoints, breakdown, volumes, isLoading: isLoadingPoints } = useUserPoints();
   const { referralUrl, stats, isLoading: isLoadingReferral, error: referralError } = useReferral();
   const { apy } = useUSYCPrice();
-  const { leaderboard, isLoading: isLoadingLeaderboard, userRank, totalDepositors } = useLeaderboard(account?.address);
+  const { leaderboard, isLoading: isLoadingLeaderboard, userRank, userEntry, totalDepositors } = useLeaderboard(account?.address);
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const isConnected = account?.isConnected ?? false;
   const address = account?.address;
@@ -237,7 +237,7 @@ const Rewards = () => {
                 <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/50 bg-clip-text text-transparent">
                   {isLoadingPoints ? "..." : formattedPoints}
                 </p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">1pt / $10/day</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">From all activities</p>
               </div>
 
               {/* Badge Status - Compact */}
@@ -274,6 +274,40 @@ const Rewards = () => {
                 </p>
               </div>
             </div>
+
+            {/* Points Breakdown */}
+            {breakdown && volumes && (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <p className="text-xs text-muted-foreground mb-3">Points Breakdown</p>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                    <p className="text-lg font-semibold">{breakdown.bridgePoints.toFixed(0)}</p>
+                    <p className="text-[10px] text-muted-foreground">Bridge</p>
+                    <p className="text-[9px] text-muted-foreground/60">${volumes.bridge.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                    <p className="text-lg font-semibold">{breakdown.vaultPoints.toFixed(0)}</p>
+                    <p className="text-[10px] text-muted-foreground">Vault</p>
+                    <p className="text-[9px] text-muted-foreground/60">${volumes.vault.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                    <p className="text-lg font-semibold">{breakdown.swapPoints.toFixed(0)}</p>
+                    <p className="text-[10px] text-muted-foreground">Swap</p>
+                    <p className="text-[9px] text-muted-foreground/60">${volumes.swap.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                    <p className="text-lg font-semibold">{breakdown.liquidityPoints.toFixed(0)}</p>
+                    <p className="text-[10px] text-muted-foreground">Liquidity</p>
+                    <p className="text-[9px] text-muted-foreground/60">${volumes.liquidity.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-white/[0.02]">
+                    <p className="text-lg font-semibold">{breakdown.referralPoints.toFixed(0)}</p>
+                    <p className="text-[10px] text-muted-foreground">Referral</p>
+                    <p className="text-[9px] text-muted-foreground/60">{volumes.referrals} refs</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Badge Mint Action (if not owned) */}
             {!alreadyOwns && !showSuccess && (
@@ -335,7 +369,7 @@ const Rewards = () => {
                   <Trophy className="w-5 h-5 text-yellow-500" />
                   <h3 className="font-semibold">Leaderboard</h3>
                 </div>
-                <span className="text-xs text-muted-foreground">{totalDepositors} depositors</span>
+                <span className="text-xs text-muted-foreground">{totalDepositors} users</span>
               </div>
 
               {isLoadingLeaderboard ? (
@@ -343,7 +377,7 @@ const Rewards = () => {
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
               ) : leaderboard.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8 text-sm">No deposits yet</p>
+                <p className="text-center text-muted-foreground py-8 text-sm">No points earned yet</p>
               ) : (
                 <div className="space-y-2">
                   {leaderboard.slice(0, showAllLeaderboard ? 15 : 5).map((entry) => {
@@ -377,10 +411,10 @@ const Rewards = () => {
                           </span>
                         </div>
 
-                        {/* Amount */}
+                        {/* Points */}
                         <div className="text-right">
                           <span className="font-semibold text-sm">
-                            ${parseFloat(entry.formattedAmount).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                            {entry.formattedAmount} pts
                           </span>
                         </div>
                       </div>
@@ -388,27 +422,22 @@ const Rewards = () => {
                   })}
 
                   {/* Show user's position if not in visible list */}
-                  {userRank && userRank > (showAllLeaderboard ? 15 : 5) && (
+                  {userEntry && userRank && userRank > (showAllLeaderboard ? 15 : 5) && (
                     <>
                       <div className="text-center text-muted-foreground text-xs py-1">• • •</div>
-                      {leaderboard.filter(e => e.address.toLowerCase() === address?.toLowerCase()).map((entry) => (
-                        <div
-                          key={entry.address}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30"
-                        >
-                          <div className="w-8 flex justify-center">
-                            <span className="text-sm font-medium">#{entry.rank}</span>
-                          </div>
-                          <div className="flex-1">
-                            <span className="font-mono text-sm text-primary font-semibold">You</span>
-                          </div>
-                          <div className="text-right">
-                            <span className="font-semibold text-sm">
-                              ${parseFloat(entry.formattedAmount).toLocaleString('en-US', { maximumFractionDigits: 0 })}
-                            </span>
-                          </div>
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30">
+                        <div className="w-8 flex justify-center">
+                          <span className="text-sm font-medium">#{userEntry.rank}</span>
                         </div>
-                      ))}
+                        <div className="flex-1">
+                          <span className="font-mono text-sm text-primary font-semibold">You</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-semibold text-sm">
+                            {userEntry.formattedAmount} pts
+                          </span>
+                        </div>
+                      </div>
                     </>
                   )}
 

@@ -1,100 +1,100 @@
-import { useAccount, useReadContracts } from 'wagmi';
-import { defineChain } from 'viem';
-import { TREASURY_CONTRACTS } from '@/lib/constants';
+import { useState, useEffect } from 'react';
+import { useAccount } from 'wagmi';
+import { createClient } from '@supabase/supabase-js';
 
-// Arc Testnet chain definition
-const arcTestnet = defineChain({
-  id: 5042002,
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://rpc.testnet.arc.network'] },
-  },
-  blockExplorers: {
-    default: { name: 'Arc Explorer', url: 'https://testnet.arcscan.app' },
-  },
-  testnet: true,
-}) as const;
+const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
+const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
 
-// V8 Treasury Vault ABI for points
-const TREASURY_VAULT_V8_ABI = [
-  {
-    inputs: [{ name: 'user', type: 'address' }],
-    name: 'getUserPoints',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ name: 'user', type: 'address' }],
-    name: 'getPointsBreakdown',
-    outputs: [
-      { name: 'permanentPoints', type: 'uint256' },
-      { name: 'pendingTimePoints', type: 'uint256' },
-      { name: 'referralPoints', type: 'uint256' },
-      { name: 'totalPoints', type: 'uint256' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export interface PointsBreakdown {
-  permanentPoints: number;
-  pendingTimePoints: number;
+  bridgePoints: number;
+  swapPoints: number;
+  liquidityPoints: number;
+  vaultPoints: number;
   referralPoints: number;
   totalPoints: number;
+}
+
+export interface UserPointsData {
+  wallet_address: string;
+  bridge_volume: number;
+  swap_volume: number;
+  liquidity_volume: number;
+  vault_volume: number;
+  referral_count: number;
+  total_points: number;
 }
 
 export const useUserPoints = () => {
   const account = useAccount();
   const address = account?.address;
   const isConnected = account?.isConnected ?? false;
-  const chainId = account?.chainId;
-  const isArcTestnet = chainId === 5042002;
 
-  // Multicall for both getUserPoints and getPointsBreakdown
-  const { data: pointsData, isLoading } = useReadContracts({
-    contracts: [
-      {
-        address: TREASURY_CONTRACTS.TreasuryVault,
-        abi: TREASURY_VAULT_V8_ABI,
-        functionName: 'getUserPoints',
-        args: address ? [address] : undefined,
-        chainId: arcTestnet.id,
-      },
-      {
-        address: TREASURY_CONTRACTS.TreasuryVault,
-        abi: TREASURY_VAULT_V8_ABI,
-        functionName: 'getPointsBreakdown',
-        args: address ? [address] : undefined,
-        chainId: arcTestnet.id,
-      },
-    ],
-    query: {
-      enabled: isConnected && isArcTestnet && !!address,
-      refetchInterval: 60000, // Auto-refresh every 60 seconds
-    },
-  });
+  const [pointsData, setPointsData] = useState<UserPointsData | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // V8 points are whole numbers (not scaled)
-  const points = pointsData?.[0]?.result as bigint | undefined;
-  const breakdown = pointsData?.[1]?.result as [bigint, bigint, bigint, bigint] | undefined;
+  useEffect(() => {
+    if (!isConnected || !address) {
+      setPointsData(null);
+      return;
+    }
 
-  const pointsValue = points ? Number(points) : 0;
+    const fetchPoints = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('user_points')
+          .select('*')
+          .eq('wallet_address', address.toLowerCase())
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          throw fetchError;
+        }
+
+        setPointsData(data || null);
+      } catch (e: any) {
+        console.error('Failed to fetch user points:', e);
+        setError(e.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPoints();
+
+    const interval = setInterval(fetchPoints, 60000);
+    return () => clearInterval(interval);
+  }, [address, isConnected]);
+
+  const pointsValue = pointsData?.total_points || 0;
   const formattedPoints = pointsValue.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
-  const pointsBreakdown: PointsBreakdown | null = breakdown ? {
-    permanentPoints: Number(breakdown[0]),
-    pendingTimePoints: Number(breakdown[1]),
-    referralPoints: Number(breakdown[2]),
-    totalPoints: Number(breakdown[3]),
+  const pointsBreakdown: PointsBreakdown | null = pointsData ? {
+    bridgePoints: (pointsData.bridge_volume / 100) * 1.0,
+    swapPoints: (pointsData.swap_volume / 100) * 0.5,
+    liquidityPoints: (pointsData.liquidity_volume / 100) * 2.0,
+    vaultPoints: (pointsData.vault_volume / 100) * 1.0,
+    referralPoints: pointsData.referral_count * 50,
+    totalPoints: pointsData.total_points,
   } : null;
 
   return {
     points: pointsValue,
     formattedPoints,
     breakdown: pointsBreakdown,
+    volumes: pointsData ? {
+      bridge: pointsData.bridge_volume,
+      swap: pointsData.swap_volume,
+      liquidity: pointsData.liquidity_volume,
+      vault: pointsData.vault_volume,
+      referrals: pointsData.referral_count,
+    } : null,
     isLoading,
+    error,
   };
 };
