@@ -147,16 +147,29 @@ const Litepaper = () => {
           </section>
 
           {/* Points */}
+          {/* Points */}
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">Points System</h2>
+            <p className="text-muted-foreground text-sm">
+              Points are calculated based on <strong>time-weighted average balance</strong> over 30 days.
+              This rewards long-term holders and prevents farming exploits.
+            </p>
+
             <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+              <h3 className="font-semibold mb-3 text-sm">Earning Points</h3>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Daily</span><code className="px-2 py-0.5 rounded bg-white/5 text-xs">1 pt = $10 × 1 day × multiplier</code></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Deposit bonus</span><code className="px-2 py-0.5 rounded bg-white/5 text-xs">1 pt per $100</code></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Referral</span><span className="text-blue-400">10% of referral's points</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">NFT boost</span><span className="text-primary">1.2x multiplier</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Minimum</span><span className="text-yellow-400">$100 for points</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Bridge</span><span>1 pt per $100 bridged</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Vault (flexible)</span><span>1 pt per $100 avg balance</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Vault (locked)</span><span className="text-green-400">1.5 pt per $100 avg balance</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">LP Pool</span><span className="text-blue-400">2 pt per $100 avg balance</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Swap</span><span className="text-muted-foreground">0.25 pt per $100 volume</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Referral</span><span className="text-purple-400">50 pts per active referral</span></div>
               </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm">
+              <strong>Time-Weighted:</strong> Points for Vault/LP are based on your average balance over 30 days.
+              Depositing $10K for 1 day = 333 pts. Holding $10K for 30 days = 10,000 pts.
             </div>
           </section>
 
