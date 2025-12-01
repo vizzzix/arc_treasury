@@ -11,7 +11,7 @@ const Litepaper = () => {
   const navigate = useNavigate();
   const { isConnected } = useAccount();
   const { apy } = useUSYCPrice();
-  const netAPY = (apy * 0.95).toFixed(2); // Net APY after 5% platform fee
+  const netAPY = (apy * 0.95).toFixed(2);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -55,14 +55,14 @@ const Litepaper = () => {
             <p className="text-lg text-muted-foreground">
               Sustainable yield on stablecoins via US Treasury Bills
             </p>
-            <p className="text-xs text-muted-foreground">Arc Testnet · November 2025</p>
+            <p className="text-xs text-muted-foreground">Arc Testnet · December 2025</p>
           </div>
 
           {/* Overview */}
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">Overview</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Arc Treasury is a yield vault on Arc Network. Deposit USDC/EURC → converted to USYC via Hashnote Teller → earn ~{netAPY}% APY from US Treasury Bills. Real on-chain integration, institutional-grade yield.
+              Arc Treasury is a yield vault on Arc Network. Deposit USDC/EURC, converted to USYC via Hashnote Teller, earn ~{netAPY}% APY from US Treasury Bills. Real on-chain integration, institutional-grade yield.
             </p>
           </section>
 
@@ -72,9 +72,8 @@ const Litepaper = () => {
             <p className="text-muted-foreground leading-relaxed">
               USYC = Hashnote Short Duration Yield Fund. Tokenized money market fund investing in reverse repo on US Government securities. Regulated by BMA and CIMA.
             </p>
-
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
                 <h3 className="font-semibold mb-3">Fund Details</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Currency</span><span>USDC</span></div>
@@ -83,14 +82,13 @@ const Litepaper = () => {
                   <div className="flex justify-between"><span className="text-muted-foreground">Subscription</span><span>0%</span></div>
                 </div>
               </div>
-
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
                 <h3 className="font-semibold mb-3">Key Benefits</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>• Instant on-chain subscribe/redeem 24/7</p>
-                  <p>• No credit intermediaries</p>
-                  <p>• Assets in reverse repo (safe)</p>
-                  <p>• Transparent pricing via oracle</p>
+                  <p>Instant on-chain subscribe/redeem 24/7</p>
+                  <p>No credit intermediaries</p>
+                  <p>Assets in reverse repo (safe)</p>
+                  <p>Transparent pricing via oracle</p>
                 </div>
               </div>
             </div>
@@ -99,7 +97,7 @@ const Litepaper = () => {
           {/* How It Works */}
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">How It Works</h2>
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
               <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
                 <span className="px-3 py-1.5 rounded-lg bg-primary/10 font-medium">USDC</span>
                 <span className="text-muted-foreground">→</span>
@@ -121,8 +119,7 @@ const Litepaper = () => {
             <p className="text-muted-foreground">
               All deposits earn same APY. Locks give bonus Points (not extra yield).
             </p>
-
-            <div className="rounded-2xl overflow-hidden border border-white/10">
+            <div className="rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm">
               <table className="w-full text-sm">
                 <thead className="bg-white/5">
                   <tr>
@@ -140,36 +137,51 @@ const Litepaper = () => {
                 </tbody>
               </table>
             </div>
-
-            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-sm">
+            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-sm backdrop-blur-sm">
               <strong>Early Withdrawal:</strong> 25% penalty on principal. Yield can be claimed anytime.
             </div>
           </section>
 
-          {/* Points */}
-          {/* Points */}
+          {/* Points System */}
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">Points System</h2>
-            <p className="text-muted-foreground text-sm">
-              Points are calculated based on <strong>time-weighted average balance</strong> over 30 days.
-              This rewards long-term holders and prevents farming exploits.
+            <p className="text-muted-foreground leading-relaxed">
+              Points are calculated based on <strong className="text-foreground">time-weighted average balance</strong> over 30 days. This rewards long-term holders and prevents farming exploits.
             </p>
-
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
-              <h3 className="font-semibold mb-3 text-sm">Earning Points</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Bridge</span><span>1 pt per $100 bridged</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Vault (flexible)</span><span>1 pt per $100 avg balance</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Vault (locked)</span><span className="text-green-400">1.5 pt per $100 avg balance</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">LP Pool</span><span className="text-blue-400">2 pt per $100 avg balance</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Swap</span><span className="text-muted-foreground">0.25 pt per $100 volume</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Referral</span><span className="text-purple-400">50 pts per active referral</span></div>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+              <h3 className="font-semibold mb-4">Earning Points</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Bridge</span>
+                  <span>1 pt per $100 bridged</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Vault (flexible)</span>
+                  <span>1 pt per $100 avg balance / 30d</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Vault (locked)</span>
+                  <span className="text-green-400">1.5 pt per $100 avg balance / 30d</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">LP Pool</span>
+                  <span className="text-blue-400">2 pt per $100 avg balance / 30d</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Swap</span>
+                  <span className="text-muted-foreground">0.25 pt per $100 volume</span>
+                </div>
+                <div className="flex justify-between items-center border-t border-white/10 pt-3 mt-3">
+                  <span className="text-muted-foreground">Referral</span>
+                  <span className="text-purple-400">25 pts + 10% of referral's points</span>
+                </div>
               </div>
             </div>
-
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm">
-              <strong>Time-Weighted:</strong> Points for Vault/LP are based on your average balance over 30 days.
-              Depositing $10K for 1 day = 333 pts. Holding $10K for 30 days = 10,000 pts.
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-sm backdrop-blur-sm">
+              <strong>Time-Weighted Example:</strong> Hold $10K for 30 days = 100 pts. Hold only 1 day = ~3 pts.
+            </div>
+            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 text-sm backdrop-blur-sm">
+              <strong>Referral Bonus:</strong> Get 25 pts when your referral signs up, plus 10% of all points they earn ongoing.
             </div>
           </section>
 
@@ -177,14 +189,14 @@ const Litepaper = () => {
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">Business Model</h2>
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
                 <h3 className="font-semibold mb-3">Revenue</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Platform fee</span><span className="text-primary font-medium">5% of yield</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Early withdrawal</span><span className="font-medium">25% penalty</span></div>
                 </div>
               </div>
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10">
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
                 <h3 className="font-semibold mb-3">Distribution</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Users</span><span className="text-green-400 font-medium">95% of yield</span></div>
@@ -198,33 +210,33 @@ const Litepaper = () => {
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">Roadmap 2026</h2>
             <div className="space-y-3">
-              <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20 backdrop-blur-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-xs font-medium">Q1</span>
                   <span className="font-medium">Mainnet Launch</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Arc Mainnet, USYC whitelist, audit. Target: $1-5M TVL</p>
+                <p className="text-sm text-muted-foreground">Arc Mainnet, USYC whitelist, audit. Target: $1-5M TVL</p>
               </div>
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 backdrop-blur-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-xs font-medium">Q2</span>
                   <span className="font-medium">Growth</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Marketing, Aave/Pendle strategies. Target: $10-25M TVL</p>
+                <p className="text-sm text-muted-foreground">Marketing, Aave/Pendle strategies. Target: $10-25M TVL</p>
               </div>
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 backdrop-blur-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 text-xs font-medium">Q3</span>
                   <span className="font-medium">ARC Token</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Governance token, points conversion, DAO. Target: $50M TVL</p>
+                <p className="text-sm text-muted-foreground">Governance token, points conversion, DAO. Target: $50M TVL</p>
               </div>
-              <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20 backdrop-blur-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-medium">Q4</span>
                   <span className="font-medium">Scale</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Cross-chain, institutions, more RWA. Target: $100M TVL</p>
+                <p className="text-sm text-muted-foreground">Cross-chain, institutions, more RWA. Target: $100M TVL</p>
               </div>
             </div>
           </section>
@@ -232,13 +244,15 @@ const Litepaper = () => {
           {/* Risks */}
           <section className="space-y-4">
             <h2 className="text-2xl font-bold text-primary">Risks</h2>
-            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-sm">
+            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-sm backdrop-blur-sm">
               <strong>Testnet Only:</strong> Test tokens with no real value. Do not deposit real assets.
             </div>
-            <div className="text-sm text-muted-foreground space-y-2">
-              <p>• <strong>Smart Contract Risk:</strong> May contain bugs. Only deposit what you can lose.</p>
-              <p>• <strong>Yield Fluctuation:</strong> APY from Treasury rates, varies over time.</p>
-              <p>• <strong>Early Withdrawal:</strong> 25% penalty. Plan liquidity needs.</p>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p><strong className="text-foreground">Smart Contract Risk:</strong> May contain bugs. Only deposit what you can lose.</p>
+                <p><strong className="text-foreground">Yield Fluctuation:</strong> APY from Treasury rates, varies over time.</p>
+                <p><strong className="text-foreground">Early Withdrawal:</strong> 25% penalty. Plan liquidity needs.</p>
+              </div>
             </div>
           </section>
 
@@ -248,9 +262,9 @@ const Litepaper = () => {
             <p className="text-sm text-muted-foreground">Sustainable yield on Arc Network</p>
             <div className="flex justify-center gap-4 text-sm">
               <a href="https://arctreasury.biz" className="text-primary hover:underline">Website</a>
-              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground">|</span>
               <a href="https://testnet.arcscan.app/address/0x17ca5232415430bC57F646A72fD15634807bF729" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Explorer</a>
-              <span className="text-muted-foreground">•</span>
+              <span className="text-muted-foreground">|</span>
               <a href="/faq" className="text-primary hover:underline">FAQ</a>
             </div>
           </section>

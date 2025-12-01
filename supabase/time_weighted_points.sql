@@ -41,6 +41,7 @@ DECLARE
   v_bridge_volume DECIMAL := 0;
   v_swap_volume DECIMAL := 0;
   v_referral_count INT := 0;
+  v_referral_points DECIMAL := 0;  -- 10% of referrals' points
 
   -- Time-weighted averages (за последние 30 дней)
   v_tw_vault DECIMAL := 0;
@@ -60,10 +61,16 @@ BEGIN
   FROM swap_transactions
   WHERE wallet_address = p_wallet;
 
-  -- Referrals
+  -- Referrals count
   SELECT COUNT(*) INTO v_referral_count
   FROM referrals
   WHERE referrer_address = p_wallet AND is_active = true;
+
+  -- Referral bonus: 10% of each referral's total points
+  SELECT COALESCE(SUM(up.total_points * 0.10), 0) INTO v_referral_points
+  FROM referrals r
+  JOIN user_points up ON up.wallet_address = r.referee_address
+  WHERE r.referrer_address = p_wallet AND r.is_active = true;
 
   -- Time-weighted vault balance (average over last 30 days)
   SELECT
@@ -92,7 +99,7 @@ BEGIN
   -- Vault TW: 1 pt per $100 average balance per 30 days
   -- LP TW: 2 pt per $100 average balance per 30 days
   -- Locked TW: 1.5 pt per $100 average balance per 30 days (bonus for commitment)
-  -- Referral: 50 pts each
+  -- Referral: 25 pts signup bonus + 10% of referral's points (ongoing)
 
   v_total_points :=
     (v_bridge_volume / 100.0) +                    -- 1 pt/$100
@@ -100,7 +107,8 @@ BEGIN
     (v_tw_vault / 100.0) +                         -- 1 pt/$100 TW avg
     (v_tw_lp / 100.0 * 2.0) +                      -- 2 pt/$100 TW avg
     (v_tw_locked / 100.0 * 1.5) +                  -- 1.5 pt/$100 TW avg
-    (v_referral_count * 50);
+    (v_referral_count * 25) +                      -- 25 pts signup bonus per referral
+    v_referral_points;                             -- + 10% of referrals' points
 
   -- Upsert into user_points
   INSERT INTO user_points (
