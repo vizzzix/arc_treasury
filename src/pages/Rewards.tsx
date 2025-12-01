@@ -455,7 +455,7 @@ const Rewards = () => {
                       ) : (
                         <>
                           <ChevronDown className="w-4 h-4" />
-                          Show all ({leaderboard.length})
+                          Show top 15
                         </>
                       )}
                     </button>
