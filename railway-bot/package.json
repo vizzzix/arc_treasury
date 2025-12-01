@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node --import tsx telegramBot.ts & node points-bot.cjs --daemon --interval=60 & node rebalance-bot.cjs --daemon --interval=300",
+    "start": "concurrently \"node --import tsx telegramBot.ts\" \"node points-bot.cjs --daemon --interval=60\" \"node rebalance-bot.cjs --daemon --interval=300\"",
     "telegram": "tsx telegramBot.ts",
     "points": "node points-bot.cjs --daemon --interval=60",
     "points-once": "node points-bot.cjs",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "concurrently": "^8.2.2",
     "dotenv": "^16.3.1",
     "viem": "^2.21.0"
   },
