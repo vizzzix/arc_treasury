@@ -3,11 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
 import { UserMenu } from "@/components/UserMenu";
-import { ArrowLeft, Copy, Check, Twitter, Send, Loader2, Trophy, Crown, Medal, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowLeft, Copy, Check, Twitter, Send, Loader2, Trophy, ChevronDown, ChevronUp } from "lucide-react";
 import { useUserPoints } from "@/hooks/useUserPoints";
 import { useReferral } from "@/hooks/useReferral";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
+import { useTreasuryVault } from "@/hooks/useTreasuryVault";
+import { useLockedPositions } from "@/hooks/useLockedPositions";
+import { useSwapPool } from "@/hooks/useSwapPool";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { TREASURY_CONTRACTS } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -61,6 +65,35 @@ const Rewards = () => {
   const [copied, setCopied] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showAllLeaderboard, setShowAllLeaderboard] = useState(false);
+
+  // Real-time balances for display (not TW averages)
+  const { userShareValue: vaultUsdcValue, userEURCShareValue: vaultEurcValue } = useTreasuryVault();
+  const { positions: lockedPositions } = useLockedPositions(address);
+  const { poolStats } = useSwapPool();
+  const { eurToUsd: liveRate } = useExchangeRate();
+
+  // Use live EUR/USD rate, fallback to 1.08
+  const eurUsdRate = liveRate > 0 ? liveRate : 1.08;
+
+  // Calculate real vault balance (flexible + locked)
+  const realVaultBalance = (() => {
+    const flexibleUsdc = parseFloat(vaultUsdcValue || '0');
+    const flexibleEurc = parseFloat(vaultEurcValue || '0') * eurUsdRate;
+    const lockedTotal = lockedPositions?.reduce((sum, pos) => {
+      const amount = pos.amount;
+      const usdValue = pos.token === 'EURC' ? amount * eurUsdRate : amount;
+      return sum + usdValue;
+    }, 0) || 0;
+    return flexibleUsdc + flexibleEurc + lockedTotal;
+  })();
+
+  // Calculate real LP balance from pool stats
+  const realLpBalance = (() => {
+    if (!poolStats) return 0;
+    const usdcShare = parseFloat(poolStats.userUsdcShare || '0');
+    const eurcShare = parseFloat(poolStats.userEurcShare || '0') * eurUsdRate;
+    return usdcShare + eurcShare;
+  })();
 
   // Badge data
   const { data: totalSupply } = useReadContract({
@@ -288,7 +321,7 @@ const Rewards = () => {
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.vaultPoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Vault</p>
-                    <p className="text-[9px] text-muted-foreground/60">${volumes.vault.toLocaleString()}</p>
+                    <p className="text-[9px] text-muted-foreground/60">${realVaultBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.swapPoints.toFixed(0)}</p>
@@ -298,7 +331,7 @@ const Rewards = () => {
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.liquidityPoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Liquidity</p>
-                    <p className="text-[9px] text-muted-foreground/60">${volumes.liquidity.toLocaleString()}</p>
+                    <p className="text-[9px] text-muted-foreground/60">${realLpBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.referralPoints.toFixed(0)}</p>
@@ -362,81 +395,69 @@ const Rewards = () => {
               </div>
             </div>
 
-            {/* Leaderboard */}
-            <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-4">
+            {/* Leaderboard - Compact like Live Activity */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-yellow-500" />
-                  <h3 className="font-semibold">Leaderboard</h3>
+                  <Trophy className="w-4 h-4 text-yellow-500" />
+                  <h3 className="font-semibold text-sm">Leaderboard</h3>
+                  <span className="text-xs text-muted-foreground">• {totalDepositors} users</span>
                 </div>
-                <span className="text-xs text-muted-foreground">{totalDepositors} users</span>
               </div>
 
               {isLoadingLeaderboard ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 </div>
               ) : leaderboard.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8 text-sm">No points earned yet</p>
+                <p className="text-center text-muted-foreground py-4 text-xs">No points earned yet</p>
               ) : (
-                <div className="space-y-2">
-                  {leaderboard.slice(0, showAllLeaderboard ? 15 : 5).map((entry) => {
+                <div className="space-y-1">
+                  {leaderboard.slice(0, showAllLeaderboard ? 25 : 5).map((entry) => {
                     const isCurrentUser = address?.toLowerCase() === entry.address.toLowerCase();
                     return (
                       <div
                         key={entry.address}
-                        className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                        className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${
                           isCurrentUser
-                            ? 'bg-primary/10 border border-primary/30'
-                            : 'bg-white/[0.02] hover:bg-white/[0.04]'
+                            ? 'bg-primary/10'
+                            : 'bg-white/[0.02] hover:bg-white/[0.05]'
                         }`}
                       >
                         {/* Rank */}
-                        <div className="w-8 flex justify-center">
-                          {entry.rank === 1 ? (
-                            <Crown className="w-5 h-5 text-yellow-500" />
-                          ) : entry.rank === 2 ? (
-                            <Medal className="w-5 h-5 text-gray-400" />
-                          ) : entry.rank === 3 ? (
-                            <Medal className="w-5 h-5 text-amber-600" />
-                          ) : (
-                            <span className="text-sm font-medium text-muted-foreground">#{entry.rank}</span>
-                          )}
-                        </div>
+                        <span className={`w-5 text-center font-medium ${
+                          entry.rank === 1 ? 'text-yellow-500' :
+                          entry.rank === 2 ? 'text-gray-400' :
+                          entry.rank === 3 ? 'text-amber-600' : 'text-muted-foreground'
+                        }`}>
+                          {entry.rank}
+                        </span>
 
                         {/* Address */}
-                        <div className="flex-1 min-w-0">
-                          <span className={`font-mono text-sm ${isCurrentUser ? 'text-primary font-semibold' : ''}`}>
-                            {isCurrentUser ? 'You' : formatAddress(entry.address)}
-                          </span>
-                        </div>
+                        <span className={`font-mono flex-1 ${isCurrentUser ? 'text-primary font-semibold' : 'text-foreground/70'}`}>
+                          {isCurrentUser ? 'You' : formatAddress(entry.address)}
+                        </span>
 
                         {/* Points */}
-                        <div className="text-right">
-                          <span className="font-semibold text-sm">
-                            {entry.formattedAmount} pts
-                          </span>
-                        </div>
+                        <span className="text-muted-foreground">
+                          {entry.formattedAmount}
+                        </span>
                       </div>
                     );
                   })}
 
                   {/* Show user's position if not in visible list */}
-                  {userEntry && userRank && userRank > (showAllLeaderboard ? 15 : 5) && (
+                  {userEntry && userRank && userRank > (showAllLeaderboard ? 25 : 5) && (
                     <>
-                      <div className="text-center text-muted-foreground text-xs py-1">• • •</div>
-                      <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/30">
-                        <div className="w-8 flex justify-center">
-                          <span className="text-sm font-medium">#{userEntry.rank}</span>
-                        </div>
-                        <div className="flex-1">
-                          <span className="font-mono text-sm text-primary font-semibold">You</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-semibold text-sm">
-                            {userEntry.formattedAmount} pts
-                          </span>
-                        </div>
+                      <div className="text-center text-muted-foreground/50 text-[10px]">• • •</div>
+                      <div className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-primary/10 text-xs">
+                        <span className="w-5 text-center font-medium text-muted-foreground">
+                          {userEntry.rank}
+                        </span>
+                        <span className="font-mono text-primary font-semibold flex-1">You</span>
+                        <span className="text-muted-foreground">
+                          {userEntry.formattedAmount}
+                        </span>
                       </div>
                     </>
                   )}
@@ -445,17 +466,17 @@ const Rewards = () => {
                   {leaderboard.length > 5 && (
                     <button
                       onClick={() => setShowAllLeaderboard(!showAllLeaderboard)}
-                      className="w-full flex items-center justify-center gap-2 py-3 mt-2 text-sm text-muted-foreground hover:text-foreground transition-colors rounded-xl hover:bg-white/[0.02]"
+                      className="w-full flex items-center justify-center gap-1 py-2 mt-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-white/[0.02]"
                     >
                       {showAllLeaderboard ? (
                         <>
-                          <ChevronUp className="w-4 h-4" />
+                          <ChevronUp className="w-3 h-3" />
                           Show less
                         </>
                       ) : (
                         <>
-                          <ChevronDown className="w-4 h-4" />
-                          Show top 15
+                          <ChevronDown className="w-3 h-3" />
+                          Show top 25
                         </>
                       )}
                     </button>

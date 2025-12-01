@@ -11,6 +11,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { useSwapPool } from "@/hooks/useSwapPool";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { LiveSwapFeed } from "@/components/LiveSwapFeed";
 
 const formatBalance = (balance: string | number) => {
   const num = typeof balance === 'string' ? parseFloat(balance) : balance;
@@ -338,6 +339,9 @@ const Swap = () => {
                 </div>
               </div>
             </Card>
+
+            {/* Live Activity */}
+            <LiveSwapFeed />
           </div>
         ) : (
           <>
@@ -442,6 +446,7 @@ const Swap = () => {
 
         {activeTab === 'swap' ? (
           /* Swap Tab */
+          <>
           <Card className="p-6 border-border/50 bg-card/50 backdrop-blur-sm">
             {/* Settings button */}
             <div className="flex justify-end mb-4">
@@ -621,6 +626,12 @@ const Swap = () => {
               </div>
             </div>
           </Card>
+
+          {/* Live Activity - Swap Tab */}
+          <div className="mt-4">
+            <LiveSwapFeed />
+          </div>
+          </>
         ) : (
           /* Pool Tab */
           <div className="space-y-4">
@@ -960,6 +971,9 @@ const Swap = () => {
                 </div>
               )}
             </Card>
+
+            {/* Live Activity */}
+            <LiveSwapFeed />
           </div>
         )}
           </>

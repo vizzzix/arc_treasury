@@ -31,7 +31,7 @@ async function withRetry(fn, retries = 3, delay = 2000) {
 
 // Contract addresses
 const STABLECOIN_SWAP = '0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf';
-const EURC_ADDRESS = '0xf88AC22c2c276FB6F345D5F3A63F7b50CD1Cf991';
+const EURC_ADDRESS = '0x742b2D045D430FE718B57046645Ba33295914b69'; // SwapEURC token
 
 // Fixer.io API for live EUR/USD rate
 const FIXER_API_KEY = process.env.FIXER_API_KEY || '80f6690ad5c8e6aafe4373f4a0ce6e96';
@@ -133,8 +133,11 @@ async function getPoolState(publicClient) {
 async function executeRebalance(publicClient, walletClient, account, poolState) {
   const { direction, usdcValueUsd, eurcValueUsd, targetUsdcUsd, liveRate, totalValueUsd } = poolState;
 
+  // IMPORTANT: To reduce USDC in pool, we must BUY USDC with EURC (swapEurcForUsdc)
+  // To reduce EURC in pool, we must BUY EURC with USDC (swapUsdcForEurc)
+
   if (direction === 'USDC_TO_EURC') {
-    // Too much USDC, swap USDC -> EURC
+    // Too much USDC in pool -> buy USDC with our EURC to drain USDC from pool
     const excessUsd = usdcValueUsd - targetUsdcUsd;
     let swapAmountUsd = Math.min(excessUsd, totalValueUsd * MAX_SWAP_PERCENT);
 
@@ -143,50 +146,30 @@ async function executeRebalance(publicClient, walletClient, account, poolState) 
       return false;
     }
 
-    const swapAmountUsdc = swapAmountUsd; // 1 USDC = $1
-    console.log(`[Rebalance] Swapping ${swapAmountUsdc.toFixed(2)} USDC -> EURC`);
-
-    // Get quote
-    const amountWei = parseEther(swapAmountUsdc.toFixed(6));
-    const [eurcOut] = await publicClient.readContract({
-      address: STABLECOIN_SWAP,
-      abi: SWAP_ABI,
-      functionName: 'getEurcOut',
-      args: [amountWei],
+    // Check operator EURC balance
+    const eurcBalance = await publicClient.readContract({
+      address: EURC_ADDRESS,
+      abi: EURC_ABI,
+      functionName: 'balanceOf',
+      args: [account.address],
     });
+    const operatorEurc = Number(formatUnits(eurcBalance, 6));
+    const swapAmountEurc = swapAmountUsd / liveRate;
+    const maxEurcFromBalance = operatorEurc * 0.9; // Keep 10% reserve
 
-    // Allow 1% slippage
-    const minEurcOut = eurcOut * 99n / 100n;
-
-    // Execute swap
-    const hash = await walletClient.writeContract({
-      address: STABLECOIN_SWAP,
-      abi: SWAP_ABI,
-      functionName: 'swapUsdcForEurc',
-      args: [minEurcOut],
-      value: amountWei,
-      account,
-    });
-
-    console.log(`[Rebalance] TX: ${hash}`);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    console.log(`[Rebalance] Confirmed in block ${receipt.blockNumber}`);
-    return true;
-
-  } else {
-    // Too much EURC, swap EURC -> USDC
-    const excessUsd = eurcValueUsd - targetUsdcUsd;
-    let swapAmountUsd = Math.min(excessUsd, totalValueUsd * MAX_SWAP_PERCENT);
+    if (maxEurcFromBalance < swapAmountEurc) {
+      swapAmountUsd = maxEurcFromBalance * liveRate;
+    }
 
     if (swapAmountUsd < MIN_SWAP_AMOUNT) {
-      console.log(`[Rebalance] Swap amount $${swapAmountUsd.toFixed(2)} below minimum, skipping`);
+      console.log(`[Rebalance] Operator EURC balance too low (${operatorEurc.toFixed(2)} EURC), need more`);
       return false;
     }
 
-    const swapAmountEurc = swapAmountUsd / liveRate;
-    console.log(`[Rebalance] Swapping ${swapAmountEurc.toFixed(2)} EURC -> USDC`);
+    const finalSwapEurc = swapAmountUsd / liveRate;
+    console.log(`[Rebalance] Swapping ${finalSwapEurc.toFixed(2)} EURC -> USDC to drain USDC from pool (balance: ${operatorEurc.toFixed(2)} EURC)`);
 
-    const amountWei = parseUnits(swapAmountEurc.toFixed(6), 6);
+    const amountWei = parseUnits(finalSwapEurc.toFixed(6), 6);
 
     // Check and approve EURC if needed
     const allowance = await publicClient.readContract({
@@ -202,7 +185,7 @@ async function executeRebalance(publicClient, walletClient, account, poolState) 
         address: EURC_ADDRESS,
         abi: EURC_ABI,
         functionName: 'approve',
-        args: [STABLECOIN_SWAP, amountWei * 2n],
+        args: [STABLECOIN_SWAP, amountWei * 10n], // Approve 10x for future swaps
         account,
       });
       await publicClient.waitForTransactionReceipt({ hash: approveHash });
@@ -225,6 +208,58 @@ async function executeRebalance(publicClient, walletClient, account, poolState) 
       abi: SWAP_ABI,
       functionName: 'swapEurcForUsdc',
       args: [amountWei, minUsdcOut],
+      account,
+    });
+
+    console.log(`[Rebalance] TX: ${hash}`);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    console.log(`[Rebalance] Confirmed in block ${receipt.blockNumber}`);
+    return true;
+
+  } else {
+    // Too much EURC in pool -> buy EURC with our USDC to drain EURC from pool
+    const excessUsd = eurcValueUsd - targetUsdcUsd;
+    let swapAmountUsd = Math.min(excessUsd, totalValueUsd * MAX_SWAP_PERCENT);
+
+    // Check operator USDC balance
+    const operatorBalance = await publicClient.getBalance({ address: account.address });
+    const operatorUsdc = Number(formatEther(operatorBalance));
+    const maxSwapFromBalance = operatorUsdc - 100; // Keep 100 USDC for gas
+
+    if (maxSwapFromBalance < MIN_SWAP_AMOUNT) {
+      console.log(`[Rebalance] Operator USDC balance too low (${operatorUsdc.toFixed(2)} USDC), need at least ${MIN_SWAP_AMOUNT + 100} USDC`);
+      return false;
+    }
+
+    swapAmountUsd = Math.min(swapAmountUsd, maxSwapFromBalance);
+
+    if (swapAmountUsd < MIN_SWAP_AMOUNT) {
+      console.log(`[Rebalance] Swap amount $${swapAmountUsd.toFixed(2)} below minimum, skipping`);
+      return false;
+    }
+
+    const swapAmountUsdc = swapAmountUsd; // 1 USDC = $1
+    console.log(`[Rebalance] Swapping ${swapAmountUsdc.toFixed(2)} USDC -> EURC to drain EURC from pool (balance: ${operatorUsdc.toFixed(2)} USDC)`);
+
+    // Get quote
+    const amountWei = parseEther(swapAmountUsdc.toFixed(6));
+    const [eurcOut] = await publicClient.readContract({
+      address: STABLECOIN_SWAP,
+      abi: SWAP_ABI,
+      functionName: 'getEurcOut',
+      args: [amountWei],
+    });
+
+    // Allow 1% slippage
+    const minEurcOut = eurcOut * 99n / 100n;
+
+    // Execute swap
+    const hash = await walletClient.writeContract({
+      address: STABLECOIN_SWAP,
+      abi: SWAP_ABI,
+      functionName: 'swapUsdcForEurc',
+      args: [minEurcOut],
+      value: amountWei,
       account,
     });
 
