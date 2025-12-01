@@ -19,7 +19,7 @@ export default defineConfig({
   },
   networks: {
     arcTestnet: {
-      url: "https://rpc.blockdaemon.testnet.arc.network",
+      url: "https://rpc.testnet.arc.network",
       chainId: 5042002,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       type: "http" as const,

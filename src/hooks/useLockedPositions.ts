@@ -9,7 +9,7 @@ import { arcTestnet } from '@/lib/wagmi';
 // Create public client for waiting on receipts
 const client = createPublicClient({
   chain: arcTestnet,
-  transport: http('https://rpc-testnet.arcplatform.io'),
+  transport: http('https://rpc.testnet.arc.network'),
 });
 
 export interface LockedPosition {
