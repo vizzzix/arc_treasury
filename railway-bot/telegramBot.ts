@@ -78,7 +78,7 @@ let lastSwapBlockChecked = 0n;
 let lastConvertCheck = Date.now();
 let lastExchangeRateUpdate = 0; // Force update on startup
 
-// Set to track sent notifications and prevent duplicates
+// Set to track sent notifications and prevent duplicates (v2 - persistent via Supabase)
 const sentNotifications = new Set<string>();
 const MAX_SENT_CACHE = 1000; // Limit memory usage
 
