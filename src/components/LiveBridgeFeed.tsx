@@ -395,7 +395,11 @@ export const LiveBridgeFeed = () => {
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setShowTop(!showTop)}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setShowTop(prev => !prev);
+            }}
             className={`p-1 rounded-lg hover:bg-white/10 transition-colors ${showTop ? 'bg-yellow-500/20 text-yellow-500' : ''}`}
             title="Top Bridgers"
           >
@@ -417,7 +421,14 @@ export const LiveBridgeFeed = () => {
         <div className="mb-3 p-3 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border border-yellow-500/20">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-yellow-500">Top 10 Bridgers (24h)</span>
-            <button onClick={() => setShowTop(false)} className="p-0.5 hover:bg-white/10 rounded">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setShowTop(false);
+              }}
+              className="p-0.5 hover:bg-white/10 rounded"
+            >
               <X className="w-3 h-3 text-muted-foreground" />
             </button>
           </div>
