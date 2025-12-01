@@ -739,10 +739,10 @@ const Swap = () => {
                         onChange={(e) => {
                           const usdc = e.target.value;
                           setAddUsdcAmount(usdc);
-                          // Auto-calculate EURC based on pool ratio
-                          if (usdc && parseFloat(usdc) > 0 && parseFloat(poolStats.usdcReserve) > 0) {
-                            const ratio = parseFloat(poolStats.eurcReserve) / parseFloat(poolStats.usdcReserve);
-                            setAddEurcAmount((parseFloat(usdc) * ratio).toFixed(2));
+                          // Auto-calculate EURC based on exchange rate (fixed rate)
+                          if (usdc && parseFloat(usdc) > 0 && poolStats.exchangeRate > 0) {
+                            const eurc = parseFloat(usdc) / poolStats.exchangeRate;
+                            setAddEurcAmount(eurc.toFixed(2));
                           } else {
                             setAddEurcAmount('');
                           }
@@ -754,9 +754,9 @@ const Swap = () => {
                           onClick={() => {
                             const max = Math.max(0, parseFloat(usdcBalance) - 1).toFixed(2);
                             setAddUsdcAmount(max);
-                            if (parseFloat(poolStats.usdcReserve) > 0) {
-                              const ratio = parseFloat(poolStats.eurcReserve) / parseFloat(poolStats.usdcReserve);
-                              setAddEurcAmount((parseFloat(max) * ratio).toFixed(2));
+                            if (poolStats.exchangeRate > 0) {
+                              const eurc = parseFloat(max) / poolStats.exchangeRate;
+                              setAddEurcAmount(eurc.toFixed(2));
                             }
                           }}
                           className="text-xs text-primary hover:text-primary/80"
@@ -782,10 +782,10 @@ const Swap = () => {
                         onChange={(e) => {
                           const eurc = e.target.value;
                           setAddEurcAmount(eurc);
-                          // Auto-calculate USDC based on pool ratio
-                          if (eurc && parseFloat(eurc) > 0 && parseFloat(poolStats.eurcReserve) > 0) {
-                            const ratio = parseFloat(poolStats.usdcReserve) / parseFloat(poolStats.eurcReserve);
-                            setAddUsdcAmount((parseFloat(eurc) * ratio).toFixed(2));
+                          // Auto-calculate USDC based on exchange rate (fixed rate)
+                          if (eurc && parseFloat(eurc) > 0 && poolStats.exchangeRate > 0) {
+                            const usdc = parseFloat(eurc) * poolStats.exchangeRate;
+                            setAddUsdcAmount(usdc.toFixed(2));
                           } else {
                             setAddUsdcAmount('');
                           }
