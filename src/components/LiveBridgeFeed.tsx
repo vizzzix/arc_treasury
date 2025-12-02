@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useBridgeFeed, BridgeTransaction, TopBridger } from '@/hooks/useBridgeFeed';
 import { useLeaderboardMessages } from '@/hooks/useLeaderboardMessages';
 import { RefreshCw, Activity, Trophy, X, Edit3, MessageSquare, Sparkles, Trash2 } from 'lucide-react';
@@ -271,6 +271,9 @@ export const LiveBridgeFeed = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showTop, setShowTop] = useState(false);
   const [showMessagePopup, setShowMessagePopup] = useState(false);
+
+  // Ref to prevent rapid toggle during re-renders
+  const isTogglingRef = useRef(false);
   const [showCelebrationPopup, setShowCelebrationPopup] = useState(false);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [previousRank, setPreviousRank] = useState<number | null>(null);
@@ -330,6 +333,26 @@ export const LiveBridgeFeed = () => {
   const filteredTransactions = transactions
     .filter(tx => tx.amount_usd > 0.01)
     .slice(0, 5);
+
+  // Stable toggle function with debounce protection
+  const toggleShowTop = useCallback(() => {
+    if (isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    setShowTop(prev => !prev);
+    // Reset after short delay to allow next click
+    setTimeout(() => {
+      isTogglingRef.current = false;
+    }, 100);
+  }, []);
+
+  const closeShowTop = useCallback(() => {
+    if (isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    setShowTop(false);
+    setTimeout(() => {
+      isTogglingRef.current = false;
+    }, 100);
+  }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -396,14 +419,7 @@ export const LiveBridgeFeed = () => {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              setShowTop(prev => !prev);
-            }}
+            onClick={toggleShowTop}
             className={`p-2 -m-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer select-none touch-manipulation ${showTop ? 'bg-yellow-500/20 text-yellow-500' : ''}`}
             title="Top Bridgers"
           >
@@ -427,14 +443,7 @@ export const LiveBridgeFeed = () => {
             <span className="text-xs font-medium text-yellow-500">Top 10 Bridgers (24h)</span>
             <button
               type="button"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setShowTop(false);
-              }}
+              onClick={closeShowTop}
               className="p-1.5 -m-1 hover:bg-white/10 rounded cursor-pointer select-none touch-manipulation"
             >
               <X className="w-3.5 h-3.5 text-muted-foreground" />
