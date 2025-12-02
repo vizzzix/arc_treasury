@@ -240,16 +240,6 @@ export const LiveBridgeFeed = () => {
               </>
             )}
 
-            {/* Boost legend */}
-            <div className="mt-2 pt-2 border-t border-yellow-500/10">
-              <div className="flex flex-wrap gap-2 text-[9px] text-muted-foreground/70">
-                <span>#1: 3x</span>
-                <span>#2: 2.5x</span>
-                <span>#3: 2x</span>
-                <span>#4-5: 1.5x</span>
-                <span>#6-10: 1.25x</span>
-              </div>
-            </div>
           </div>
         </div>
       )}
