@@ -25,8 +25,8 @@ export interface PointsBreakdown {
   vaultPoints: number;
   referralPoints: number;
   totalPoints: number;
-  bridgeBoost: number; // Current boost multiplier
-  bridgeRank: number | null; // 24h rank
+  bridgeBoost: number;
+  bridgeRank: number | null;
 }
 
 export interface UserPointsData {
@@ -46,95 +46,88 @@ export const useUserPoints = () => {
 
   const [pointsData, setPointsData] = useState<UserPointsData | null>(null);
   const [bridgeRank24h, setBridgeRank24h] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with true
   const [error, setError] = useState<string | null>(null);
-
-  // Fetch 24h bridge leaderboard rank for boost calculation
-  const fetchBridgeRank = async (walletAddress: string) => {
-    try {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      let allData: { wallet_address: string; amount_usd: number }[] = [];
-      let offset = 0;
-      const pageSize = 1000;
-
-      // Fetch all 24h bridge transactions
-      while (true) {
-        const { data, error: fetchError } = await supabase
-          .from('bridge_transactions')
-          .select('wallet_address, amount_usd')
-          .gte('created_at', oneDayAgo)
-          .range(offset, offset + pageSize - 1);
-
-        if (fetchError) throw fetchError;
-        if (!data || data.length === 0) break;
-
-        allData = [...allData, ...data];
-        if (data.length < pageSize) break;
-        offset += pageSize;
-      }
-
-      // Aggregate by wallet
-      const volumeByWallet = allData.reduce((acc, tx) => {
-        const addr = tx.wallet_address.toLowerCase();
-        acc[addr] = (acc[addr] || 0) + Number(tx.amount_usd);
-        return acc;
-      }, {} as Record<string, number>);
-
-      // Sort and find rank
-      const sorted = Object.entries(volumeByWallet)
-        .sort(([, a], [, b]) => b - a);
-
-      const userIndex = sorted.findIndex(([addr]) => addr === walletAddress.toLowerCase());
-
-      if (userIndex !== -1) {
-        setBridgeRank24h(userIndex + 1);
-      } else {
-        setBridgeRank24h(null);
-      }
-    } catch (e: any) {
-      console.error('Failed to fetch bridge rank:', e);
-      setBridgeRank24h(null);
-    }
-  };
 
   useEffect(() => {
     if (!isConnected || !address) {
       setPointsData(null);
       setBridgeRank24h(null);
+      setIsLoading(false);
       return;
     }
 
-    const fetchPoints = async () => {
+    const fetchAllData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const { data, error: fetchError } = await supabase
-          .from('user_points')
-          .select('*')
-          .eq('wallet_address', address.toLowerCase())
-          .single();
+        // Fetch points and rank in parallel
+        const [pointsResult, rankResult] = await Promise.all([
+          // Fetch user points
+          supabase
+            .from('user_points')
+            .select('*')
+            .eq('wallet_address', address.toLowerCase())
+            .single(),
+          // Fetch 24h bridge transactions for rank calculation
+          (async () => {
+            const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            let allData: { wallet_address: string; amount_usd: number }[] = [];
+            let offset = 0;
+            const pageSize = 1000;
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
+            while (true) {
+              const { data, error: fetchError } = await supabase
+                .from('bridge_transactions')
+                .select('wallet_address, amount_usd')
+                .gte('created_at', oneDayAgo)
+                .range(offset, offset + pageSize - 1);
+
+              if (fetchError) throw fetchError;
+              if (!data || data.length === 0) break;
+
+              allData = [...allData, ...data];
+              if (data.length < pageSize) break;
+              offset += pageSize;
+            }
+
+            // Aggregate by wallet
+            const volumeByWallet = allData.reduce((acc, tx) => {
+              const addr = tx.wallet_address.toLowerCase();
+              acc[addr] = (acc[addr] || 0) + Number(tx.amount_usd);
+              return acc;
+            }, {} as Record<string, number>);
+
+            // Sort and find rank
+            const sorted = Object.entries(volumeByWallet)
+              .sort(([, a], [, b]) => b - a);
+
+            const userIndex = sorted.findIndex(([addr]) => addr === address.toLowerCase());
+            return userIndex !== -1 ? userIndex + 1 : null;
+          })()
+        ]);
+
+        // Handle points result
+        if (pointsResult.error && pointsResult.error.code !== 'PGRST116') {
+          throw pointsResult.error;
         }
+        setPointsData(pointsResult.data || null);
 
-        setPointsData(data || null);
+        // Handle rank result
+        setBridgeRank24h(rankResult);
+
       } catch (e: any) {
-        console.error('Failed to fetch user points:', e);
+        console.error('Failed to fetch user data:', e);
         setError(e.message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchPoints();
-    fetchBridgeRank(address);
+    fetchAllData();
 
-    const interval = setInterval(() => {
-      fetchPoints();
-      fetchBridgeRank(address);
-    }, 60000);
+    const interval = setInterval(fetchAllData, 60000);
     return () => clearInterval(interval);
   }, [address, isConnected]);
 
