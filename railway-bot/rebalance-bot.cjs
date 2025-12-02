@@ -33,8 +33,7 @@ async function withRetry(fn, retries = 3, delay = 2000) {
 const STABLECOIN_SWAP = '0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf';
 const EURC_ADDRESS = '0x742b2D045D430FE718B57046645Ba33295914b69'; // SwapEURC token
 
-// Fixer.io API for live EUR/USD rate
-const FIXER_API_KEY = process.env.FIXER_API_KEY || '80f6690ad5c8e6aafe4373f4a0ce6e96';
+// Exchange rate API (free alternatives)
 
 // Rebalance config
 const DEVIATION_THRESHOLD = 0.05; // 5% deviation triggers rebalance
@@ -46,6 +45,7 @@ const CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
 const SWAP_ABI = [
   { inputs: [], name: 'getReserves', outputs: [{ name: '_usdcReserve', type: 'uint256' }, { name: 'eurcReserve', type: 'uint256' }], stateMutability: 'view', type: 'function' },
   { inputs: [], name: 'exchangeRate', outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+  { inputs: [{ name: 'newRate', type: 'uint256' }], name: 'setExchangeRate', outputs: [], stateMutability: 'nonpayable', type: 'function' },
   { inputs: [{ name: 'usdcIn', type: 'uint256' }], name: 'getEurcOut', outputs: [{ name: 'eurcOut', type: 'uint256' }, { name: 'fee', type: 'uint256' }], stateMutability: 'view', type: 'function' },
   { inputs: [{ name: 'eurcIn', type: 'uint256' }], name: 'getUsdcOut', outputs: [{ name: 'usdcOut', type: 'uint256' }, { name: 'fee', type: 'uint256' }], stateMutability: 'view', type: 'function' },
   { inputs: [{ name: 'minEurcOut', type: 'uint256' }], name: 'swapUsdcForEurc', outputs: [{ name: 'eurcOut', type: 'uint256' }], stateMutability: 'payable', type: 'function' },
@@ -68,19 +68,42 @@ async function fetchEurUsdRate() {
     return cachedRate.rate;
   }
 
-  try {
-    const response = await fetch(`https://data.fixer.io/api/latest?access_key=${FIXER_API_KEY}&symbols=USD`);
-    const data = await response.json();
+  // Try multiple free APIs in order
+  const apis = [
+    {
+      name: 'exchangerate-api',
+      url: 'https://api.exchangerate-api.com/v4/latest/EUR',
+      parse: (data) => data.rates?.USD,
+    },
+    {
+      name: 'frankfurter',
+      url: 'https://api.frankfurter.app/latest?from=EUR&to=USD',
+      parse: (data) => data.rates?.USD,
+    },
+    {
+      name: 'floatrates',
+      url: 'https://www.floatrates.com/daily/eur.json',
+      parse: (data) => data.usd?.rate,
+    },
+  ];
 
-    if (data.success && data.rates?.USD) {
-      cachedRate = { rate: data.rates.USD, timestamp: Date.now() };
-      console.log(`[Rate] EUR/USD = ${cachedRate.rate}`);
-      return cachedRate.rate;
+  for (const api of apis) {
+    try {
+      const response = await fetch(api.url, { timeout: 5000 });
+      const data = await response.json();
+      const rate = api.parse(data);
+
+      if (rate && rate > 0.5 && rate < 2) {
+        cachedRate = { rate, timestamp: Date.now() };
+        console.log(`[Rate] EUR/USD = ${rate.toFixed(4)} (from ${api.name})`);
+        return rate;
+      }
+    } catch (error) {
+      console.warn(`[Rate] ${api.name} failed:`, error.message);
     }
-  } catch (error) {
-    console.warn('[Rate] Failed to fetch, using cached:', error.message);
   }
 
+  console.warn('[Rate] All APIs failed, using cached:', cachedRate.rate);
   return cachedRate.rate;
 }
 
@@ -270,6 +293,39 @@ async function executeRebalance(publicClient, walletClient, account, poolState) 
   }
 }
 
+// Update exchange rate in contract if it differs from live rate
+async function updateExchangeRateIfNeeded(publicClient, walletClient, account, liveRate, contractRate) {
+  const rateDiff = Math.abs(liveRate - contractRate) / contractRate;
+  const RATE_THRESHOLD = 0.005; // 0.5% difference triggers update
+
+  if (rateDiff > RATE_THRESHOLD) {
+    console.log(`[Rate] Contract rate ${contractRate.toFixed(4)} differs from live ${liveRate.toFixed(4)} by ${(rateDiff * 100).toFixed(2)}%`);
+
+    // Convert to contract format (6 decimals)
+    const newRateWei = BigInt(Math.round(liveRate * 1e6));
+
+    try {
+      const hash = await walletClient.writeContract({
+        address: STABLECOIN_SWAP,
+        abi: SWAP_ABI,
+        functionName: 'setExchangeRate',
+        args: [newRateWei],
+        account,
+      });
+
+      console.log(`[Rate] Updating exchange rate TX: ${hash}`);
+      await publicClient.waitForTransactionReceipt({ hash });
+      console.log(`[Rate] Exchange rate updated to ${liveRate.toFixed(4)}`);
+      return true;
+    } catch (error) {
+      console.error('[Rate] Failed to update exchange rate:', error.message);
+      return false;
+    }
+  }
+
+  return false;
+}
+
 async function checkAndRebalance() {
   const privateKey = process.env.PRIVATE_KEY_OPERATOR;
   if (!privateKey) {
@@ -301,6 +357,9 @@ async function checkAndRebalance() {
     console.log(`Live Rate: 1 EUR = $${poolState.liveRate.toFixed(4)}`);
     console.log(`Contract Rate: 1 EUR = $${poolState.contractRate.toFixed(4)}`);
     console.log('==================\n');
+
+    // Update exchange rate if needed
+    await updateExchangeRateIfNeeded(publicClient, walletClient, account, poolState.liveRate, poolState.contractRate);
 
     if (poolState.needsRebalance) {
       console.log(`[Rebalance] Deviation ${(poolState.deviation * 100).toFixed(2)}% > threshold ${DEVIATION_THRESHOLD * 100}%`);

@@ -395,15 +395,19 @@ export const LiveBridgeFeed = () => {
         </div>
         <div className="flex items-center gap-1">
           <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
               setShowTop(prev => !prev);
             }}
-            className={`p-1 rounded-lg hover:bg-white/10 transition-colors ${showTop ? 'bg-yellow-500/20 text-yellow-500' : ''}`}
+            className={`p-2 -m-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer select-none touch-manipulation ${showTop ? 'bg-yellow-500/20 text-yellow-500' : ''}`}
             title="Top Bridgers"
           >
-            <Trophy className={`w-3.5 h-3.5 ${!showTop ? 'text-yellow-500 animate-pulse' : ''}`} />
+            <Trophy className={`w-4 h-4 ${!showTop ? 'text-yellow-500 animate-pulse' : ''}`} />
           </button>
           <button
             onClick={handleRefresh}
@@ -422,14 +426,18 @@ export const LiveBridgeFeed = () => {
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-yellow-500">Top 10 Bridgers (24h)</span>
             <button
+              type="button"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 setShowTop(false);
               }}
-              className="p-0.5 hover:bg-white/10 rounded"
+              className="p-1.5 -m-1 hover:bg-white/10 rounded cursor-pointer select-none touch-manipulation"
             >
-              <X className="w-3 h-3 text-muted-foreground" />
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
           </div>
           <div className="space-y-1.5">
