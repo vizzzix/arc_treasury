@@ -46,13 +46,15 @@ export const useUserPoints = () => {
 
   const [pointsData, setPointsData] = useState<UserPointsData | null>(null);
   const [bridgeRank24h, setBridgeRank24h] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start with true
+  const [rankLoaded, setRankLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isConnected || !address) {
       setPointsData(null);
       setBridgeRank24h(null);
+      setRankLoaded(false);
       setIsLoading(false);
       return;
     }
@@ -116,6 +118,7 @@ export const useUserPoints = () => {
 
         // Handle rank result
         setBridgeRank24h(rankResult);
+        setRankLoaded(true);
 
       } catch (e: any) {
         console.error('Failed to fetch user data:', e);
@@ -131,7 +134,8 @@ export const useUserPoints = () => {
     return () => clearInterval(interval);
   }, [address, isConnected]);
 
-  const boostMultiplier = getBoostMultiplier(bridgeRank24h);
+  // Only apply boost once rank is loaded to avoid visual jumps
+  const boostMultiplier = rankLoaded ? getBoostMultiplier(bridgeRank24h) : 1.0;
 
   // Calculate bridge points with boost applied
   const baseBridgePoints = pointsData ? (pointsData.bridge_volume / 100) * 1.0 : 0;
@@ -168,6 +172,7 @@ export const useUserPoints = () => {
     } : null,
     bridgeRank: bridgeRank24h,
     bridgeBoost: boostMultiplier,
+    rankLoaded,
     isLoading,
     error,
   };
