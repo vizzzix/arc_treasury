@@ -961,6 +961,8 @@ Supply: ${totalSupply.toString()} / ${maxSupply.toString()}
 async function checkBridgeEvents() {
   if (!TELEGRAM_CHAT_ID) return;
 
+  const MAX_BLOCK_RANGE = 500n; // Limit to avoid RPC errors
+
   try {
     // === Monitor Arc Testnet (incoming from Sepolia) ===
     const arcCurrentBlock = await publicClient.getBlockNumber();
@@ -971,12 +973,18 @@ async function checkBridgeEvents() {
     }
 
     if (arcCurrentBlock > lastBridgeBlockChecked) {
+      // Limit block range to avoid RPC errors
+      const arcFromBlock = lastBridgeBlockChecked + 1n;
+      const arcToBlock = arcCurrentBlock - arcFromBlock > MAX_BLOCK_RANGE
+        ? arcFromBlock + MAX_BLOCK_RANGE
+        : arcCurrentBlock;
+
       // Monitor MessageReceived events on Arc (Sepolia → Arc completed)
       const arcMessageLogs = await publicClient.getLogs({
         address: CCTP_MESSAGE_TRANSMITTER_ARC,
         event: parseAbiItem("event MessageReceived(address indexed caller, uint32 sourceDomain, bytes32 indexed messageId, bytes32 sender, uint32 finalityThreshold, bytes messageBody)"),
-        fromBlock: lastBridgeBlockChecked + 1n,
-        toBlock: arcCurrentBlock,
+        fromBlock: arcFromBlock,
+        toBlock: arcToBlock,
       });
 
       for (const log of arcMessageLogs) {
@@ -1034,8 +1042,8 @@ ${sourceChain} → Arc Testnet ✅
         await markNotificationSent(txHash, 'bridge_to_arc');
       }
 
-      lastBridgeBlockChecked = arcCurrentBlock;
-      await saveBotState('last_bridge_arc_block', arcCurrentBlock);
+      lastBridgeBlockChecked = arcToBlock;
+      await saveBotState('last_bridge_arc_block', arcToBlock);
     }
 
     // === Monitor Sepolia (incoming from Arc) ===
@@ -1048,6 +1056,12 @@ ${sourceChain} → Arc Testnet ✅
     }
 
     if (sepoliaCurrentBlock > lastSepoliaBridgeBlockChecked) {
+      // Limit block range for Sepolia too
+      const sepoliaFromBlock = lastSepoliaBridgeBlockChecked + 1n;
+      const sepoliaToBlock = sepoliaCurrentBlock - sepoliaFromBlock > MAX_BLOCK_RANGE
+        ? sepoliaFromBlock + MAX_BLOCK_RANGE
+        : sepoliaCurrentBlock;
+
       // Sepolia USDC address (Circle)
       const USDC_SEPOLIA = "0x1c7d4b196cb0c7b01d743fbc6116a902379c7238" as `0x${string}`;
 
@@ -1058,11 +1072,11 @@ ${sourceChain} → Arc Testnet ✅
         args: {
           from: "0x0000000000000000000000000000000000000000" as `0x${string}`,
         },
-        fromBlock: lastSepoliaBridgeBlockChecked + 1n,
-        toBlock: sepoliaCurrentBlock,
+        fromBlock: sepoliaFromBlock,
+        toBlock: sepoliaToBlock,
       });
 
-      console.log(`[${new Date().toISOString()}] Sepolia: checked blocks ${lastSepoliaBridgeBlockChecked + 1n}-${sepoliaCurrentBlock}, found ${usdcMintLogs.length} USDC mints`);
+      console.log(`[${new Date().toISOString()}] Sepolia: checked blocks ${sepoliaFromBlock}-${sepoliaToBlock}, found ${usdcMintLogs.length} USDC mints`);
 
       for (const log of usdcMintLogs) {
         const txHash = log.transactionHash;
@@ -1101,8 +1115,8 @@ Arc Testnet → Sepolia ✅
         await markNotificationSent(txHash, 'bridge_to_sepolia');
       }
 
-      lastSepoliaBridgeBlockChecked = sepoliaCurrentBlock;
-      await saveBotState('last_sepolia_block', sepoliaCurrentBlock);
+      lastSepoliaBridgeBlockChecked = sepoliaToBlock;
+      await saveBotState('last_sepolia_block', sepoliaToBlock);
     }
 
   } catch (e) {
