@@ -100,7 +100,7 @@ async function main() {
 
   console.log("\n" + "=".repeat(60));
   console.log("SUCCESS! EURC is being bridged to Arc Testnet");
-  console.log("Wait ~2-3 minutes for Circle attestation");
+  console.log("Wait ~30 seconds for Circle attestation");
   console.log("=".repeat(60));
 }
 

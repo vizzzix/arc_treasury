@@ -231,7 +231,7 @@ export const BridgeModal = ({ open, onOpenChange }: BridgeModalProps) => {
                     Step 1/2: Waiting for Circle Attestation
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Status: <span className="font-medium">{attestationStatus}</span>. Takes ~2-3 min. Green button will appear when ready.
+                    Status: <span className="font-medium">{attestationStatus}</span>. Takes ~30 sec. Green button will appear when ready.
                   </p>
                 </div>
               </div>

@@ -408,7 +408,13 @@ export const useBridgeCCTP = () => {
 
         // Check overall result state
         if (result?.state === 'success') {
-          // Full success
+          // Full success - track the bridge in site_bridges
+          const burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
+          if (burnTxHash) {
+            const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
+            trackSiteBridge(burnTxHash, address!, amount, direction);
+          }
+
           setAttestationStatus('confirming');
           toast.info('Transaction sent, waiting for confirmation...');
           await new Promise(resolve => setTimeout(resolve, 6000));
@@ -431,6 +437,12 @@ export const useBridgeCCTP = () => {
           // Try to get burn tx hash from step, or fallback to transactions state
           const burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
           console.log('[useBridgeCCTP] Burn tx hash from step:', burnTxHash);
+
+          // Track the bridge even if mint failed
+          if (burnTxHash) {
+            const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
+            trackSiteBridge(burnTxHash, address!, amount, direction);
+          }
 
           setAttestationStatus('pending_mint');
           toast.warning('Your funds are safe!', {

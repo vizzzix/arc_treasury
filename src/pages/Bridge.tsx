@@ -221,7 +221,7 @@ const Bridge = () => {
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <CheckCircle2 className="w-4 h-4 text-primary" />
-                <span>Automatic attestation (~2-3 min)</span>
+                <span>Fast Transfer (~30 seconds)</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <CheckCircle2 className="w-4 h-4 text-primary" />
@@ -347,7 +347,7 @@ const Bridge = () => {
                     Waiting for Circle Attestation
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    This usually takes 2-3 minutes...
+                    This usually takes under 30 seconds...
                   </p>
                 </div>
               </div>
