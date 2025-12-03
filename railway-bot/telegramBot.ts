@@ -982,7 +982,7 @@ async function checkBridgeEvents() {
       // Monitor MessageReceived events on Arc (Sepolia → Arc completed)
       const arcMessageLogs = await publicClient.getLogs({
         address: CCTP_MESSAGE_TRANSMITTER_ARC,
-        event: parseAbiItem("event MessageReceived(address indexed caller, uint32 sourceDomain, bytes32 indexed messageId, bytes32 sender, uint32 finalityThreshold, bytes messageBody)"),
+        event: parseAbiItem("event MessageReceived(address indexed caller, uint32 sourceDomain, bytes32 indexed nonce, bytes32 sender, uint32 indexed finalityThresholdExecuted, bytes messageBody)"),
         fromBlock: arcFromBlock,
         toBlock: arcToBlock,
       });
