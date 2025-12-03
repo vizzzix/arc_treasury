@@ -67,7 +67,7 @@ const ALERT_APY_HIGH = 6.0;
 const ALERT_DRIFT = 0.3;
 const USYC_DRIFT_THRESHOLD = 0.2; // Alert if contract APY differs from USYC by more than 0.2%
 
-// In-memory state (Railway restarts will reset this, which is fine)
+// State variables (loaded from Supabase on startup)
 let lastUpdateId = 0;
 let lastContractAPY = 0;
 let lastBlockChecked = 0n;
@@ -77,10 +77,53 @@ let lastSepoliaBridgeBlockChecked = 0n;
 let lastSwapBlockChecked = 0n;
 let lastConvertCheck = Date.now();
 let lastExchangeRateUpdate = 0; // Force update on startup
+let stateLoaded = false; // Flag to track if state was loaded from Supabase
 
-// Set to track sent notifications and prevent duplicates (v2 - persistent via Supabase)
-const sentNotifications = new Set<string>();
-const MAX_SENT_CACHE = 1000; // Limit memory usage
+// ============ Persistent State Functions ============
+
+async function loadBotState(): Promise<void> {
+  if (!supabase) return;
+
+  try {
+    const { data, error } = await supabase
+      .from('bot_state')
+      .select('key, value');
+
+    if (error) {
+      console.log("⚠️ bot_state table not found, using defaults");
+      return;
+    }
+
+    if (data) {
+      for (const row of data) {
+        const val = BigInt(row.value || 0);
+        switch (row.key) {
+          case 'last_arc_block': lastBlockChecked = val; break;
+          case 'last_sepolia_block': lastSepoliaBridgeBlockChecked = val; break;
+          case 'last_badge_block': lastBadgeBlockChecked = val; break;
+          case 'last_swap_block': lastSwapBlockChecked = val; break;
+          case 'last_bridge_arc_block': lastBridgeBlockChecked = val; break;
+        }
+      }
+      stateLoaded = true;
+      console.log(`✅ Loaded state: arc=${lastBlockChecked}, sepolia=${lastSepoliaBridgeBlockChecked}, badge=${lastBadgeBlockChecked}`);
+    }
+  } catch (e) {
+    console.error("loadBotState error:", e);
+  }
+}
+
+async function saveBotState(key: string, value: bigint): Promise<void> {
+  if (!supabase) return;
+
+  try {
+    await supabase
+      .from('bot_state')
+      .upsert({ key, value: Number(value), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  } catch (e) {
+    console.error("saveBotState error:", e);
+  }
+}
 
 // Operator wallet for auto-conversion
 let operatorWalletClient: ReturnType<typeof createWalletClient> | null = null;
@@ -215,6 +258,34 @@ async function saveBridgeTransaction(
       }, { onConflict: 'tx_hash' });
   } catch (e) {
     console.error("Save bridge transaction error:", e);
+  }
+}
+
+// Check if this bridge was initiated from our site (arctreasury.biz)
+// Matches by wallet_address + direction + recent timestamp (within 10 minutes)
+async function isSiteBridge(walletAddress: string, direction: 'to_arc' | 'to_sepolia'): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from('site_bridges')
+      .select('tx_hash')
+      .eq('wallet_address', walletAddress.toLowerCase())
+      .eq('direction', direction)
+      .gte('created_at', tenMinutesAgo)
+      .limit(1);
+
+    if (error) {
+      console.error("isSiteBridge error:", error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  } catch (e) {
+    console.error("isSiteBridge error:", e);
+    return false;
   }
 }
 
@@ -807,6 +878,7 @@ _User broke lock early and paid 10% penalty_
     }
 
     lastBlockChecked = currentBlock;
+    await saveBotState('last_arc_block', currentBlock);
   } catch (e) {
     console.error("Event check error:", e);
   }
@@ -878,6 +950,7 @@ Supply: ${totalSupply.toString()} / ${maxSupply.toString()}
     }
 
     lastBadgeBlockChecked = currentBlock;
+    await saveBotState('last_badge_block', currentBlock);
   } catch (e) {
     console.error("Badge mint check error:", e);
   }
@@ -937,24 +1010,32 @@ async function checkBridgeEvents() {
 
         const amountStr = amount > 0 ? `*$${amount.toFixed(2)} USDC*` : "USDC";
 
-        // Track user and save transaction in Supabase
+        // Track user and save transaction in Supabase (for Live Feed - all bridges)
         const userStatus = await trackBridgeUser(caller, amount);
         await saveBridgeTransaction(caller, amount, 'to_arc', txHash);
-        const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
 
-        const message = `🌉 *Bridge Completed* ${userBadge}
+        // Only send Telegram notification if bridge was from our site
+        const fromOurSite = await isSiteBridge(caller, 'to_arc');
+        if (fromOurSite) {
+          const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
+
+          const message = `🌉 *Bridge Completed* ${userBadge}
 
 \`${callerShort}\` received ${amountStr}
 ${sourceChain} → Arc Testnet ✅
 
 [View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
-        await sendMessage(TELEGRAM_CHAT_ID, message);
+          await sendMessage(TELEGRAM_CHAT_ID, message);
+          console.log(`[${new Date().toISOString()}] Bridge to Arc (SITE): ${amount} USDC from ${callerShort}`);
+        } else {
+          console.log(`[${new Date().toISOString()}] Bridge to Arc (external): ${amount} USDC from ${callerShort} - no notification`);
+        }
         await markNotificationSent(txHash, 'bridge_to_arc');
-        console.log(`[${new Date().toISOString()}] Bridge to Arc: ${amount} USDC from ${callerShort} (${userStatus.isNew ? 'NEW' : 'returning'})`);
       }
 
       lastBridgeBlockChecked = arcCurrentBlock;
+      await saveBotState('last_bridge_arc_block', arcCurrentBlock);
     }
 
     // === Monitor Sepolia (incoming from Arc) ===
@@ -995,26 +1076,33 @@ ${sourceChain} → Arc Testnet ✅
         const recipientShort = recipient ? `${recipient.slice(0, 6)}...${recipient.slice(-4)}` : "Unknown";
         const amount = Number(formatUnits(args.value || 0n, 6));
 
-        // Track user and save transaction in Supabase
+        // Track user and save transaction in Supabase (for Live Feed - all bridges)
         const userStatus = await trackBridgeUser(recipient, amount);
         await saveBridgeTransaction(recipient, amount, 'to_sepolia', txHash);
-        const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
 
-        const amountStr = `*$${amount.toFixed(2)} USDC*`;
+        // Only send Telegram notification if bridge was from our site
+        const fromOurSite = await isSiteBridge(recipient, 'to_sepolia');
+        if (fromOurSite) {
+          const userBadge = userStatus.isNew ? "🆕 New User" : `🔄 Return #${userStatus.bridgeCount}`;
+          const amountStr = `*$${amount.toFixed(2)} USDC*`;
 
-        const message = `🌉 *Bridge Completed* ${userBadge}
+          const message = `🌉 *Bridge Completed* ${userBadge}
 
 \`${recipientShort}\` received ${amountStr}
 Arc Testnet → Sepolia ✅
 
 [View Tx](https://sepolia.etherscan.io/tx/${txHash})`;
 
-        await sendMessage(TELEGRAM_CHAT_ID, message);
+          await sendMessage(TELEGRAM_CHAT_ID, message);
+          console.log(`[${new Date().toISOString()}] Bridge to Sepolia (SITE): ${amount} USDC to ${recipientShort}`);
+        } else {
+          console.log(`[${new Date().toISOString()}] Bridge to Sepolia (external): ${amount} USDC to ${recipientShort} - no notification`);
+        }
         await markNotificationSent(txHash, 'bridge_to_sepolia');
-        console.log(`[${new Date().toISOString()}] Bridge to Sepolia: ${amount} USDC to ${recipientShort} (${userStatus.isNew ? 'NEW' : 'returning'})`);
       }
 
       lastSepoliaBridgeBlockChecked = sepoliaCurrentBlock;
+      await saveBotState('last_sepolia_block', sepoliaCurrentBlock);
     }
 
   } catch (e) {
@@ -1159,6 +1247,7 @@ Provider: \`${provider}\`
     }
 
     lastSwapBlockChecked = currentBlock;
+    await saveBotState('last_swap_block', currentBlock);
   } catch (e) {
     console.error("Swap event check error:", e);
   }
@@ -1485,6 +1574,9 @@ async function main() {
 
   console.log("✅ Bot token configured");
   console.log(`📡 Chat ID: ${TELEGRAM_CHAT_ID || "not set (no auto-alerts)"}`);
+
+  // Load persistent state from Supabase
+  await loadBotState();
 
   // Initialize operator wallet for auto-conversion
   if (AUTO_CONVERT_ENABLED) {

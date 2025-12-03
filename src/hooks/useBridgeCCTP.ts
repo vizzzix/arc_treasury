@@ -21,6 +21,28 @@ import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_AP
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase client for tracking site bridges
+const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
+const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Track bridge initiated from our site
+const trackSiteBridge = async (txHash: string, walletAddress: string, amount: string, direction: 'to_arc' | 'to_sepolia') => {
+  try {
+    await supabase.from('site_bridges').upsert({
+      tx_hash: txHash.toLowerCase(),
+      wallet_address: walletAddress.toLowerCase(),
+      amount_usd: parseFloat(amount),
+      direction,
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'tx_hash' });
+    console.log('[useBridgeCCTP] Tracked site bridge:', txHash);
+  } catch (e) {
+    console.error('[useBridgeCCTP] Failed to track site bridge:', e);
+  }
+};
 // viem imports removed - using Circle API for message bytes
 
 type BridgeNetwork = keyof typeof SUPPORTED_NETWORKS;
@@ -298,12 +320,21 @@ export const useBridgeCCTP = () => {
                       step: 'Burn',
                     }],
                   }));
+                  // Track this bridge as initiated from our site
+                  const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
+                  trackSiteBridge(hash, address!, amount, direction);
                 }
                 break;
 
               case 'BURN_CONFIRMED':
                 toast.success('Burn confirmed!');
                 burnConfirmedRef.current = true;
+                // Backup tracking - in case BURN_STARTED didn't have txHash
+                if (progress.txHash || progress.transactionHash) {
+                  const hash = progress.txHash || progress.transactionHash;
+                  const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
+                  trackSiteBridge(hash, address!, amount, direction);
+                }
                 setState(prev => ({
                   ...prev,
                   transactions: prev.transactions.map(tx => ({ ...tx, status: 'success' as const })),
@@ -315,7 +346,7 @@ export const useBridgeCCTP = () => {
                 // If we're waiting for attestation, burn must have been confirmed
                 burnConfirmedRef.current = true;
                 setAttestationStatus('pending');
-                toast.info('Waiting for Circle attestation (~2-3 min)...');
+                toast.info('Waiting for Circle attestation (~30 sec)...');
                 break;
 
               case 'ATTESTATION_COMPLETE':
