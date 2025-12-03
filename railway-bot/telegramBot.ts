@@ -79,6 +79,10 @@ let lastConvertCheck = Date.now();
 let lastExchangeRateUpdate = 0; // Force update on startup
 let stateLoaded = false; // Flag to track if state was loaded from Supabase
 
+// In-memory cache for sent notifications to prevent duplicates
+const sentNotifications = new Set<string>();
+const MAX_SENT_CACHE = 1000;
+
 // ============ Persistent State Functions ============
 
 async function loadBotState(): Promise<void> {
