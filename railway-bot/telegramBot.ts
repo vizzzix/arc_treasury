@@ -987,7 +987,14 @@ async function checkBridgeEvents() {
         toBlock: arcToBlock,
       });
 
+      console.log(`[${new Date().toISOString()}] Arc bridge: checked blocks ${arcFromBlock}-${arcToBlock}, found ${arcMessageLogs.length} events`);
+
+      // Update block BEFORE processing to avoid getting stuck on errors
+      lastBridgeBlockChecked = arcToBlock;
+      await saveBotState('last_bridge_arc_block', arcToBlock);
+
       for (const log of arcMessageLogs) {
+        try {
         const txHash = log.transactionHash;
         if (await wasNotificationSent(txHash, 'bridge_to_arc')) {
           console.log(`[${new Date().toISOString()}] Skipping duplicate bridge to Arc: ${txHash}`);
@@ -1040,10 +1047,10 @@ ${sourceChain} → Arc Testnet ✅
           console.log(`[${new Date().toISOString()}] Bridge to Arc (external): ${amount} USDC from ${callerShort} - no notification`);
         }
         await markNotificationSent(txHash, 'bridge_to_arc');
+        } catch (logError) {
+          console.error(`Error processing Arc bridge log:`, logError);
+        }
       }
-
-      lastBridgeBlockChecked = arcToBlock;
-      await saveBotState('last_bridge_arc_block', arcToBlock);
     }
 
     // === Monitor Sepolia (incoming from Arc) ===
@@ -1078,7 +1085,12 @@ ${sourceChain} → Arc Testnet ✅
 
       console.log(`[${new Date().toISOString()}] Sepolia: checked blocks ${sepoliaFromBlock}-${sepoliaToBlock}, found ${usdcMintLogs.length} USDC mints`);
 
+      // Update block BEFORE processing to avoid getting stuck on errors
+      lastSepoliaBridgeBlockChecked = sepoliaToBlock;
+      await saveBotState('last_sepolia_block', sepoliaToBlock);
+
       for (const log of usdcMintLogs) {
+        try {
         const txHash = log.transactionHash;
         if (await wasNotificationSent(txHash, 'bridge_to_sepolia')) {
           console.log(`[${new Date().toISOString()}] Skipping duplicate bridge to Sepolia: ${txHash}`);
@@ -1113,10 +1125,10 @@ Arc Testnet → Sepolia ✅
           console.log(`[${new Date().toISOString()}] Bridge to Sepolia (external): ${amount} USDC to ${recipientShort} - no notification`);
         }
         await markNotificationSent(txHash, 'bridge_to_sepolia');
+        } catch (logError) {
+          console.error(`Error processing Sepolia bridge log:`, logError);
+        }
       }
-
-      lastSepoliaBridgeBlockChecked = sepoliaToBlock;
-      await saveBotState('last_sepolia_block', sepoliaToBlock);
     }
 
   } catch (e) {
