@@ -17,6 +17,8 @@ import Support from "./pages/Support";
 import Litepaper from "./pages/Litepaper";
 import LockDesignPreview from "./pages/LockDesignPreview";
 import Swap from "./pages/Swap";
+import PitchDeck from "./pages/PitchDeck";
+import CallCheatSheet from "./pages/CallCheatSheet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const AppRoutes = () => {
         <Route path="/litepaper" element={<Litepaper />} />
         <Route path="/lock-preview" element={<LockDesignPreview />} />
         <Route path="/swap" element={<Swap />} />
+        <Route path="/pitch/:token" element={<PitchDeck />} />
+        <Route path="/call/:token" element={<CallCheatSheet />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
