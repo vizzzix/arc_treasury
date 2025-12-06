@@ -40,6 +40,9 @@ const Bridge = () => {
     return localStorage.getItem('bridge_badge_dismissed') !== 'true';
   });
   const [savedBridgeParams, setSavedBridgeParams] = useState<{ amount: string; toNetwork: keyof typeof SUPPORTED_NETWORKS } | null>(null);
+  const [showRestoreForm, setShowRestoreForm] = useState(false);
+  const [restoreTxHash, setRestoreTxHash] = useState("");
+  const [restoreStatus, setRestoreStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error' | 'claimed'; message: string }>({ type: 'idle', message: '' });
 
   // Persist dismissal to localStorage
   useEffect(() => {
@@ -53,7 +56,7 @@ const Bridge = () => {
       localStorage.setItem('bridge_badge_dismissed', 'true');
     }
   }, [showBadgeReminder]);
-  const { bridge, claimPendingBridge, clearPendingBurn, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
+  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
 
   const { balance: fromBalance, isLoading: isLoadingFromBalance } = useUSDCBalance(fromNetwork);
   const { balance: toBalance, isLoading: isLoadingToBalance } = useUSDCBalance(toNetwork);
@@ -72,6 +75,26 @@ const Bridge = () => {
   const handleHalf = () => {
     const balance = parseFloat(fromBalance);
     if (balance > 0) setAmount((balance / 2).toFixed(2));
+  };
+
+  const handleRestore = async () => {
+    if (!restoreTxHash || !restoreTxHash.startsWith('0x')) return;
+    if (restoreTxHash.length !== 66) {
+      setRestoreStatus({ type: 'error', message: 'Transaction hash should be 66 characters (0x + 64 hex)' });
+      return;
+    }
+    setRestoreStatus({ type: 'loading', message: 'Verifying with Circle API...' });
+    const result = await restorePendingBurn(restoreTxHash, fromNetwork, toNetwork, '0');
+    if (result.success) {
+      setRestoreStatus({ type: 'success', message: result.message });
+      setTimeout(() => {
+        setShowRestoreForm(false);
+        setRestoreTxHash("");
+        setRestoreStatus({ type: 'idle', message: '' });
+      }, 2000);
+    } else {
+      setRestoreStatus({ type: result.type as 'error' | 'claimed', message: result.message });
+    }
   };
 
   return (
@@ -506,6 +529,59 @@ const Bridge = () => {
               </div>
             </div>
           )}
+
+          {/* Restore Pending Bridge */}
+          <div className="pt-4 border-t border-white/5">
+            <button
+              onClick={() => setShowRestoreForm(!showRestoreForm)}
+              className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors flex items-center gap-1 mx-auto"
+            >
+              {showRestoreForm ? <X className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+              {showRestoreForm ? "Close" : "Having trouble with a stuck transfer?"}
+            </button>
+
+            {showRestoreForm && (
+              <div className="mt-4 p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  If your bridge was interrupted after the burn transaction, enter your burn tx hash to restore and claim.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="0x..."
+                    value={restoreTxHash}
+                    onChange={(e) => {
+                      setRestoreTxHash(e.target.value);
+                      if (restoreStatus.type !== 'idle' && restoreStatus.type !== 'loading') {
+                        setRestoreStatus({ type: 'idle', message: '' });
+                      }
+                    }}
+                    className="text-sm font-mono h-9 bg-white/5 border-white/10 flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleRestore}
+                    disabled={!restoreTxHash || !restoreTxHash.startsWith('0x') || restoreStatus.type === 'loading'}
+                    className="bg-yellow-600 hover:bg-yellow-700 h-9"
+                  >
+                    {restoreStatus.type === 'loading' ? 'Checking...' : 'Restore'}
+                  </Button>
+                </div>
+                {restoreStatus.type !== 'idle' && restoreStatus.type !== 'loading' && (
+                  <div className={`text-xs mt-2 px-2 py-1.5 rounded-lg ${
+                    restoreStatus.type === 'success' ? 'bg-green-500/10 text-green-400' :
+                    restoreStatus.type === 'claimed' ? 'bg-blue-500/10 text-blue-400' :
+                    'bg-red-500/10 text-red-400'
+                  }`}>
+                    {restoreStatus.type === 'success' && '✓ '}
+                    {restoreStatus.type === 'claimed' && '✓ '}
+                    {restoreStatus.type === 'error' && '✗ '}
+                    {restoreStatus.message}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         )}
 

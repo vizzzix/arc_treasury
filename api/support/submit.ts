@@ -90,6 +90,7 @@ export default async function handler(request: any, response: any) {
         await resend.emails.send({
           from: 'Arc Treasury <noreply@arctreasury.biz>',
           to: SUPPORT_EMAIL,
+          replyTo: email,
           subject: `[${category.toUpperCase()}] ${subject}`,
           html: `
             <h2>New Support Request</h2>

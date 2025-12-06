@@ -737,30 +737,70 @@ export const useBridgeCCTP = () => {
 
   /**
    * Manually restore a pending burn for claiming
-   * Used when user refreshes page and localStorage didn't save properly
+   * Validates the transaction by checking Circle Attestation API
+   * Returns: { success: boolean, message: string, type: 'success' | 'error' | 'claimed' }
    */
-  const restorePendingBurn = useCallback((burnTxHash: string, fromNetwork: BridgeNetwork, toNetwork: BridgeNetwork, amount: string) => {
+  const restorePendingBurn = useCallback(async (burnTxHash: string, fromNetwork: BridgeNetwork, toNetwork: BridgeNetwork, amount: string): Promise<{ success: boolean; message: string; type: string }> => {
     if (!burnTxHash || !burnTxHash.startsWith('0x')) {
-      toast.error('Invalid transaction hash');
-      return;
+      return { success: false, message: 'Invalid transaction hash format', type: 'error' };
     }
 
-    const pendingBurn: PendingBurn = {
-      txHash: burnTxHash,
-      fromNetwork,
-      toNetwork,
-      amount,
-      timestamp: Date.now(),
-    };
-
-    // Save to localStorage
-    if (address) {
-      savePendingBurn(address, pendingBurn);
+    // Validate tx hash length (should be 66 chars: 0x + 64 hex)
+    if (burnTxHash.length !== 66) {
+      return { success: false, message: 'Transaction hash should be 66 characters', type: 'error' };
     }
 
-    setState(prev => ({ ...prev, pendingBurn }));
-    setAttestationStatus('pending_mint');
-    toast.success('Pending burn restored! You can now claim your USDC.');
+    try {
+      // Check attestation from Circle API to validate this is a real burn tx
+      const sourceDomain = CCTP_DOMAINS[fromNetwork];
+      const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
+
+      console.log('[useBridgeCCTP] Checking attestation for:', burnTxHash);
+      const response = await fetch(attestationUrl);
+      const data = await response.json();
+
+      console.log('[useBridgeCCTP] Attestation check response:', data);
+
+      if (!data.messages || data.messages.length === 0) {
+        return { success: false, message: 'No CCTP burn found for this transaction. Make sure this is a valid burn tx hash.', type: 'error' };
+      }
+
+      const messageData = data.messages[0];
+
+      // Check if already claimed
+      if (messageData.status === 'complete' || messageData.eventNonce) {
+        // Try to check if the message was already received
+        // For now, show as claimable - claimPendingBridge will catch "already received" error
+      }
+
+      // Check attestation status
+      if (!messageData.attestation || messageData.attestation === 'PENDING') {
+        return { success: false, message: 'Attestation still pending. Please wait a few minutes and try again.', type: 'error' };
+      }
+
+      // Valid burn with attestation - restore it
+      const pendingBurn: PendingBurn = {
+        txHash: burnTxHash,
+        fromNetwork,
+        toNetwork,
+        amount: amount || '0',
+        timestamp: Date.now(),
+      };
+
+      // Save to localStorage
+      if (address) {
+        savePendingBurn(address, pendingBurn);
+      }
+
+      setState(prev => ({ ...prev, pendingBurn }));
+      setAttestationStatus('pending_mint');
+
+      return { success: true, message: 'Burn verified! Click Claim to receive your USDC.', type: 'success' };
+
+    } catch (error: any) {
+      console.error('[useBridgeCCTP] Restore check error:', error);
+      return { success: false, message: 'Failed to verify transaction. Please check the tx hash and try again.', type: 'error' };
+    }
   }, [address]);
 
   /**

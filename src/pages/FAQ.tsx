@@ -16,32 +16,32 @@ const FAQ = () => {
 
   const faqs = [
     {
-      category: "About",
+      category: "About Arc Treasury",
       items: [
         {
-          question: "What is Arc Treasury?",
-          answer: `Yield vault on Arc Testnet. Deposit USDC/EURC → earn ~${apy.toFixed(1)}% APY from US Treasury Bills via USYC (Hashnote). Testnet tokens have no real value.`,
+          question: "What is Arc Treasury and how does yield work?",
+          answer: `Arc Treasury is a yield vault built on Circle's Arc blockchain. You deposit USDC, we convert it to USYC (tokenized US Treasury Bills by Hashnote), and you earn ~${apy.toFixed(1)}% APY — the same rate as the Federal Reserve. USYC price grows daily from T-Bill returns, and you can redeem to USDC anytime.`,
         },
         {
-          question: "How does the yield work?",
-          answer: `Your stablecoins convert to USYC (tokenized T-Bills). USYC price grows daily from T-Bill returns. APY is variable (~${apy.toFixed(2)}% net after fees).`,
+          question: "Why use Arc Treasury instead of accessing USYC directly?",
+          answer: `Direct USYC access requires institutional investor status, KYC/AML verification, a $100,000 minimum investment, and wallet allowlisting. Arc Treasury removes all these barriers — any USDC holder can access T-Bill yields through our vault with no minimum deposit.`,
         },
         {
           question: "What are the fees?",
-          answer: "Arc Treasury: 5% of yield only. USYC: 0.1% redemption + 10% performance fee. No deposit/withdrawal fees.",
+          answer: `Arc Treasury charges 5% of yield only — you keep 95% of all earnings. There are no deposit fees, no withdrawal fees, and no hidden costs. USYC itself has a 0.1% redemption fee on mainnet.`,
         },
       ],
     },
     {
-      category: "Deposits & Locks",
+      category: "Deposits & Positions",
       items: [
         {
-          question: "Flexible vs Locked deposits?",
-          answer: "Same APY for both. Locked deposits earn bonus Points (1.5x/2x/3x multiplier). Early unlock = 25% penalty. Flexible = withdraw anytime.",
+          question: "What's the difference between Flexible and Locked deposits?",
+          answer: `Both earn the same ~${apy.toFixed(1)}% APY. Flexible deposits can be withdrawn anytime. Locked deposits (1, 3, or 12 months) earn bonus Points with multipliers: 1.5x for 1 month, 2x for 3 months, 3x for 12 months. Early unlock incurs a 25% points penalty.`,
         },
         {
-          question: "How to get testnet USDC?",
-          answer: "faucet.circle.com → Arc Testnet → request USDC. Or bridge from Sepolia via /bridge page.",
+          question: "How do I get testnet USDC to try the platform?",
+          answer: "Visit faucet.circle.com and select Arc Testnet to request free testnet USDC. Alternatively, you can bridge USDC from Ethereum Sepolia using our Bridge feature.",
         },
       ],
     },
@@ -49,33 +49,21 @@ const FAQ = () => {
       category: "Points & Rewards",
       items: [
         {
-          question: "How do Points work?",
-          answer: "Points = Deposit × Days × Multiplier. Flex=1x, 1M=1.5x, 3M=2x, 12M=3x. Points → future ARC token rewards.",
+          question: "How do Points work and what are they worth?",
+          answer: "Points are calculated as: Deposit Amount × Days Held × Lock Multiplier. Flexible deposits earn 1x, while locked positions earn 1.5x (1M), 2x (3M), or 3x (12M). Points will convert to ARC token rewards at mainnet launch — early users get the best rates.",
         },
         {
-          question: "What is Early Supporter Badge?",
-          answer: "Free NFT for first 5,000 users. Deposit $10+ → mint on /rewards. Gives permanent 1.2x points boost!",
+          question: "What is the Early Supporter Badge?",
+          answer: "A free NFT available to the first 5,000 users who deposit $10 or more. Mint it on the /rewards page. The badge provides a permanent 1.2x multiplier on all future points earnings, stacking with lock multipliers.",
         },
       ],
     },
     {
-      category: "Testnet Mode",
+      category: "Testnet & Mainnet",
       items: [
         {
-          question: "How does yield work on testnet?",
-          answer: "On testnet, we simulate USYC yield due to Hashnote Teller limitations (90 USDC daily limit, ~10% testnet fee). Instead of real USYC conversion, the vault accrues yield from a USDC reserve pool at the same APY rate. Your experience mirrors mainnet behavior.",
-        },
-        {
-          question: "Why not use real USYC on testnet?",
-          answer: "Hashnote's testnet Teller has strict limits: 90 USDC/day max conversion, ~10% conversion fee (vs 0% on mainnet). This makes real conversion impractical for testing. We simulate yield to let you test the full deposit/withdraw/yield flow.",
-        },
-        {
-          question: "Will mainnet be different?",
-          answer: "Yes! On mainnet: real USYC conversion (0% mint fee, 0.1% redeem fee), actual T-Bill yield, no conversion limits. The yield simulation is testnet-only to provide a realistic testing experience.",
-        },
-        {
-          question: "Is my testnet balance real?",
-          answer: "No. All tokens on Arc Testnet (USDC, EURC, shares, points) have no real value. This is for testing only. Mainnet launch will require fresh deposits with real assets.",
+          question: "How does the testnet work and what changes on mainnet?",
+          answer: "On testnet, yield is simulated using a USDC reserve pool that mirrors mainnet APY rates. The user experience is identical to mainnet. On mainnet launch: real USYC conversion, actual T-Bill yield, institutional-grade security. All testnet balances are for testing only — mainnet will require fresh deposits with real assets.",
         },
       ],
     },

@@ -54,7 +54,7 @@ const Rewards = () => {
   const navigate = useNavigate();
   const account = useAccount();
   const { toast } = useToast();
-  const { formattedPoints, breakdown, volumes, rankLoaded, isLoading: isLoadingPoints } = useUserPoints();
+  const { formattedPoints, breakdown, volumes, isLoading: isLoadingPoints } = useUserPoints();
   const { referralUrl, stats, isLoading: isLoadingReferral, error: referralError } = useReferral();
   const { apy } = useUSYCPrice();
   const { leaderboard, isLoading: isLoadingLeaderboard, userRank, userEntry, totalDepositors } = useLeaderboard(account?.address);
@@ -313,14 +313,10 @@ const Rewards = () => {
               <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
                 <p className="text-xs text-muted-foreground mb-3">Points Breakdown</p>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className={`text-center p-2 rounded-lg ${rankLoaded && breakdown.bridgeBoost > 1 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02]'}`}>
+                  <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.bridgePoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Bridge</p>
-                    {rankLoaded && breakdown.bridgeBoost > 1 ? (
-                      <p className="text-[9px] text-yellow-500 font-medium">⚡ {breakdown.bridgeBoost}x boost</p>
-                    ) : (
-                      <p className="text-[9px] text-muted-foreground/60">${volumes.bridge.toLocaleString()}</p>
-                    )}
+                    <p className="text-[9px] text-muted-foreground/60">${volumes.bridge.toLocaleString()}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.vaultPoints.toFixed(0)}</p>
