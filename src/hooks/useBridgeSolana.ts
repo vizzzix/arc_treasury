@@ -262,14 +262,26 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         console.warn('[BridgeSolana] Could not get txHash from result:', { resultTxHash, evmAddress, result });
       }
 
-      // Bridge completed - ensure state is finalized (may already be set by MINT_CONFIRMED)
-      setState(prev => ({
-        ...prev,
-        isBridging: false,
-        attestationStatus: 'complete',
-        attestationProgress: 100,
-        result,
-      }));
+      // Bridge completed - only mark complete if we have actual transactions
+      setState(prev => {
+        const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
+        if (!hasBurnTx) {
+          // No burn transaction = user cancelled before any tx was sent
+          return {
+            ...prev,
+            isBridging: false,
+            attestationStatus: 'idle',
+            attestationProgress: 0,
+          };
+        }
+        return {
+          ...prev,
+          isBridging: false,
+          attestationStatus: 'complete',
+          attestationProgress: 100,
+          result,
+        };
+      });
 
     } catch (error: any) {
       console.error('[BridgeSolana] Bridge error:', error);
@@ -434,14 +446,26 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         console.warn('[BridgeSolana] Could not get txHash from result (Sol→EVM):', { resultTxHash, publicKey: publicKey?.toBase58(), result });
       }
 
-      // Bridge completed - ensure state is finalized (may already be set by MINT_CONFIRMED)
-      setState(prev => ({
-        ...prev,
-        isBridging: false,
-        attestationStatus: 'complete',
-        attestationProgress: 100,
-        result,
-      }));
+      // Bridge completed - only mark complete if we have actual transactions
+      setState(prev => {
+        const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
+        if (!hasBurnTx) {
+          // No burn transaction = user cancelled before any tx was sent
+          return {
+            ...prev,
+            isBridging: false,
+            attestationStatus: 'idle',
+            attestationProgress: 0,
+          };
+        }
+        return {
+          ...prev,
+          isBridging: false,
+          attestationStatus: 'complete',
+          attestationProgress: 100,
+          result,
+        };
+      });
 
     } catch (error: any) {
       console.error('[BridgeSolana] Bridge error:', error);
