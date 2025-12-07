@@ -260,9 +260,11 @@ const Bridge = () => {
   const currentAttestationStatus = isSolanaInvolved ? solanaState.attestationStatus : attestationStatus;
   const isComplete = currentAttestationStatus === 'complete';
 
-  // Auto-refresh balances when bridge completes (silent to avoid UI flicker)
+  // Auto-refresh balances and clear amount when bridge completes
   useEffect(() => {
     if (isComplete) {
+      // Clear the amount field
+      setAmount("");
       // Delay slightly to allow blockchain state to update
       const timer = setTimeout(() => {
         refetchSepolia(true); // silent refetch
