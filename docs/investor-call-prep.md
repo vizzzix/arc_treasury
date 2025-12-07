@@ -22,7 +22,7 @@
 > 3. USYC is backed by US Treasury reverse repo - the safest yield source
 > 4. User earns ~4% APY with one click
 >
-> On top of this, we've built a cross-chain bridge using Circle's CCTP protocol, and an AMM for USDC/EURC swaps. All live on testnet today."
+> On top of this, we've built a multi-chain bridge using Circle's CCTP protocol — supporting Sepolia, Arc, and Solana — plus an AMM for USDC/EURC swaps. All live on testnet today."
 
 ### Why Arc?
 > "Arc is Circle's own Layer 1 blockchain. Building here means:
@@ -416,7 +416,7 @@
 - **Treasury Vault** — deposit USDC, earn T-Bill yield (~4% APY)
 - **Real USYC Integration** — connected to Hashnote's Teller contract
 - **Locked Positions** — 1/3/12 month terms with bonus yield
-- **CCTP V2 Bridge** — cross-chain Sepolia ↔ Arc, real Circle protocol
+- **CCTP V2 Bridge** — multi-chain: Sepolia ↔ Arc ↔ Solana Devnet (6 directions), real Circle protocol
 - **Stablecoin Swap AMM** — USDC/EURC with liquidity pool
 - **Points System** — earn points on every action
 - **NFT Badges** — 5 achievement badges, fully minted
