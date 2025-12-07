@@ -21,10 +21,8 @@ const SOLANA_USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJD
 const formatBalance = (balance: string) => {
   const num = parseFloat(balance);
   if (isNaN(num)) return balance;
-  if (num < 100) {
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  return Math.floor(num).toLocaleString('en-US');
+  // Always show 2 decimal places for accurate balance display
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 type NetworkType = 'ethereumSepolia' | 'arcTestnet' | 'solanaDevnet';
@@ -566,7 +564,7 @@ const Bridge = () => {
               type="number"
               placeholder="0.00"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(e.target.value.replace(',', '.'))}
               className="text-lg font-mono rounded-xl h-14 bg-white/5 border-white/10"
               min="0"
               step="0.01"
