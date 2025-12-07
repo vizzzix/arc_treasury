@@ -371,16 +371,7 @@ const Bridge = () => {
                   <div className="flex-1">
                     <p className="text-sm font-medium mb-1">Need testnet tokens?</p>
                     <div className="space-y-1">
-                      <a
-                        href="https://faucet.circle.com/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                      >
-                        Circle Faucet (USDC for EVM)
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                      {isSolanaInvolved && (
+                      {solanaConnected ? (
                         <a
                           href="https://faucet.solana.com/"
                           target="_blank"
@@ -388,6 +379,16 @@ const Bridge = () => {
                           className="text-sm text-purple-400 hover:underline flex items-center gap-1"
                         >
                           Solana Faucet (SOL for gas)
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <a
+                          href="https://faucet.circle.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          Circle Faucet (USDC for EVM)
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
