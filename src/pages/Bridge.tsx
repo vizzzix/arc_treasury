@@ -192,12 +192,14 @@ const Bridge = () => {
 
   const handleMax = () => {
     const balance = parseFloat(sourceBalance);
-    if (balance > 0) setAmount(balance.toFixed(2));
+    // Floor to 2 decimals to avoid exceeding balance
+    if (balance > 0) setAmount((Math.floor(balance * 100) / 100).toFixed(2));
   };
 
   const handleHalf = () => {
     const balance = parseFloat(sourceBalance);
-    if (balance > 0) setAmount((balance / 2).toFixed(2));
+    // Floor to 2 decimals
+    if (balance > 0) setAmount((Math.floor((balance / 2) * 100) / 100).toFixed(2));
   };
 
   const handleSwapNetworks = () => {
