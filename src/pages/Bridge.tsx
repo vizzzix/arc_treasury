@@ -666,7 +666,7 @@ const Bridge = () => {
                               </>
                             ) : (
                               <>
-                                Claim {pendingBurn.amount} USDC
+                                Claim {pendingBurn.amount && pendingBurn.amount !== '0' ? `${pendingBurn.amount} ` : ''}USDC
                                 <ArrowRight className="w-4 h-4 ml-2" />
                               </>
                             )}
