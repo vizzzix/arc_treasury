@@ -519,21 +519,60 @@ export const useBridgeCCTP = () => {
             pendingBurn: newPendingBurn,
           }));
         } else {
-          // No burn happened - cancelled early
-          console.log('[useBridgeCCTP] Bridge returned but burn was not successful');
-          setAttestationStatus(null);
-          toast.error('Bridge cancelled', {
-            description: 'Transaction was not completed.',
-            duration: 5000,
-          });
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            error: 'Transaction was cancelled',
-            result: null,
-            transactions: [],
-            mintConfirmed: false,
-          }));
+          // Check if we have a pending burn transaction in state
+          // If yes, the burn was sent but SDK didn't detect it as success
+          const pendingBurnTx = state.transactions.find(tx => tx.step === 'Burn' || tx.step === 'Deposit');
+
+          if (pendingBurnTx?.hash) {
+            // Burn transaction was sent - treat as pending claim, NOT cancelled
+            console.log('[useBridgeCCTP] Burn tx was sent but SDK missed confirmation:', pendingBurnTx.hash);
+
+            const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
+            trackSiteBridge(pendingBurnTx.hash, address!, amount, direction);
+
+            setAttestationStatus('pending_mint');
+            toast.warning('Your funds are safe!', {
+              description: 'Burn transaction sent. Click Claim to receive your USDC.',
+              duration: 15000,
+            });
+
+            const newPendingBurn = {
+              txHash: pendingBurnTx.hash,
+              fromNetwork,
+              toNetwork,
+              amount,
+              timestamp: Date.now(),
+            };
+
+            if (address) {
+              savePendingBurn(address, newPendingBurn);
+            }
+
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              error: 'Mint was not completed. Your funds are safe - click Claim USDC.',
+              result: null,
+              mintConfirmed: false,
+              pendingBurn: newPendingBurn,
+            }));
+          } else {
+            // No burn transaction at all - truly cancelled
+            console.log('[useBridgeCCTP] Bridge returned but burn was not successful');
+            setAttestationStatus(null);
+            toast.error('Bridge cancelled', {
+              description: 'Transaction was not completed.',
+              duration: 5000,
+            });
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              error: 'Transaction was cancelled',
+              result: null,
+              transactions: [],
+              mintConfirmed: false,
+            }));
+          }
         }
 
       } catch (error: any) {
