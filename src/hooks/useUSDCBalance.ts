@@ -56,9 +56,11 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const silentRefetchRef = useRef(false);
 
-  // Function to manually refresh balance
-  const refetch = () => {
+  // Function to manually refresh balance (silent = don't show loading state)
+  const refetch = (silent = false) => {
+    silentRefetchRef.current = silent;
     setRefreshKey(prev => prev + 1);
   };
 
@@ -88,7 +90,10 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
     }
 
     const fetchBalance = async () => {
-      setIsLoading(true);
+      // Only show loading state if not a silent refetch
+      if (!silentRefetchRef.current) {
+        setIsLoading(true);
+      }
       setError(null);
       
       // Create new AbortController for this request
@@ -219,6 +224,8 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
         }
         // Always set loading to false when request completes (even if aborted)
         setIsLoading(false);
+        // Reset silent refetch flag
+        silentRefetchRef.current = false;
       }
     };
 
