@@ -551,7 +551,7 @@ const Bridge = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleHalf}
-                  disabled={currentIsBridging || parseFloat(sourceBalance) <= 0}
+                  disabled={(currentIsBridging && !isComplete) || parseFloat(sourceBalance) <= 0}
                   className="h-7 text-xs rounded-lg"
                 >
                   HALF
@@ -561,7 +561,7 @@ const Bridge = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleMax}
-                  disabled={currentIsBridging || parseFloat(sourceBalance) <= 0}
+                  disabled={(currentIsBridging && !isComplete) || parseFloat(sourceBalance) <= 0}
                   className="h-7 text-xs rounded-lg"
                 >
                   MAX
@@ -576,7 +576,7 @@ const Bridge = () => {
               className="text-lg font-mono rounded-xl h-14 bg-white/5 border-white/10"
               min="0"
               step="0.01"
-              disabled={currentIsBridging}
+              disabled={currentIsBridging && !isComplete}
             />
             <p className="text-xs text-muted-foreground">
               Available: {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
