@@ -25,6 +25,21 @@ interface UseLeaderboardReturn {
 let cachedData: { leaderboard: LeaderboardEntry[]; totalUsers: number; timestamp: number } | null = null;
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
+// Get unique site users count from site_bridges
+async function getSiteUsersCount(): Promise<number> {
+  if (!supabase) return 0;
+  try {
+    const { data, error } = await supabase
+      .from('site_bridges')
+      .select('wallet_address');
+    if (error) throw error;
+    const uniqueAddresses = new Set((data || []).map(d => d.wallet_address.toLowerCase()));
+    return uniqueAddresses.size;
+  } catch {
+    return 0;
+  }
+}
+
 export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(
     cachedData?.leaderboard || []
@@ -53,17 +68,20 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
         setIsLoading(true);
         setError(null);
 
-        // Fetch top 50 users by total_points
-        const { data, error: fetchError, count } = await supabase
-          .from('user_points')
-          .select('*', { count: 'exact' })
-          .gt('total_points', 0)
-          .order('total_points', { ascending: false })
-          .limit(50);
+        // Fetch top 50 users by total_points and count of real site users
+        const [leaderboardResult, siteUsersCount] = await Promise.all([
+          supabase
+            .from('user_points')
+            .select('*')
+            .gt('total_points', 0)
+            .order('total_points', { ascending: false })
+            .limit(50),
+          getSiteUsersCount()
+        ]);
 
-        if (fetchError) throw fetchError;
+        if (leaderboardResult.error) throw leaderboardResult.error;
 
-        const entries: LeaderboardEntry[] = (data || []).map((row, index) => ({
+        const entries: LeaderboardEntry[] = (leaderboardResult.data || []).map((row, index) => ({
           address: row.wallet_address,
           totalPoints: row.total_points || 0,
           formattedAmount: (row.total_points || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }),
@@ -74,9 +92,9 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
           liquidityVolume: row.liquidity_volume || 0,
         }));
 
-        cachedData = { leaderboard: entries, totalUsers: count || 0, timestamp: Date.now() };
+        cachedData = { leaderboard: entries, totalUsers: siteUsersCount, timestamp: Date.now() };
         setLeaderboard(entries);
-        setTotalUsers(count || 0);
+        setTotalUsers(siteUsersCount);
       } catch (err) {
         console.error('Error fetching leaderboard:', err);
         setError('Failed to load leaderboard');
