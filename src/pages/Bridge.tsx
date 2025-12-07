@@ -21,8 +21,13 @@ const SOLANA_USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJD
 const formatBalance = (balance: string) => {
   const num = parseFloat(balance);
   if (isNaN(num)) return balance;
-  // Always show 2 decimal places for accurate balance display
-  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Show decimals only if needed (like Phantom wallet)
+  if (Number.isInteger(num)) {
+    return num.toLocaleString('en-US');
+  }
+  // For non-integers, show up to 2 decimals but trim trailing zeros
+  const formatted = num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return formatted;
 };
 
 type NetworkType = 'ethereumSepolia' | 'arcTestnet' | 'solanaDevnet';
