@@ -346,11 +346,11 @@ const Bridge = () => {
         {/* Hero */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 mb-4">
-            <ArrowLeftRight className="w-8 h-8 text-primary" />
+            <ArrowLeftRight className="w-8 h-8 text-primary animate-pulse" />
           </div>
           <h2 className="text-3xl font-bold mb-2">Bridge USDC</h2>
           <p className="text-sm text-muted-foreground">
-            Transfer USDC across chains via Circle CCTP
+            Sepolia ↔ Arc Testnet ↔ Solana Devnet via Circle CCTP
           </p>
         </div>
 
