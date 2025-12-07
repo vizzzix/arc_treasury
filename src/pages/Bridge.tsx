@@ -166,18 +166,6 @@ const Bridge = () => {
     }
   }, [showBadgeReminder]);
 
-  // Auto-refresh balances when bridge completes
-  useEffect(() => {
-    if (isComplete) {
-      // Delay slightly to allow blockchain state to update
-      const timer = setTimeout(() => {
-        refetchSepolia();
-        refetchArc();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isComplete, refetchSepolia, refetchArc]);
-
   // Handle bridge based on networks
   const handleBridge = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
@@ -262,6 +250,18 @@ const Bridge = () => {
   const currentError = isSolanaInvolved ? solanaState.error : error;
   const currentAttestationStatus = isSolanaInvolved ? solanaState.attestationStatus : attestationStatus;
   const isComplete = currentAttestationStatus === 'complete';
+
+  // Auto-refresh balances when bridge completes
+  useEffect(() => {
+    if (isComplete) {
+      // Delay slightly to allow blockchain state to update
+      const timer = setTimeout(() => {
+        refetchSepolia();
+        refetchArc();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, refetchSepolia, refetchArc]);
 
   // Get gas hint text
   const getGasHint = () => {
