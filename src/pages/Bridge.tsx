@@ -62,6 +62,7 @@ const Bridge = () => {
 
   // Solana balance state
   const [solanaBalance, setSolanaBalance] = useState<string | null>(null);
+  const [solanaRefreshKey, setSolanaRefreshKey] = useState(0);
 
   // Determine if Solana is involved
   const isSolanaInvolved = fromNetwork === 'solanaDevnet' || toNetwork === 'solanaDevnet';
@@ -102,6 +103,10 @@ const Bridge = () => {
   }, [wallets, select, connect]);
 
   // Fetch Solana USDC balance
+  const refetchSolanaBalance = useCallback(() => {
+    setSolanaRefreshKey(prev => prev + 1);
+  }, []);
+
   useEffect(() => {
     const fetchSolanaBalance = async () => {
       if (!publicKey || !connection) {
@@ -117,7 +122,7 @@ const Bridge = () => {
       }
     };
     fetchSolanaBalance();
-  }, [publicKey, connection]);
+  }, [publicKey, connection, solanaRefreshKey]);
 
   // Bridge hooks
   const {
@@ -258,10 +263,11 @@ const Bridge = () => {
       const timer = setTimeout(() => {
         refetchSepolia(true); // silent refetch
         refetchArc(true); // silent refetch
+        refetchSolanaBalance(); // refetch Solana balance
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, refetchSepolia, refetchArc]);
+  }, [isComplete, refetchSepolia, refetchArc, refetchSolanaBalance]);
 
   // Get gas hint text
   const getGasHint = () => {
