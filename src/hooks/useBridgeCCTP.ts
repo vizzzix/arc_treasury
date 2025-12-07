@@ -904,6 +904,22 @@ export const useBridgeCCTP = () => {
     setAttestationStatus(null);
   }, [address]);
 
+  // Reset all state for starting a new bridge
+  const reset = useCallback(() => {
+    setState({
+      isBridging: false,
+      isClaiming: false,
+      error: null,
+      result: null,
+      transactions: [],
+      mintConfirmed: false,
+      pendingBurn: null,
+    });
+    setAttestationStatus(null);
+    mintConfirmedRef.current = false;
+    burnConfirmedRef.current = false;
+  }, []);
+
   return {
     ...state,
     bridge,
@@ -911,6 +927,7 @@ export const useBridgeCCTP = () => {
     claimPendingBridge,
     restorePendingBurn,
     clearPendingBurn,
+    reset,
     attestationStatus,
     // Bridge Kit handles mint automatically, so no manual completion needed
     canCompleteBridge: false,

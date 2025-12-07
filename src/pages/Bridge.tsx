@@ -127,7 +127,7 @@ const Bridge = () => {
     reset: resetSolana,
   } = useBridgeSolana();
 
-  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
+  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, reset: resetCCTP, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
 
   // Get balances
   const { balance: sepoliaBalance, isLoading: isLoadingSepolia, refetch: refetchSepolia } = useUSDCBalance('ethereumSepolia');
@@ -300,6 +300,8 @@ const Bridge = () => {
     if (isSolanaInvolved) {
       resetSolana();
     }
+    // Reset EVM bridge state
+    resetCCTP();
     setSavedBridgeParams(null);
     setAmount("");
   };
