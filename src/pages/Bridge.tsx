@@ -130,8 +130,8 @@ const Bridge = () => {
   const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
 
   // Get balances
-  const { balance: sepoliaBalance, isLoading: isLoadingSepolia } = useUSDCBalance('ethereumSepolia');
-  const { balance: arcBalance, isLoading: isLoadingArc } = useUSDCBalance('arcTestnet');
+  const { balance: sepoliaBalance, isLoading: isLoadingSepolia, refetch: refetchSepolia } = useUSDCBalance('ethereumSepolia');
+  const { balance: arcBalance, isLoading: isLoadingArc, refetch: refetchArc } = useUSDCBalance('arcTestnet');
 
   // Get current source balance based on fromNetwork
   const getSourceBalance = () => {
@@ -165,6 +165,18 @@ const Bridge = () => {
       localStorage.setItem('bridge_badge_dismissed', 'true');
     }
   }, [showBadgeReminder]);
+
+  // Auto-refresh balances when bridge completes
+  useEffect(() => {
+    if (isComplete) {
+      // Delay slightly to allow blockchain state to update
+      const timer = setTimeout(() => {
+        refetchSepolia();
+        refetchArc();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isComplete, refetchSepolia, refetchArc]);
 
   // Handle bridge based on networks
   const handleBridge = async () => {
