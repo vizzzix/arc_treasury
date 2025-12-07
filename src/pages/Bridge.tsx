@@ -191,15 +191,14 @@ const Bridge = () => {
   };
 
   const handleMax = () => {
-    const balance = parseFloat(sourceBalance);
-    // Floor to 2 decimals to avoid exceeding balance
-    if (balance > 0) setAmount((Math.floor(balance * 100) / 100).toFixed(2));
+    // Use exact balance string to send full amount
+    if (parseFloat(sourceBalance) > 0) setAmount(sourceBalance);
   };
 
   const handleHalf = () => {
     const balance = parseFloat(sourceBalance);
-    // Floor to 2 decimals
-    if (balance > 0) setAmount((Math.floor((balance / 2) * 100) / 100).toFixed(2));
+    // Floor to 6 decimals (USDC precision)
+    if (balance > 0) setAmount((Math.floor((balance / 2) * 1000000) / 1000000).toString());
   };
 
   const handleSwapNetworks = () => {
