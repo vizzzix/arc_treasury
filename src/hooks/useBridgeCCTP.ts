@@ -393,14 +393,23 @@ export const useBridgeCCTP = () => {
 
         // Analyze result.steps to determine what happened
         const steps = result?.steps || [];
-        const burnStep = steps.find((s: any) => s.name?.toLowerCase().includes('burn'));
+        console.log('[useBridgeCCTP] All steps:', JSON.stringify(steps, null, 2));
+        const burnStep = steps.find((s: any) =>
+          s.name?.toLowerCase().includes('burn') ||
+          s.name?.toLowerCase().includes('deposit') ||
+          s.type?.toLowerCase().includes('burn')
+        );
         console.log('[useBridgeCCTP] Burn step details:', JSON.stringify(burnStep, null, 2));
-        const mintStep = steps.find((s: any) => s.name?.toLowerCase().includes('mint'));
+        const mintStep = steps.find((s: any) =>
+          s.name?.toLowerCase().includes('mint') ||
+          s.type?.toLowerCase().includes('mint')
+        );
 
-        const burnSucceeded = burnStep?.state === 'success';
-        const mintSucceeded = mintStep?.state === 'success';
+        // Check burn success - also use burnConfirmedRef as fallback (set during progress events)
+        const burnSucceeded = burnStep?.state === 'success' || burnConfirmedRef.current;
+        const mintSucceeded = mintStep?.state === 'success' || mintConfirmedRef.current;
 
-        console.log('[useBridgeCCTP] burnSucceeded:', burnSucceeded, 'mintSucceeded:', mintSucceeded);
+        console.log('[useBridgeCCTP] burnSucceeded:', burnSucceeded, 'mintSucceeded:', mintSucceeded, 'burnConfirmedRef:', burnConfirmedRef.current);
 
         // Check overall result state
         if (result?.state === 'success') {
@@ -431,8 +440,13 @@ export const useBridgeCCTP = () => {
           // Burn succeeded but mint failed - funds are pending!
           console.log('[useBridgeCCTP] Burn succeeded but mint failed - funds are pending');
           // Try to get burn tx hash from step, or fallback to transactions state
-          const burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
-          console.log('[useBridgeCCTP] Burn tx hash from step:', burnTxHash);
+          let burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
+          // Fallback: get from state.transactions if step doesn't have it
+          if (!burnTxHash) {
+            const burnTx = state.transactions.find(tx => tx.step === 'Burn' || tx.step === 'Deposit');
+            burnTxHash = burnTx?.hash;
+          }
+          console.log('[useBridgeCCTP] Burn tx hash from step or state:', burnTxHash);
 
           // Track the bridge even if mint failed
           if (burnTxHash) {
