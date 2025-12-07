@@ -296,13 +296,32 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         errorMsg.includes('4001') || // EIP-1193 user rejection
         errorMsg.includes('ACTION_REJECTED');
 
-      setState(prev => ({
-        ...prev,
-        isBridging: false,
-        error: isUserRejection ? 'Transaction cancelled by user' : (error.message || 'Bridge failed'),
-        attestationStatus: 'idle',
-        attestationProgress: 0,
-      }));
+      setState(prev => {
+        // Check if burn already happened - if so, show pending_mint state for recovery
+        const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
+        if (hasBurnTx) {
+          // Burn happened but mint failed - show pending_mint for manual claim
+          const burnTx = prev.transactions.find(tx => tx.step === 'Burn');
+          console.warn('[BridgeSolana] Burn completed but mint failed. TxHash:', burnTx?.hash);
+          return {
+            ...prev,
+            isBridging: false,
+            error: isUserRejection
+              ? 'Mint cancelled. Your USDC was burned - use the burn tx hash to claim manually.'
+              : `Bridge failed after burn: ${error.message}. Use burn tx hash to claim.`,
+            attestationStatus: 'pending_mint',
+            attestationProgress: 70,
+          };
+        }
+        // No burn yet - safe to reset to idle
+        return {
+          ...prev,
+          isBridging: false,
+          error: isUserRejection ? 'Transaction cancelled by user' : (error.message || 'Bridge failed'),
+          attestationStatus: 'idle',
+          attestationProgress: 0,
+        };
+      });
     }
   }, [bridgeKit, evmConnected, solanaConnected, publicKey, getEVMProvider, getSolanaProvider, connection, evmAddress]);
 
@@ -480,13 +499,32 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         errorMsg.includes('4001') || // EIP-1193 user rejection
         errorMsg.includes('ACTION_REJECTED');
 
-      setState(prev => ({
-        ...prev,
-        isBridging: false,
-        error: isUserRejection ? 'Transaction cancelled by user' : (error.message || 'Bridge failed'),
-        attestationStatus: 'idle',
-        attestationProgress: 0,
-      }));
+      setState(prev => {
+        // Check if burn already happened - if so, show pending_mint state for recovery
+        const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
+        if (hasBurnTx) {
+          // Burn happened but mint failed - show pending_mint for manual claim
+          const burnTx = prev.transactions.find(tx => tx.step === 'Burn');
+          console.warn('[BridgeSolana] Burn completed but mint failed. TxHash:', burnTx?.hash);
+          return {
+            ...prev,
+            isBridging: false,
+            error: isUserRejection
+              ? 'Mint cancelled. Your USDC was burned - use the burn tx hash to claim manually.'
+              : `Bridge failed after burn: ${error.message}. Use burn tx hash to claim.`,
+            attestationStatus: 'pending_mint',
+            attestationProgress: 70,
+          };
+        }
+        // No burn yet - safe to reset to idle
+        return {
+          ...prev,
+          isBridging: false,
+          error: isUserRejection ? 'Transaction cancelled by user' : (error.message || 'Bridge failed'),
+          attestationStatus: 'idle',
+          attestationProgress: 0,
+        };
+      });
     }
   }, [bridgeKit, solanaConnected, publicKey, evmConnected, getSolanaProvider, getEVMProvider, connection]);
 
