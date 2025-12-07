@@ -265,20 +265,27 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
 
       // Bridge completed successfully - SDK Promise resolved means bridge is done
       // Force complete state since MINT_CONFIRMED event may not fire for Solana destination
-      console.log('[BridgeSolana] Bridge Promise resolved - marking complete');
+      console.log('[BridgeSolana] Bridge Promise resolved (EVM→Sol) - marking complete. Current state:', JSON.stringify({
+        isBridging: true,
+        attestationStatus: 'checking...',
+      }));
+
+      // Force complete regardless of hasBurnTx - SDK Promise resolving means success
       setState(prev => {
-        const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
-        if (!hasBurnTx) {
-          // No burn transaction = user cancelled before any tx was sent
-          console.log('[BridgeSolana] No burn tx found - resetting to idle');
-          return {
-            ...prev,
-            isBridging: false,
-            attestationStatus: 'idle',
-            attestationProgress: 0,
-          };
+        console.log('[BridgeSolana] setState called. Prev state:', {
+          attestationStatus: prev.attestationStatus,
+          attestationProgress: prev.attestationProgress,
+          hasBurnTx: prev.transactions.some(tx => tx.step === 'Burn'),
+          transactions: prev.transactions.length,
+        });
+
+        // If already complete, don't change
+        if (prev.attestationStatus === 'complete') {
+          console.log('[BridgeSolana] Already complete, keeping state');
+          return prev;
         }
-        // Even if MINT_CONFIRMED didn't fire, the SDK Promise resolving means success
+
+        // SDK Promise resolved = success, set complete
         console.log('[BridgeSolana] Setting complete state (EVM→Sol)');
         return {
           ...prev,
@@ -491,20 +498,24 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       }
 
       // Bridge completed successfully - SDK Promise resolved means bridge is done
-      console.log('[BridgeSolana] Bridge Promise resolved - marking complete');
+      console.log('[BridgeSolana] Bridge Promise resolved (Sol→EVM) - marking complete');
+
+      // Force complete regardless of hasBurnTx - SDK Promise resolving means success
       setState(prev => {
-        const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
-        if (!hasBurnTx) {
-          // No burn transaction = user cancelled before any tx was sent
-          console.log('[BridgeSolana] No burn tx found - resetting to idle');
-          return {
-            ...prev,
-            isBridging: false,
-            attestationStatus: 'idle',
-            attestationProgress: 0,
-          };
+        console.log('[BridgeSolana] setState called (Sol→EVM). Prev state:', {
+          attestationStatus: prev.attestationStatus,
+          attestationProgress: prev.attestationProgress,
+          hasBurnTx: prev.transactions.some(tx => tx.step === 'Burn'),
+          transactions: prev.transactions.length,
+        });
+
+        // If already complete, don't change
+        if (prev.attestationStatus === 'complete') {
+          console.log('[BridgeSolana] Already complete, keeping state');
+          return prev;
         }
-        // Even if MINT_CONFIRMED didn't fire, the SDK Promise resolving means success
+
+        // SDK Promise resolved = success, set complete
         console.log('[BridgeSolana] Setting complete state (Sol→EVM)');
         return {
           ...prev,
