@@ -371,7 +371,7 @@ const Bridge = () => {
                   <div className="flex-1">
                     <p className="text-sm font-medium mb-1">Need testnet tokens?</p>
                     <div className="space-y-1">
-                      {solanaConnected ? (
+                      {isSolanaInvolved ? (
                         <a
                           href="https://faucet.solana.com/"
                           target="_blank"
