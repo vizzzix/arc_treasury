@@ -17,6 +17,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useConnectorClient, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
+import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
@@ -675,7 +676,11 @@ export const useBridgeCCTP = () => {
         }
       ] as const;
 
+      // Get the correct chain object for the destination
+      const destChain = destNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
+
       const hash = await walletClient.writeContract({
+        chain: destChain,
         address: destContracts.MessageTransmitter,
         abi: messageTransmitterABI,
         functionName: 'receiveMessage',
