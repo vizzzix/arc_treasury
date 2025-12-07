@@ -51,6 +51,7 @@ export const SUPPORTED_NETWORKS = {
     bridgeKitChain: 'Arc_Testnet' as const, // Bridge Kit automatically resolves CCTP contracts for this chain
     isTestnet: true,
     explorerUrl: 'https://testnet.arcscan.app',
+    type: 'evm' as const,
   },
   ethereumSepolia: {
     name: 'Ethereum Sepolia',
@@ -58,6 +59,15 @@ export const SUPPORTED_NETWORKS = {
     bridgeKitChain: 'Ethereum_Sepolia' as const,
     isTestnet: true,
     explorerUrl: 'https://sepolia.etherscan.io',
+    type: 'evm' as const,
+  },
+  solanaDevnet: {
+    name: 'Solana Devnet',
+    chainId: 0, // Solana doesn't use chainId
+    bridgeKitChain: 'Solana_Devnet' as const,
+    isTestnet: true,
+    explorerUrl: 'https://explorer.solana.com/?cluster=devnet',
+    type: 'solana' as const,
   },
 } as const;
 
@@ -133,6 +143,7 @@ export const TRANSFER_SPEED = {
 export const CCTP_DOMAINS = {
   ethereumSepolia: 0, // Ethereum Sepolia domain
   arcTestnet: 26, // Arc Testnet domain
+  solanaDevnet: 5, // Solana Devnet domain
 } as const;
 
 // Circle Attestation API (Testnet)

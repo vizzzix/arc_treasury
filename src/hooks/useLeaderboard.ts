@@ -1,10 +1,5 @@
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from '@/lib/supabase';
 
 export interface LeaderboardEntry {
   address: string;
@@ -45,6 +40,11 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
       if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
         setLeaderboard(cachedData.leaderboard);
         setTotalUsers(cachedData.totalUsers);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!supabase) {
         setIsLoading(false);
         return;
       }
@@ -96,17 +96,19 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
     }
 
     const fetchUserRank = async () => {
+      // Check if user is in cached leaderboard
+      const inLeaderboard = leaderboard.find(
+        e => e.address.toLowerCase() === userAddress.toLowerCase()
+      );
+
+      if (inLeaderboard) {
+        setUserEntry(inLeaderboard);
+        return;
+      }
+
+      if (!supabase) return;
+
       try {
-        // Check if user is in cached leaderboard
-        const inLeaderboard = leaderboard.find(
-          e => e.address.toLowerCase() === userAddress.toLowerCase()
-        );
-
-        if (inLeaderboard) {
-          setUserEntry(inLeaderboard);
-          return;
-        }
-
         // Fetch user's data
         const { data: userData, error: userError } = await supabase
           .from('user_points')

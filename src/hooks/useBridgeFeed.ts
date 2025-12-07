@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from '@/lib/supabase';
 
 export interface BridgeTransaction {
   id: number;
   wallet_address: string;
   amount_usd: number;
-  direction: 'to_arc' | 'to_sepolia';
+  direction: 'to_arc' | 'to_sepolia' | 'sep_to_sol' | 'arc_to_sol' | 'sol_to_sep' | 'sol_to_arc';
   tx_hash: string;
   created_at: string;
 }
@@ -27,7 +22,7 @@ export interface TopBridger {
   rank?: number;
 }
 
-// Hook for bridge feed data with 24h leaderboard and all-time stats
+// Hook for bridge feed data - only from site_bridges (our site's transactions)
 export const useBridgeFeed = (limit: number = 10) => {
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
   const [stats, setStats] = useState<BridgeStats>({
@@ -40,45 +35,46 @@ export const useBridgeFeed = (limit: number = 10) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch recent transactions from site_bridges only
   const fetchTransactions = async () => {
+    if (!supabase) return;
     try {
       const { data, error: fetchError } = await supabase
-        .from('bridge_transactions')
+        .from('site_bridges')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(limit);
 
       if (fetchError) throw fetchError;
-      setTransactions(data || []);
+
+      const txs: BridgeTransaction[] = (data || []).map((tx: any, idx: number) => ({
+        id: idx,
+        wallet_address: tx.wallet_address,
+        amount_usd: tx.amount_usd,
+        direction: tx.direction,
+        tx_hash: tx.tx_hash,
+        created_at: tx.created_at,
+      }));
+
+      setTransactions(txs);
     } catch (e: any) {
       console.error('Failed to fetch bridge transactions:', e);
       setError(e.message);
     }
   };
 
+  // Fetch all-time stats from site_bridges only
   const fetchStats = async () => {
+    if (!supabase) return;
     try {
-      // Use ALL TIME stats function (not 24h) so stats accumulate
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_bridge_stats_all_time');
-
-      if (!rpcError && rpcData && rpcData.length > 0) {
-        setStats({
-          totalVolume24h: Number(rpcData[0].total_volume) || 0,
-          transactionCount24h: Number(rpcData[0].tx_count) || 0,
-          uniqueUsers24h: Number(rpcData[0].unique_users) || 0,
-        });
-        return;
-      }
-
-      // Fallback: fetch all transactions (no time filter)
       let allData: { wallet_address: string; amount_usd: number }[] = [];
       let offset = 0;
       const pageSize = 1000;
 
-      for (let i = 0; i < 100; i++) { // Max 100 pages (100k transactions)
+      // Paginate through all site_bridges
+      for (let i = 0; i < 100; i++) {
         const { data, error: fetchError } = await supabase
-          .from('bridge_transactions')
+          .from('site_bridges')
           .select('wallet_address, amount_usd')
           .range(offset, offset + pageSize - 1);
 
@@ -91,7 +87,7 @@ export const useBridgeFeed = (limit: number = 10) => {
       }
 
       const totalVolume = allData.reduce((sum, tx) => sum + Number(tx.amount_usd), 0);
-      const uniqueUsers = new Set(allData.map(tx => tx.wallet_address)).size;
+      const uniqueUsers = new Set(allData.map(tx => tx.wallet_address.toLowerCase())).size;
 
       setStats({
         totalVolume24h: totalVolume,
@@ -103,17 +99,19 @@ export const useBridgeFeed = (limit: number = 10) => {
     }
   };
 
+  // Fetch top bridgers (24h) from site_bridges only
   const fetchTopBridgers = async () => {
+    if (!supabase) return;
     try {
-      // Top bridgers are calculated for the last 24 hours only
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       let allData: { wallet_address: string; amount_usd: number }[] = [];
       let offset = 0;
       const pageSize = 1000;
 
+      // Fetch 24h data from site_bridges
       while (true) {
         const { data, error: fetchError } = await supabase
-          .from('bridge_transactions')
+          .from('site_bridges')
           .select('wallet_address, amount_usd')
           .gte('created_at', oneDayAgo)
           .range(offset, offset + pageSize - 1);
@@ -122,7 +120,7 @@ export const useBridgeFeed = (limit: number = 10) => {
         if (!data || data.length === 0) break;
 
         allData = [...allData, ...data];
-        if (data.length < pageSize) break; // Last page
+        if (data.length < pageSize) break;
         offset += pageSize;
       }
 
@@ -151,7 +149,6 @@ export const useBridgeFeed = (limit: number = 10) => {
 
     const load = async () => {
       setIsLoading(true);
-      // Load all data in parallel for faster initial load
       await Promise.all([fetchTopBridgers(), fetchTransactions(), fetchStats()]);
       if (isMounted) setIsLoading(false);
     };
@@ -174,7 +171,6 @@ export const useBridgeFeed = (limit: number = 10) => {
   }, []);
 
   const refresh = async () => {
-    // Load top bridgers first so gold status is ready
     await fetchTopBridgers();
     await Promise.all([fetchTransactions(), fetchStats()]);
   };

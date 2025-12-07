@@ -4,13 +4,12 @@ import { RefreshCw, Activity, Trophy, X, Zap } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAccount } from 'wagmi';
 
-// Boost multipliers based on rank (24h leaderboard position)
+// Boost multipliers based on rank (24h leaderboard position) - Top 5 only
 const getBoostMultiplier = (rank: number): number => {
   if (rank === 1) return 3.0;
   if (rank === 2) return 2.5;
   if (rank === 3) return 2.0;
   if (rank <= 5) return 1.5;
-  if (rank <= 10) return 1.25;
   return 1.0;
 };
 
@@ -50,22 +49,42 @@ const getTierBadge = (amount: number): string => {
 
 interface TransactionRowProps {
   tx: BridgeTransaction;
-  isTop10: boolean;
+  isTop5: boolean;
 }
 
-const TransactionRow = ({ tx, isTop10 }: TransactionRowProps) => {
-  const isToArc = tx.direction === 'to_arc';
+const getDirectionLabel = (direction: string): { label: string; color: string } => {
+  switch (direction) {
+    // EVM to EVM
+    case 'to_arc':
+      return { label: 'Sep→Arc', color: 'text-green-400' };
+    case 'to_sepolia':
+    case 'from_arc':
+      return { label: 'Arc→Sep', color: 'text-blue-400' };
+    // Solana bridges - all purple
+    case 'sep_to_sol':
+      return { label: 'Sep→Sol', color: 'text-purple-400' };
+    case 'arc_to_sol':
+      return { label: 'Arc→Sol', color: 'text-purple-400' };
+    case 'sol_to_sep':
+      return { label: 'Sol→Sep', color: 'text-purple-400' };
+    case 'sol_to_arc':
+      return { label: 'Sol→Arc', color: 'text-purple-400' };
+    default:
+      return { label: direction, color: 'text-muted-foreground' };
+  }
+};
+
+const TransactionRow = ({ tx, isTop5 }: TransactionRowProps) => {
   const timeAgo = formatDistanceToNow(new Date(tx.created_at), { addSuffix: false });
+  const { label, color } = getDirectionLabel(tx.direction);
 
   return (
-    <div className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${isTop10 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
-      {isTop10 && <span className="text-yellow-500">👑</span>}
-      <span className={`font-mono ${isTop10 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(tx.wallet_address)}</span>
+    <div className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${isTop5 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
+      {isTop5 && <span className="text-yellow-500">👑</span>}
+      <span className={`font-mono ${isTop5 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(tx.wallet_address)}</span>
       <span className="text-muted-foreground">{formatAmount(tx.amount_usd, true)}</span>
       <span>{getTierBadge(tx.amount_usd)}</span>
-      <span className={`${isToArc ? 'text-green-400' : 'text-blue-400'}`}>
-        {isToArc ? 'Sep→Arc' : 'Arc→Sep'}
-      </span>
+      <span className={color}>{label}</span>
       <span className="ml-auto text-muted-foreground/60">{timeAgo}</span>
     </div>
   );
@@ -82,14 +101,14 @@ export const LiveBridgeFeed = () => {
 
   // Get user's rank
   const userRankData = getUserRank(address);
-  const isUserInTop10Real = userRankData && userRankData.rank && userRankData.rank <= 10;
+  const isUserInTop5 = userRankData && userRankData.rank && userRankData.rank <= 5;
 
-  // Get top 10 bridgers (show 10 in panel now)
-  const top10Bridgers = allBridgersRanked.slice(0, 10);
+  // Get top 5 bridgers
+  const top5Bridgers = allBridgersRanked.slice(0, 5);
 
-  // Get top 10 wallet addresses for highlighting
-  const top10Wallets = new Set(
-    allBridgersRanked.slice(0, 10).map(b => b.wallet_address.toLowerCase())
+  // Get top 5 wallet addresses for highlighting
+  const top5Wallets = new Set(
+    allBridgersRanked.slice(0, 5).map(b => b.wallet_address.toLowerCase())
   );
 
   // Filter out $0 transactions and take first 5
@@ -175,12 +194,12 @@ export const LiveBridgeFeed = () => {
         </div>
       </div>
 
-      {/* Top 10 Bridgers Panel with Boosts */}
+      {/* Top 5 Bridgers Panel with Boosts */}
       {showTop && (
         <div className="mb-3 p-3 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border border-yellow-500/20">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-yellow-500">Top 10 Bridgers (24h)</span>
+              <span className="text-xs font-medium text-yellow-500">Top 5 Bridgers (24h)</span>
               <span className="text-[10px] text-yellow-500/70 flex items-center gap-0.5">
                 <Zap className="w-3 h-3" /> Points Boost Active
               </span>
@@ -194,7 +213,7 @@ export const LiveBridgeFeed = () => {
             </button>
           </div>
           <div className="space-y-1.5">
-            {top10Bridgers.map((bridger, index) => {
+            {top5Bridgers.map((bridger, index) => {
               const isCurrentUser = address?.toLowerCase() === bridger.wallet_address.toLowerCase();
               const rank = index + 1;
               const boost = getBoostMultiplier(rank);
@@ -212,8 +231,7 @@ export const LiveBridgeFeed = () => {
                     rank === 1 ? 'bg-yellow-500/20 text-yellow-400' :
                     rank === 2 ? 'bg-gray-400/20 text-gray-300' :
                     rank === 3 ? 'bg-amber-500/20 text-amber-400' :
-                    rank <= 5 ? 'bg-blue-500/20 text-blue-400' :
-                    'bg-green-500/20 text-green-400'
+                    'bg-blue-500/20 text-blue-400'
                   }`}>
                     <Zap className="w-2.5 h-2.5" />
                     {formatBoost(rank)}
@@ -223,8 +241,8 @@ export const LiveBridgeFeed = () => {
               );
             })}
 
-            {/* Show user's rank if not in top 10 but has rank data */}
-            {userRankData && !isUserInTop10Real && (
+            {/* Show user's rank if not in top 5 but has rank data */}
+            {userRankData && !isUserInTop5 && (
               <>
                 <div className="text-center text-muted-foreground/50 text-[10px]">• • •</div>
                 <div className="flex items-center gap-2 text-xs bg-primary/10 rounded px-1 -mx-1">
@@ -251,7 +269,7 @@ export const LiveBridgeFeed = () => {
             <TransactionRow
               key={tx.id}
               tx={tx}
-              isTop10={top10Wallets.has(tx.wallet_address.toLowerCase())}
+              isTop5={top5Wallets.has(tx.wallet_address.toLowerCase())}
             />
           ))}
         </div>

@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from '@/lib/supabase';
 
 export interface PointsBreakdown {
   bridgePoints: number;
@@ -43,6 +38,7 @@ export const useUserPoints = () => {
     }
 
     const fetchPoints = async () => {
+      if (!supabase) return;
       setIsLoading(true);
       setError(null);
 

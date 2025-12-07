@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from '@/lib/supabase';
 
 export interface LeaderboardMessage {
   id: number;
@@ -35,6 +30,10 @@ export const useLeaderboardMessages = (boardType: 'bridge' | 'swap' = 'bridge') 
 
   // Fetch all messages for this board type
   const fetchMessages = useCallback(async () => {
+    if (!supabase) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const { data, error } = await supabase
         .from('leaderboard_messages')
@@ -63,6 +62,7 @@ export const useLeaderboardMessages = (boardType: 'bridge' | 'swap' = 'bridge') 
 
   // Save or update a message
   const saveMessage = useCallback(async (walletAddress: string, message: string): Promise<boolean> => {
+    if (!supabase) return false;
     const sanitized = sanitizeMessage(message);
     if (!sanitized) return false;
 
@@ -101,6 +101,7 @@ export const useLeaderboardMessages = (boardType: 'bridge' | 'swap' = 'bridge') 
 
   // Delete a message (sets message to empty string since DELETE is blocked by RLS)
   const deleteMessage = useCallback(async (walletAddress: string): Promise<boolean> => {
+    if (!supabase) return false;
     setIsSaving(true);
     try {
       // Use upsert with empty message since DELETE is blocked by RLS policy

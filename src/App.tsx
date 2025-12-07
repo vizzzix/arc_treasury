@@ -7,6 +7,7 @@ import { WagmiProvider } from 'wagmi';
 import { ThemeProvider } from "next-themes";
 import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
+import { SolanaWalletProvider } from './providers/SolanaWalletProvider';
 import Landing from "./pages/Landing";
 import DashboardSimplified from "./pages/DashboardSimplified";
 import FAQ from "./pages/FAQ";
@@ -19,6 +20,7 @@ import LockDesignPreview from "./pages/LockDesignPreview";
 import Swap from "./pages/Swap";
 import PitchDeck from "./pages/PitchDeck";
 import CallCheatSheet from "./pages/CallCheatSheet";
+import BridgeSolana from "./pages/BridgeSolana";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +44,7 @@ const AppRoutes = () => {
         <Route path="/litepaper" element={<Litepaper />} />
         <Route path="/lock-preview" element={<LockDesignPreview />} />
         <Route path="/swap" element={<Swap />} />
+        <Route path="/bridge-solana" element={<BridgeSolana />} />
         <Route path="/pitch/:token" element={<PitchDeck />} />
         <Route path="/call/:token" element={<CallCheatSheet />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
@@ -54,13 +57,15 @@ const AppRoutes = () => {
 const App = () => (
   <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AppRoutes />
-        </TooltipProvider>
-      </ThemeProvider>
+      <SolanaWalletProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </ThemeProvider>
+      </SolanaWalletProvider>
     </QueryClientProvider>
   </WagmiProvider>
 );

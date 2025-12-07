@@ -21,15 +21,11 @@ import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_AP
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
-import { createClient } from '@supabase/supabase-js';
-
-// Supabase client for tracking site bridges
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from '@/lib/supabase';
 
 // Track bridge initiated from our site
 const trackSiteBridge = async (txHash: string, walletAddress: string, amount: string, direction: 'to_arc' | 'to_sepolia') => {
+  if (!supabase) return;
   try {
     await supabase.from('site_bridges').upsert({
       tx_hash: txHash.toLowerCase(),

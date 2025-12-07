@@ -1,10 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_ANON_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+import { supabase } from '@/lib/supabase';
 
 export interface SwapTransaction {
   id: number;
@@ -60,6 +55,7 @@ export const useSwapFeed = (limit: number = 10) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchActivity = async () => {
+    if (!supabase) return;
     try {
       // Fetch recent swaps
       const { data: swaps } = await supabase
@@ -113,6 +109,7 @@ export const useSwapFeed = (limit: number = 10) => {
   };
 
   const fetchStats = async () => {
+    if (!supabase) return;
     try {
       // Get 24h stats for swaps
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -143,6 +140,7 @@ export const useSwapFeed = (limit: number = 10) => {
   };
 
   const fetchTopSwappers = async () => {
+    if (!supabase) return;
     try {
       // Fetch all swap transactions with pagination
       let allSwaps: { wallet_address: string; amount_usd: number }[] = [];

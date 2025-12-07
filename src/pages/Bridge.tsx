@@ -1,36 +1,52 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Info, ArrowLeft, Loader2, ExternalLink, XCircle, ArrowLeftRight, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowRight, Info, ArrowLeft, Loader2, ExternalLink, XCircle, ArrowLeftRight, X, CheckCircle2, AlertCircle, Wallet, Clock, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAccount } from "wagmi";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletConnect } from "@/components/WalletConnect";
 import { UserMenu } from "@/components/UserMenu";
 import { useBridgeCCTP } from "@/hooks/useBridgeCCTP";
+import { useBridgeSolana, EVMNetwork } from "@/hooks/useBridgeSolana";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { SUPPORTED_NETWORKS } from "@/lib/constants";
 import { LiveBridgeFeed } from "@/components/LiveBridgeFeed";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { PublicKey } from "@solana/web3.js";
+
+// Solana USDC mint address (Devnet)
+const SOLANA_USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 
 const formatBalance = (balance: string) => {
   const num = parseFloat(balance);
   if (isNaN(num)) return balance;
-  // Show decimals for small amounts (< $100), hide for large
   if (num < 100) {
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   return Math.floor(num).toLocaleString('en-US');
 };
 
+type NetworkType = 'ethereumSepolia' | 'arcTestnet' | 'solanaDevnet';
+
+const NETWORK_OPTIONS: { id: NetworkType; name: string }[] = [
+  { id: 'ethereumSepolia', name: 'Ethereum Sepolia' },
+  { id: 'arcTestnet', name: 'Arc Testnet' },
+  { id: 'solanaDevnet', name: 'Solana Devnet' },
+];
+
 const Bridge = () => {
   const navigate = useNavigate();
   const account = useAccount();
   const isConnected = account?.isConnected ?? false;
 
-  // Direction: true = Sepolia → Arc, false = Arc → Sepolia
-  const [isSepoliaToArc, setIsSepoliaToArc] = useState(true);
-
-  const fromNetwork: keyof typeof SUPPORTED_NETWORKS = isSepoliaToArc ? "ethereumSepolia" : "arcTestnet";
-  const toNetwork: keyof typeof SUPPORTED_NETWORKS = isSepoliaToArc ? "arcTestnet" : "ethereumSepolia";
+  // Unified network selection
+  const [fromNetwork, setFromNetwork] = useState<NetworkType>('ethereumSepolia');
+  const [toNetwork, setToNetwork] = useState<NetworkType>('arcTestnet');
+  const [showFromDropdown, setShowFromDropdown] = useState(false);
+  const [showToDropdown, setShowToDropdown] = useState(false);
+  const fromDropdownRef = useRef<HTMLDivElement>(null);
+  const toDropdownRef = useRef<HTMLDivElement>(null);
 
   const [amount, setAmount] = useState<string>("");
   const [showFaucetInfo, setShowFaucetInfo] = useState(() => {
@@ -39,10 +55,103 @@ const Bridge = () => {
   const [showBadgeReminder, setShowBadgeReminder] = useState(() => {
     return localStorage.getItem('bridge_badge_dismissed') !== 'true';
   });
-  const [savedBridgeParams, setSavedBridgeParams] = useState<{ amount: string; toNetwork: keyof typeof SUPPORTED_NETWORKS } | null>(null);
+  const [savedBridgeParams, setSavedBridgeParams] = useState<{ amount: string; toNetwork: NetworkType } | null>(null);
   const [showRestoreForm, setShowRestoreForm] = useState(false);
   const [restoreTxHash, setRestoreTxHash] = useState("");
   const [restoreStatus, setRestoreStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error' | 'claimed'; message: string }>({ type: 'idle', message: '' });
+
+  // Solana balance state
+  const [solanaBalance, setSolanaBalance] = useState<string | null>(null);
+
+  // Determine if Solana is involved
+  const isSolanaInvolved = fromNetwork === 'solanaDevnet' || toNetwork === 'solanaDevnet';
+  const isEVMtoEVM = !isSolanaInvolved;
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (fromDropdownRef.current && !fromDropdownRef.current.contains(event.target as Node)) {
+        setShowFromDropdown(false);
+      }
+      if (toDropdownRef.current && !toDropdownRef.current.contains(event.target as Node)) {
+        setShowToDropdown(false);
+      }
+    };
+    if (showFromDropdown || showToDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showFromDropdown, showToDropdown]);
+
+  // Solana wallet
+  const { connected: solanaConnected, publicKey, disconnect: disconnectSolana, connecting: solanaConnecting, wallets, select, connect } = useWallet();
+  const { connection } = useConnection();
+
+  const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+  const handleConnectSolana = useCallback(async () => {
+    const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+    if (phantomWallet) {
+      select(phantomWallet.adapter.name);
+      try {
+        await connect();
+      } catch (error) {
+        console.error('Failed to connect Phantom:', error);
+      }
+    }
+  }, [wallets, select, connect]);
+
+  // Fetch Solana USDC balance
+  useEffect(() => {
+    const fetchSolanaBalance = async () => {
+      if (!publicKey || !connection) {
+        setSolanaBalance(null);
+        return;
+      }
+      try {
+        const ata = await getAssociatedTokenAddress(SOLANA_USDC_MINT, publicKey);
+        const balance = await connection.getTokenAccountBalance(ata);
+        setSolanaBalance(balance.value.uiAmountString || '0');
+      } catch {
+        setSolanaBalance('0');
+      }
+    };
+    fetchSolanaBalance();
+  }, [publicKey, connection]);
+
+  // Bridge hooks
+  const {
+    state: solanaState,
+    bridgeToSolana,
+    bridgeFromSolana,
+    reset: resetSolana,
+  } = useBridgeSolana();
+
+  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
+
+  // Get balances
+  const { balance: sepoliaBalance, isLoading: isLoadingSepolia } = useUSDCBalance('ethereumSepolia');
+  const { balance: arcBalance, isLoading: isLoadingArc } = useUSDCBalance('arcTestnet');
+
+  // Get current source balance based on fromNetwork
+  const getSourceBalance = () => {
+    if (fromNetwork === 'ethereumSepolia') return sepoliaBalance;
+    if (fromNetwork === 'arcTestnet') return arcBalance;
+    if (fromNetwork === 'solanaDevnet') return solanaBalance || '0';
+    return '0';
+  };
+
+  const getDestBalance = () => {
+    if (toNetwork === 'ethereumSepolia') return sepoliaBalance;
+    if (toNetwork === 'arcTestnet') return arcBalance;
+    if (toNetwork === 'solanaDevnet') return solanaBalance || '0';
+    return '0';
+  };
+
+  const sourceBalance = getSourceBalance();
+  const destBalance = getDestBalance();
+  const isLoadingBalance = (fromNetwork === 'ethereumSepolia' && isLoadingSepolia) ||
+                           (fromNetwork === 'arcTestnet' && isLoadingArc);
 
   // Persist dismissal to localStorage
   useEffect(() => {
@@ -56,25 +165,62 @@ const Bridge = () => {
       localStorage.setItem('bridge_badge_dismissed', 'true');
     }
   }, [showBadgeReminder]);
-  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
 
-  const { balance: fromBalance, isLoading: isLoadingFromBalance } = useUSDCBalance(fromNetwork);
-  const { balance: toBalance, isLoading: isLoadingToBalance } = useUSDCBalance(toNetwork);
-
+  // Handle bridge based on networks
   const handleBridge = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
     setSavedBridgeParams({ amount, toNetwork });
-    await bridge({ fromNetwork, toNetwork, amount });
+
+    if (isEVMtoEVM) {
+      // EVM to EVM bridge
+      await bridge({
+        fromNetwork: fromNetwork as 'ethereumSepolia' | 'arcTestnet',
+        toNetwork: toNetwork as 'ethereumSepolia' | 'arcTestnet',
+        amount
+      });
+    } else if (fromNetwork === 'solanaDevnet') {
+      // Solana to EVM
+      await bridgeFromSolana(toNetwork as EVMNetwork, amount);
+    } else if (toNetwork === 'solanaDevnet') {
+      // EVM to Solana
+      await bridgeToSolana(fromNetwork as EVMNetwork, amount);
+    }
   };
 
   const handleMax = () => {
-    const balance = parseFloat(fromBalance);
+    const balance = parseFloat(sourceBalance);
     if (balance > 0) setAmount(balance.toFixed(2));
   };
 
   const handleHalf = () => {
-    const balance = parseFloat(fromBalance);
+    const balance = parseFloat(sourceBalance);
     if (balance > 0) setAmount((balance / 2).toFixed(2));
+  };
+
+  const handleSwapNetworks = () => {
+    const temp = fromNetwork;
+    setFromNetwork(toNetwork);
+    setToNetwork(temp);
+    setAmount("");
+  };
+
+  const selectFromNetwork = (network: NetworkType) => {
+    if (network === toNetwork) {
+      // Swap if same
+      setToNetwork(fromNetwork);
+    }
+    setFromNetwork(network);
+    setShowFromDropdown(false);
+    setAmount("");
+  };
+
+  const selectToNetwork = (network: NetworkType) => {
+    if (network === fromNetwork) {
+      // Swap if same
+      setFromNetwork(toNetwork);
+    }
+    setToNetwork(network);
+    setShowToDropdown(false);
   };
 
   const handleRestore = async () => {
@@ -84,7 +230,9 @@ const Bridge = () => {
       return;
     }
     setRestoreStatus({ type: 'loading', message: 'Verifying with Circle API...' });
-    const result = await restorePendingBurn(restoreTxHash, fromNetwork, toNetwork, '0');
+    const fromNet = fromNetwork as 'ethereumSepolia' | 'arcTestnet';
+    const toNet = toNetwork as 'ethereumSepolia' | 'arcTestnet';
+    const result = await restorePendingBurn(restoreTxHash, fromNet, toNet, '0');
     if (result.success) {
       setRestoreStatus({ type: 'success', message: result.message });
       setTimeout(() => {
@@ -95,6 +243,53 @@ const Bridge = () => {
     } else {
       setRestoreStatus({ type: result.type as 'error' | 'claimed', message: result.message });
     }
+  };
+
+  // Determine current bridging state
+  const currentIsBridging = isSolanaInvolved ? solanaState.isBridging : isBridging;
+  const currentError = isSolanaInvolved ? solanaState.error : error;
+  const currentAttestationStatus = isSolanaInvolved ? solanaState.attestationStatus : attestationStatus;
+  const isComplete = currentAttestationStatus === 'complete';
+
+  // Get gas hint text
+  const getGasHint = () => {
+    if (fromNetwork === 'ethereumSepolia') return 'ETH on Sepolia';
+    if (fromNetwork === 'arcTestnet') return 'USDC on Arc Testnet';
+    if (fromNetwork === 'solanaDevnet') return 'SOL on Solana';
+    return '';
+  };
+
+  const getNetworkName = (network: NetworkType) => {
+    return NETWORK_OPTIONS.find(n => n.id === network)?.name || network;
+  };
+
+  // Check if ready to bridge
+  const canBridge = () => {
+    if (!amount || parseFloat(amount) <= 0) return false;
+    if (currentIsBridging) return false;
+
+    // Need EVM wallet for EVM networks
+    if (fromNetwork !== 'solanaDevnet' && !isConnected) return false;
+
+    // Need Solana wallet for Solana
+    if (isSolanaInvolved && !solanaConnected) return false;
+
+    return true;
+  };
+
+  const getButtonText = () => {
+    if (currentIsBridging) return 'Bridging...';
+    if (!isConnected && fromNetwork !== 'solanaDevnet') return 'Connect EVM Wallet';
+    if (isSolanaInvolved && !solanaConnected) return 'Connect Solana Wallet';
+    return `Bridge to ${getNetworkName(toNetwork)}`;
+  };
+
+  const handleReset = () => {
+    if (isSolanaInvolved) {
+      resetSolana();
+    }
+    setSavedBridgeParams(null);
+    setAmount("");
   };
 
   return (
@@ -117,7 +312,32 @@ const Bridge = () => {
               <div className="h-4 w-px bg-border/30" />
               <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Bridge</h1>
             </div>
-            {isConnected ? <UserMenu /> : <WalletConnect />}
+            <div className="flex items-center gap-2">
+              {/* Solana wallet button - show when Solana is involved */}
+              {isSolanaInvolved && (
+                solanaConnected && publicKey ? (
+                  <Button
+                    onClick={() => disconnectSolana()}
+                    variant="outline"
+                    className="gap-2 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 backdrop-blur-sm"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    {formatAddress(publicKey.toBase58())}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleConnectSolana}
+                    disabled={solanaConnecting}
+                    variant="outline"
+                    className="gap-2 rounded-xl border-white/10 bg-white/5 hover:bg-white/10 backdrop-blur-sm"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    {solanaConnecting ? '...' : 'Solana'}
+                  </Button>
+                )
+              )}
+              {isConnected ? <UserMenu /> : <WalletConnect />}
+            </div>
           </div>
         </div>
       </nav>
@@ -130,7 +350,7 @@ const Bridge = () => {
           </div>
           <h2 className="text-3xl font-bold mb-2">Bridge USDC</h2>
           <p className="text-sm text-muted-foreground">
-            Transfer USDC between Ethereum Sepolia and Arc Testnet via Circle CCTP V2
+            Transfer USDC across chains via Circle CCTP
           </p>
         </div>
 
@@ -149,16 +369,29 @@ const Bridge = () => {
                 <div className="flex items-start gap-3 pr-6">
                   <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium mb-1">Need testnet USDC?</p>
-                    <a
-                      href="https://faucet.circle.com/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                      Get free tokens from Circle Faucet
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
+                    <p className="text-sm font-medium mb-1">Need testnet tokens?</p>
+                    <div className="space-y-1">
+                      <a
+                        href="https://faucet.circle.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        Circle Faucet (USDC for EVM)
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      {isSolanaInvolved && (
+                        <a
+                          href="https://faucet.solana.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-purple-400 hover:underline flex items-center gap-1"
+                        >
+                          Solana Faucet (SOL for gas)
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -191,90 +424,53 @@ const Bridge = () => {
           </div>
         )}
 
-        {/* Bridge Form or Preview */}
-        {!isConnected ? (
-          /* Preview for disconnected wallet */
-          <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm space-y-6">
-            {/* From Network Preview */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">From</p>
-              <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                <span className="font-medium">Ethereum Sepolia</span>
-                <span className="text-sm text-muted-foreground">- USDC</span>
-              </div>
-            </div>
-
-            {/* Arrow */}
-            <div className="flex justify-center">
-              <div className="p-3 rounded-full bg-primary/10 border border-primary/20">
-                <ArrowLeftRight className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-
-            {/* To Network Preview */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">To</p>
-              <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                <span className="font-medium">Arc Testnet</span>
-                <span className="text-sm text-muted-foreground">- USDC</span>
-              </div>
-            </div>
-
-            {/* Amount Preview */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Amount</p>
-              <div className="h-14 rounded-xl bg-white/5 border border-white/10 flex items-center px-4">
-                <span className="text-lg text-muted-foreground font-mono">0.00</span>
-              </div>
-            </div>
-
-            {/* Connect Wallet CTA */}
-            <div className="text-center space-y-4">
-              <WalletConnect />
-              <p className="text-sm text-muted-foreground">
-                Connect wallet to bridge USDC
-              </p>
-            </div>
-
-            {/* Features */}
-            <div className="pt-4 border-t border-white/10 space-y-3">
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
-                <span>Circle CCTP V2 & Bridge Kit SDK</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
-                <span>Fast Transfer (~30 seconds)</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-4 h-4 text-primary" />
-                <span>No manual completion required</span>
-              </div>
-            </div>
-          </div>
-        ) : (
+        {/* Unified Bridge Form */}
         <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm space-y-6">
           {/* From Network */}
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">From</p>
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-              <span className="font-medium">{SUPPORTED_NETWORKS[fromNetwork].name}</span>
-              <span className="text-sm text-muted-foreground">
-                {isLoadingFromBalance ? '...' : `${formatBalance(fromBalance)} USDC`}
-              </span>
+            <div className="relative" ref={fromDropdownRef}>
+              <button
+                onClick={() => !currentIsBridging && setShowFromDropdown(!showFromDropdown)}
+                disabled={currentIsBridging}
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:border-primary/30 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{getNetworkName(fromNetwork)}</span>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showFromDropdown ? 'rotate-180' : ''}`} />
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
+                </span>
+              </button>
+              {showFromDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-xl bg-background border border-white/10 shadow-2xl overflow-hidden z-10">
+                  {NETWORK_OPTIONS.map((network) => (
+                    <button
+                      key={network.id}
+                      onClick={() => selectFromNetwork(network.id)}
+                      className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors group ${fromNetwork === network.id ? 'bg-primary/10' : ''}`}
+                    >
+                      <span className={`text-sm transition-colors ${fromNetwork === network.id ? 'text-primary font-medium' : 'group-hover:text-primary'}`}>
+                        {network.name}
+                      </span>
+                      {fromNetwork === network.id && (
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Arrow - clickable to swap direction */}
+          {/* Arrow - clickable to swap */}
           <div className="flex justify-center">
             <button
-              onClick={() => {
-                setIsSepoliaToArc(!isSepoliaToArc);
-                setAmount("");
-              }}
-              disabled={isBridging}
+              onClick={handleSwapNetworks}
+              disabled={currentIsBridging}
               className="p-3 rounded-full bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all duration-200 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Swap direction"
+              title="Swap networks"
             >
               <ArrowLeftRight className="w-5 h-5 text-primary" />
             </button>
@@ -283,11 +479,38 @@ const Bridge = () => {
           {/* To Network */}
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">To</p>
-            <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-              <span className="font-medium">{SUPPORTED_NETWORKS[toNetwork].name}</span>
-              <span className="text-sm text-muted-foreground">
-                {isLoadingToBalance ? '...' : `${formatBalance(toBalance)} USDC`}
-              </span>
+            <div className="relative" ref={toDropdownRef}>
+              <button
+                onClick={() => !currentIsBridging && setShowToDropdown(!showToDropdown)}
+                disabled={currentIsBridging}
+                className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:border-primary/30 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{getNetworkName(toNetwork)}</span>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showToDropdown ? 'rotate-180' : ''}`} />
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {`${formatBalance(destBalance)} USDC`}
+                </span>
+              </button>
+              {showToDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1 rounded-xl bg-background border border-white/10 shadow-2xl overflow-hidden z-10">
+                  {NETWORK_OPTIONS.map((network) => (
+                    <button
+                      key={network.id}
+                      onClick={() => selectToNetwork(network.id)}
+                      className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors group ${toNetwork === network.id ? 'bg-primary/10' : ''}`}
+                    >
+                      <span className={`text-sm transition-colors ${toNetwork === network.id ? 'text-primary font-medium' : 'group-hover:text-primary'}`}>
+                        {network.name}
+                      </span>
+                      {toNetwork === network.id && (
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -301,7 +524,7 @@ const Bridge = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleHalf}
-                  disabled={isBridging || parseFloat(fromBalance) <= 0}
+                  disabled={currentIsBridging || parseFloat(sourceBalance) <= 0}
                   className="h-7 text-xs rounded-lg"
                 >
                   HALF
@@ -311,7 +534,7 @@ const Bridge = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleMax}
-                  disabled={isBridging || parseFloat(fromBalance) <= 0}
+                  disabled={currentIsBridging || parseFloat(sourceBalance) <= 0}
                   className="h-7 text-xs rounded-lg"
                 >
                   MAX
@@ -326,151 +549,126 @@ const Bridge = () => {
               className="text-lg font-mono rounded-xl h-14 bg-white/5 border-white/10"
               min="0"
               step="0.01"
-              disabled={isBridging}
+              disabled={currentIsBridging}
             />
             <p className="text-xs text-muted-foreground">
-              Available: {isLoadingFromBalance ? '...' : `${formatBalance(fromBalance)} USDC`}
+              Available: {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
             </p>
           </div>
 
           {/* Error */}
-          {error && (
+          {currentError && currentAttestationStatus === 'idle' && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-              <p className="text-sm text-red-400">{error}</p>
+              <p className="text-sm text-red-400">{currentError}</p>
             </div>
           )}
 
-          {/* Bridge Button */}
-          <Button
-            size="lg"
-            className="w-full rounded-xl h-14 text-base font-semibold"
-            disabled={!amount || parseFloat(amount) <= 0 || isBridging || (mintConfirmed && result)}
-            onClick={handleBridge}
-          >
-            {isBridging ? (
-              <>
-                <Loader2 className="mr-2 w-5 h-5 animate-spin" />
-                Bridging...
-              </>
-            ) : (
-              <>
-                Bridge to {isSepoliaToArc ? "Arc Testnet" : "Ethereum Sepolia"}
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </>
-            )}
-          </Button>
-
-          {/* Attestation Status - Bridge Kit handles completion automatically */}
-          {attestationStatus === 'pending' && (
-            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-              <div className="flex items-start gap-3">
-                <Clock className="w-5 h-5 text-blue-400 animate-pulse flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-400 mb-1">
-                    Waiting for Circle Attestation
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This usually takes under 30 seconds...
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Attestation received, waiting for mint */}
-          {attestationStatus === 'attested' && (
-            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-              <div className="flex items-start gap-3">
-                <Loader2 className="w-5 h-5 text-yellow-400 animate-spin flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-yellow-400 mb-1">
-                    Attestation Received - Minting...
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Please confirm the mint transaction in your wallet
-                  </p>
-                  {!isSepoliaToArc && (
-                    <p className="text-xs text-yellow-500/80 mt-2">
-                      ⚠️ Make sure you have ETH on Sepolia for gas. If wallet shows empty popup - you need Sepolia ETH.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Transaction sent, waiting for blockchain confirmation */}
-          {attestationStatus === 'confirming' && (
-            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-              <div className="flex items-start gap-3">
-                <Loader2 className="w-5 h-5 text-purple-400 animate-spin flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-purple-400 mb-1">
-                    Confirming Transaction...
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Waiting for blockchain confirmation
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Burn completed but mint cancelled - funds are safe */}
-          {attestationStatus === 'pending_mint' && (
-            <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 relative">
-              <button
-                onClick={clearPendingBurn}
-                className="absolute top-2 right-2 p-1 text-orange-400/60 hover:text-orange-400 transition-colors"
-                title="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-orange-400 mb-1">
-                    Your funds are safe!
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Burn completed but mint was not finished. Your USDC is waiting to be claimed.
-                  </p>
-                  {pendingBurn && (
-                    <>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Burn TX: <a href={`${SUPPORTED_NETWORKS[pendingBurn.fromNetwork].explorerUrl}/tx/${pendingBurn.txHash}`} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">{pendingBurn.txHash.slice(0, 10)}...{pendingBurn.txHash.slice(-8)}</a>
+          {/* EVM Bridge Status Messages */}
+          {isEVMtoEVM && (
+            <>
+              {/* Attestation Status - Pending */}
+              {attestationStatus === 'pending' && (
+                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-5 h-5 text-blue-400 animate-pulse flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-400 mb-1">
+                        Waiting for Circle Attestation
                       </p>
-                      <Button
-                        onClick={claimPendingBridge}
-                        disabled={isClaiming}
-                        className="mt-3 w-full bg-orange-500 hover:bg-orange-600 text-white"
-                      >
-                        {isClaiming ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Claiming...
-                          </>
-                        ) : (
-                          <>
-                            Claim {pendingBurn.amount} USDC
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-                  {!pendingBurn && (
-                    <p className="text-xs text-orange-400/80 mt-2">
-                      Contact support with your burn transaction hash to claim your USDC.
-                    </p>
-                  )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This usually takes under 30 seconds...
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
+
+              {/* Attestation received, waiting for mint */}
+              {attestationStatus === 'attested' && (
+                <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                  <div className="flex items-start gap-3">
+                    <Loader2 className="w-5 h-5 text-yellow-400 animate-spin flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-400 mb-1">
+                        Attestation Received - Minting...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Please confirm the mint transaction in your wallet
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Transaction confirming */}
+              {attestationStatus === 'confirming' && (
+                <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                  <div className="flex items-start gap-3">
+                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-purple-400 mb-1">
+                        Confirming Transaction...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Waiting for blockchain confirmation
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Pending mint recovery */}
+              {attestationStatus === 'pending_mint' && (
+                <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 relative">
+                  <button
+                    onClick={clearPendingBurn}
+                    className="absolute top-2 right-2 p-1 text-orange-400/60 hover:text-orange-400 transition-colors"
+                    title="Dismiss"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-orange-400 mb-1">
+                        Your funds are safe!
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Burn completed but mint was not finished. Your USDC is waiting to be claimed.
+                      </p>
+                      {pendingBurn && (
+                        <>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Burn TX: <a href={`${SUPPORTED_NETWORKS[pendingBurn.fromNetwork].explorerUrl}/tx/${pendingBurn.txHash}`} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">{pendingBurn.txHash.slice(0, 10)}...{pendingBurn.txHash.slice(-8)}</a>
+                          </p>
+                          <Button
+                            onClick={claimPendingBridge}
+                            disabled={isClaiming}
+                            className="mt-3 w-full bg-orange-500 hover:bg-orange-600 text-white"
+                          >
+                            {isClaiming ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Claiming...
+                              </>
+                            ) : (
+                              <>
+                                Claim {pendingBurn.amount} USDC
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Success indicator when mint is confirmed */}
-          {attestationStatus === 'complete' && mintConfirmed && result && (
+          {/* Success indicator */}
+          {isComplete && savedBridgeParams && (
             <div className="p-4 rounded-xl bg-green-500/10 border border-green-500/20">
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
@@ -479,19 +677,44 @@ const Bridge = () => {
                     Bridge Complete!
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your {formatBalance(savedBridgeParams?.amount || '0')} USDC has been successfully bridged to {SUPPORTED_NETWORKS[savedBridgeParams?.toNetwork || toNetwork].name}.
+                    Your {formatBalance(savedBridgeParams.amount)} USDC has been successfully bridged to {getNetworkName(savedBridgeParams.toNetwork)}.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
+          {/* Bridge Button */}
+          {isComplete ? (
+            <Button onClick={handleReset} className="w-full rounded-xl h-14 text-base font-semibold">
+              Bridge Again
+            </Button>
+          ) : (
+            <Button
+              onClick={handleBridge}
+              disabled={!canBridge()}
+              className="w-full rounded-xl h-14 text-base font-semibold"
+            >
+              {currentIsBridging ? (
+                <>
+                  <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                  Bridging...
+                </>
+              ) : (
+                <>
+                  {getButtonText()}
+                  {canBridge() && <ArrowRight className="ml-2 w-5 h-5" />}
+                </>
+              )}
+            </Button>
+          )}
+
           <p className="text-xs text-center text-muted-foreground">
-            Make sure you have {isSepoliaToArc ? "ETH on Sepolia" : "USDC on Arc Testnet"} for gas fees
+            Make sure you have {getGasHint()} for gas fees
           </p>
 
-          {/* Transactions */}
-          {transactions.length > 0 && (
+          {/* EVM Transactions */}
+          {isEVMtoEVM && transactions.length > 0 && (
             <div className="space-y-3 pt-4 border-t border-white/10">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Transactions</p>
               <div className="space-y-2">
@@ -530,60 +753,61 @@ const Bridge = () => {
             </div>
           )}
 
-          {/* Restore Pending Bridge */}
-          <div className="pt-4 border-t border-white/5">
-            <button
-              onClick={() => setShowRestoreForm(!showRestoreForm)}
-              className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors flex items-center gap-1 mx-auto"
-            >
-              {showRestoreForm ? <X className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-              {showRestoreForm ? "Close" : "Having trouble with a stuck transfer?"}
-            </button>
+          {/* Restore Pending Bridge - only for EVM↔EVM */}
+          {isEVMtoEVM && (
+            <div className="pt-4 border-t border-white/5">
+              <button
+                onClick={() => setShowRestoreForm(!showRestoreForm)}
+                className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors flex items-center gap-1 mx-auto"
+              >
+                {showRestoreForm ? <X className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                {showRestoreForm ? "Close" : "Having trouble with a stuck transfer?"}
+              </button>
 
-            {showRestoreForm && (
-              <div className="mt-4 p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  If your bridge was interrupted after the burn transaction, enter your burn tx hash to restore and claim.
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    type="text"
-                    placeholder="0x..."
-                    value={restoreTxHash}
-                    onChange={(e) => {
-                      setRestoreTxHash(e.target.value);
-                      if (restoreStatus.type !== 'idle' && restoreStatus.type !== 'loading') {
-                        setRestoreStatus({ type: 'idle', message: '' });
-                      }
-                    }}
-                    className="text-sm font-mono h-9 bg-white/5 border-white/10 flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleRestore}
-                    disabled={!restoreTxHash || !restoreTxHash.startsWith('0x') || restoreStatus.type === 'loading'}
-                    className="bg-yellow-600 hover:bg-yellow-700 h-9"
-                  >
-                    {restoreStatus.type === 'loading' ? 'Checking...' : 'Restore'}
-                  </Button>
-                </div>
-                {restoreStatus.type !== 'idle' && restoreStatus.type !== 'loading' && (
-                  <div className={`text-xs mt-2 px-2 py-1.5 rounded-lg ${
-                    restoreStatus.type === 'success' ? 'bg-green-500/10 text-green-400' :
-                    restoreStatus.type === 'claimed' ? 'bg-blue-500/10 text-blue-400' :
-                    'bg-red-500/10 text-red-400'
-                  }`}>
-                    {restoreStatus.type === 'success' && '✓ '}
-                    {restoreStatus.type === 'claimed' && '✓ '}
-                    {restoreStatus.type === 'error' && '✗ '}
-                    {restoreStatus.message}
+              {showRestoreForm && (
+                <div className="mt-4 p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    If your bridge was interrupted after the burn transaction, enter your burn tx hash to restore and claim.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="0x..."
+                      value={restoreTxHash}
+                      onChange={(e) => {
+                        setRestoreTxHash(e.target.value);
+                        if (restoreStatus.type !== 'idle' && restoreStatus.type !== 'loading') {
+                          setRestoreStatus({ type: 'idle', message: '' });
+                        }
+                      }}
+                      className="text-sm font-mono h-9 bg-white/5 border-white/10 flex-1"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleRestore}
+                      disabled={!restoreTxHash || !restoreTxHash.startsWith('0x') || restoreStatus.type === 'loading'}
+                      className="bg-yellow-600 hover:bg-yellow-700 h-9"
+                    >
+                      {restoreStatus.type === 'loading' ? 'Checking...' : 'Restore'}
+                    </Button>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                  {restoreStatus.type !== 'idle' && restoreStatus.type !== 'loading' && (
+                    <div className={`text-xs mt-2 px-2 py-1.5 rounded-lg ${
+                      restoreStatus.type === 'success' ? 'bg-green-500/10 text-green-400' :
+                      restoreStatus.type === 'claimed' ? 'bg-blue-500/10 text-blue-400' :
+                      'bg-red-500/10 text-red-400'
+                    }`}>
+                      {restoreStatus.type === 'success' && '✓ '}
+                      {restoreStatus.type === 'claimed' && '✓ '}
+                      {restoreStatus.type === 'error' && '✗ '}
+                      {restoreStatus.message}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        )}
 
         {/* Live Activity Feed */}
         <div className="mt-6">
