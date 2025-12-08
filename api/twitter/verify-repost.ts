@@ -59,9 +59,10 @@ export default async function handler(request: any, response: any) {
     }
 
     // Check if user retweeted our tweet
-    // Twitter API v2: Get user's retweets
-    const retweetsResponse = await fetch(
-      `https://api.twitter.com/2/users/${connection.twitter_id}/timelines/reverse_chronological?tweet.fields=referenced_tweets&max_results=100`,
+    // Twitter API v2: Get list of users who retweeted a specific tweet
+    // Then check if current user's twitter_id is in that list
+    const retweetersResponse = await fetch(
+      `https://api.twitter.com/2/tweets/${REQUIRED_TWEET_ID}/retweeted_by?max_results=100`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -69,23 +70,24 @@ export default async function handler(request: any, response: any) {
       }
     );
 
-    const retweetsData = await retweetsResponse.json();
+    const retweetersData = await retweetersResponse.json();
 
-    if (!retweetsData.data) {
+    console.log('Retweeters API response:', JSON.stringify(retweetersData));
+
+    // Check if API returned an error
+    if (retweetersData.errors) {
+      console.error('Twitter API error:', retweetersData.errors);
       return response.status(200).json({
         verified: false,
         multiplier: 1.0,
-        message: 'Could not fetch tweets. Please try again.',
+        message: 'Could not verify repost. Please try again later.',
       });
     }
 
-    // Check if any tweet is a retweet of our required tweet
-    const hasReposted = retweetsData.data.some((tweet: any) => {
-      const refs = tweet.referenced_tweets || [];
-      return refs.some((ref: any) =>
-        ref.type === 'retweeted' && ref.id === REQUIRED_TWEET_ID
-      );
-    });
+    // Check if current user is in the list of retweeters
+    const hasReposted = retweetersData.data?.some((user: any) =>
+      user.id === connection.twitter_id
+    ) || false;
 
     if (hasReposted) {
       // Update multiplier to 1.5x

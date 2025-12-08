@@ -55,9 +55,11 @@ const Bridge = () => {
   const [showFaucetInfo, setShowFaucetInfo] = useState(() => {
     return localStorage.getItem('bridge_faucet_dismissed') !== 'true';
   });
-  const [showBadgeReminder, setShowBadgeReminder] = useState(() => {
-    return localStorage.getItem('bridge_badge_dismissed') !== 'true';
+  const [showBadgeReminder, setShowBadgeReminder] = useState(false); // Disabled for now
+  const [showTwitterBoost, setShowTwitterBoost] = useState(() => {
+    return localStorage.getItem('bridge_twitter_dismissed') !== 'true';
   });
+  const [twitterStatus, setTwitterStatus] = useState<{ connected: boolean; repostVerified: boolean } | null>(null);
   const [savedBridgeParams, setSavedBridgeParams] = useState<{ amount: string; toNetwork: NetworkType } | null>(null);
   const [showRestoreForm, setShowRestoreForm] = useState(false);
   const [restoreTxHash, setRestoreTxHash] = useState("");
@@ -173,6 +175,22 @@ const Bridge = () => {
       localStorage.setItem('bridge_badge_dismissed', 'true');
     }
   }, [showBadgeReminder]);
+
+  useEffect(() => {
+    if (!showTwitterBoost) {
+      localStorage.setItem('bridge_twitter_dismissed', 'true');
+    }
+  }, [showTwitterBoost]);
+
+  // Fetch Twitter status to show boost notification
+  useEffect(() => {
+    if (!account?.address || !showTwitterBoost) return;
+
+    fetch(`/api/twitter/status?walletAddress=${account.address}`)
+      .then(res => res.json())
+      .then(data => setTwitterStatus(data))
+      .catch(() => {});
+  }, [account?.address, showTwitterBoost]);
 
   // Handle bridge based on networks
   const handleBridge = async () => {
@@ -381,7 +399,7 @@ const Bridge = () => {
         </div>
 
         {/* Info Cards */}
-        {(showFaucetInfo || showBadgeReminder) && (
+        {(showFaucetInfo || showBadgeReminder || (showTwitterBoost && twitterStatus && !twitterStatus.repostVerified)) && (
           <div className="mb-6 space-y-3">
             {/* Faucet Info */}
             {showFaucetInfo && (
@@ -442,6 +460,37 @@ const Bridge = () => {
                       className="text-sm text-purple-400 hover:underline inline-flex items-center gap-1"
                     >
                       Mint free Early Supporter NFT
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Twitter Boost */}
+            {showTwitterBoost && twitterStatus && !twitterStatus.repostVerified && (
+              <div className="p-4 rounded-2xl bg-[#1DA1F2]/5 border border-[#1DA1F2]/20 backdrop-blur-sm relative">
+                <button
+                  onClick={() => setShowTwitterBoost(false)}
+                  className="absolute top-3 right-3 p-1 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <div className="flex items-start gap-3 pr-6">
+                  <span className="text-xl">🚀</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">
+                      {twitterStatus.connected
+                        ? 'Repost our tweet for 1.5x points!'
+                        : 'Boost your points by 1.5x!'}
+                    </p>
+                    <button
+                      onClick={() => navigate("/profile")}
+                      className="text-sm text-[#1DA1F2] hover:underline inline-flex items-center gap-1"
+                    >
+                      {twitterStatus.connected
+                        ? 'Verify repost in Profile'
+                        : 'Connect Twitter + repost'}
                       <ArrowRight className="w-3 h-3" />
                     </button>
                   </div>
