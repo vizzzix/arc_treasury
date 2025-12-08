@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WalletConnect } from "@/components/WalletConnect";
 import { UserMenu } from "@/components/UserMenu";
+import TwitterConnect from "@/components/TwitterConnect";
 import { ArrowLeft, ExternalLink, Copy, Check, Wallet, Link, Mail, Loader2, Shield } from "lucide-react";
 import { SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -357,6 +358,9 @@ const Profile = () => {
                 </div>
               )}
             </div>
+
+            {/* Twitter Boost */}
+            <TwitterConnect />
 
             {/* Email Linking */}
             <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
