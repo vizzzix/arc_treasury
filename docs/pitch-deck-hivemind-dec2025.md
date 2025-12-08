@@ -114,7 +114,7 @@ style: |
 
 **USDC yield from T-Bills. Built on Circle's L1. Live on testnet.**
 
-*Prepared for DCVC — December 2025*
+*Prepared for Hivemind Capital — December 2025*
 
 ![bg right:40%](https://arctreasury.biz/logo.png)
 
@@ -353,18 +353,18 @@ User → Arc Treasury Frontend
 
 ---
 
-# DCVC Fit
+# Hivemind Portfolio Fit
 
 ## Why this aligns with your thesis
 
-| DCVC Focus | Arc Treasury |
-|------------|--------------|
-| **Deep tech infrastructure** | Core financial rails for stablecoins |
-| **Data-driven** | On-chain analytics, transparent TVL |
-| **Computational approaches** | Smart contract automation of T-Bill yield |
-| **Trillion-dollar problems** | $270B idle stablecoin capital |
+| Hivemind Focus | Arc Treasury |
+|----------------|--------------|
+| **Payment Rails** | Critical USDC infrastructure via Circle's CCTP V2 — like RD Technologies |
+| **Real World Assets** | T-Bill yields on-chain via USYC, the largest tokenized Treasury fund |
+| **Crypto Infrastructure** | Foundational DeFi on Circle's institutional-grade L1 — like GFO-X, Hiro |
+| **Institutional Grade** | Circle-backed yield, compliant structure, enterprise infrastructure |
 
-**You've backed blockchain infrastructure before** — this is the yield layer for Circle's ecosystem.
+**Your thesis on "institutionalizing digital assets" matches our approach.**
 
 ---
 
@@ -373,7 +373,7 @@ User → Arc Treasury Frontend
 1. **Working infrastructure** — not a whitepaper
 2. **First mover on Arc** — Circle's strategic L1
 3. **Real yield source** — US T-Bills, not token inflation
-4. **Conservative entry** — $5-6M FDV, 20-40x potential
+4. **Conservative entry** — $6M FDV, 20-40x potential
 5. **Technical team** — ship fast, deep blockchain expertise
 
 **Early infrastructure bet on Circle's ecosystem expansion.**
@@ -388,10 +388,10 @@ User → Arc Treasury Frontend
 |---|---|
 | **Live testnet** | arctreasury.biz |
 | **Audit-ready** | Q2 2026 |
-| **Seed open** | $5-6M FDV |
+| **Seed open** | $6M FDV |
 
 **Contact:**
 - Email: info@arctreasury.biz
 - Twitter: [@arctreasury](https://x.com/arctreasury)
 
-*Confidential — Prepared for DCVC, December 2025*
+*Confidential — Prepared for Hivemind Capital, December 2025*

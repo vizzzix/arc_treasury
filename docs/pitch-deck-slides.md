@@ -139,9 +139,9 @@ Billions idle. Users want safety + returns — but have no bridge between DeFi &
 | Feature | Description |
 |---------|-------------|
 | **Treasury Vault** | Deposit USDC → earn ~4% APY from T-Bills via USYC |
-| **Cross-chain Bridge** | Ethereum ↔ Arc via Circle CCTP V2 |
-| **Stablecoin Swap** | USDC/EURC AMM pool |
-| **Points & Rewards** | Gamified incentives, NFT badges |
+| **Cross-chain Bridge** | Sepolia ↔ Arc ↔ Solana via Circle CCTP V2 |
+| **Stablecoin Swap** | USDC/EURC AMM pool with real EUR/USD rate |
+| **Points & Rewards** | Gamified incentives, NFT badges, multipliers |
 
 > **USYC** = Hashnote's tokenized US Treasury fund. Issued by Circle International, backed by short-term T-Bills (~4% APY). Instant USDC redemption 24/7, regulated by Bermuda Monetary Authority.
 
@@ -168,20 +168,38 @@ Billions idle. Users want safety + returns — but have no bridge between DeFi &
 
 # Fully Functional Product
 
-## 100% Ready for Mainnet
+## Production-ready on testnet
 
-Arc Treasury is not a concept — it's a fully operational DeFi yield vault, already live on testnet.
+Arc Treasury is not a concept — it's a fully operational DeFi yield vault with 5 production contracts.
 
 | Component | Status |
 |-----------|--------|
-| Treasury Vault | Real USYC integration (~4% APY) |
-| Locked Positions | 1, 3, and 12-month terms |
-| Cross-chain Bridge | Circle CCTP V2 (Ethereum ↔ Arc) |
-| Stablecoin Swap | USDC/EURC AMM pool |
-| Points & NFT Badges | Fully gamified experience |
-| Battle-tested | 50+ testnet deployments |
+| Treasury Vault | Upgradeable proxy, USYC yield (~4% APY) |
+| Locked Positions | 1, 3, and 12-month terms with multipliers |
+| CCTP V2 Bridge | Sepolia ↔ Arc ↔ Solana cross-chain |
+| AMM Swap | USDC/EURC with real EUR/USD rate |
+| Points Engine | NFT badges, 1.2x-3x multipliers |
+| Referral System | 5 tiers (Bronze → Diamond) |
 
-**The code is complete. Ready for mainnet after security audit.**
+**Pre-Mainnet Development (funded by seed):**
+- Security audit (Trail of Bits / OpenZeppelin)
+- USYC institutional onboarding (KYC, $100K+)
+- Bridge networks: Base, Arbitrum, Polygon
+- DEX aggregator & liquidity routing
+- Portfolio dashboard & transaction history
+- Achievements & gamification system
+- Points optimization & anti-gaming
+- Admin dashboard & monitoring
+
+**Post-Mainnet Roadmap:**
+- Auto-compound vault
+- SDK/API for dApp integrations
+- Mobile app (PWA)
+- Additional yield integrations
+- Governance (post-TGE)
+- Institutional solutions
+
+**Core complete. 50+ testnet deployments. Development + Audit → Mainnet.**
 
 ---
 
@@ -196,7 +214,16 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 | Swap fees | 0.2% | $1M/year |
 | **Total** | | **$2.6M/year** |
 
-*$2.6M/year revenue potential at just $100M TVL — a fraction of stablecoin market share.*
+**Scale Economics:**
+
+| TVL | ARR | Note |
+|-----|-----|------|
+| $10M | $260K | Break-even |
+| $100M | $2.6M | Conservative |
+| $500M | $13M | Growth |
+| $1B | $26M | Ondo-scale |
+
+*Unit economics improve with scale — fixed infra costs, variable revenue. 80%+ margin at scale.*
 
 ---
 
@@ -256,16 +283,19 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 
 | Parameter | Value |
 |-----------|-------|
-| Target | **$1,000,000** |
-| Minimum | $600K |
-| Token allocation | 15-20% |
-| FDV | $5-6M |
+| Target | **$1,200,000** |
+| Minimum | $400K |
+| Token allocation | **20%** (at $1.2M) |
+| FDV | $6M |
 | Instrument | SAFT |
-| Vesting | 6-month cliff, 18-month linear |
+| Vesting | 6-month cliff, 18-month linear (3-month cliff for lead) |
 | Previous capital | $0 (bootstrapped) |
-| Lead investor | In discussions |
 
 *Seed pricing reflects product risk, not market risk — built, tested, aligned.*
+
+**Flexible tiers:** $400K (6.7%) • $800K (13.3%) • $1.2M (20%) — all at $6M FDV
+
+**Multiple investors welcome. Pro-rata at $6M FDV. Seed cap: $1.2M (20%).**
 
 **Investor Transparency:** Monthly reports • Quarterly calls • Real-time TVL dashboard • On-chain tracking • Full audit disclosure
 
@@ -280,7 +310,21 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 | Team (6 hires Y1) | $250K (25%) | Contingency | $150K (15%) |
 | Legal & Entity | $80K (8%) | | |
 
+*Allocations are indicative estimates. Final breakdown negotiable with lead investor.*
+
 > **Why Georgia?** 0% corporate tax (retained earnings), 1-2 day company registration, VZP crypto-friendly status, growing Web3 hub. Legitimate & efficient — not offshore hiding.
+
+---
+
+# Future Funding Rounds
+
+| Round | Amount | FDV | Trigger |
+|-------|--------|-----|---------|
+| **Seed** (current) | $1.2M | $6M | 20% tokens |
+| **Strategic** | $2-3M | $15-25M | Post-mainnet, ecosystem partners |
+| **Public / TGE** | — | $40-60M | Post-mainnet |
+
+*Seed investors get 3-10x upside to Strategic round, 7-10x to TGE.*
 
 ---
 
@@ -293,7 +337,9 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 | **Q3 2026** | **Mainnet launch on Arc** |
 | Q4 2026 | $5-15M TVL, growth push |
 | 2027 | Multi-chain expansion via CCTP |
-| **Q4 2027** | **Token launch (TGE)** |
+| **2027+** | **Token launch (TGE)** |
+
+*Timeline dependent on Arc L1 mainnet launch by Circle. Dates may shift accordingly.*
 
 ---
 
@@ -336,7 +382,7 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 |---|---|
 | **Live testnet** | Ready for audit |
 | **First mover on Arc** | Circle alignment |
-| **Seed round open** | $5-6M FDV |
+| **Seed round open** | $6M FDV |
 
 **Website:** [arctreasury.biz](https://arctreasury.biz) | **Twitter:** [@arctreasury](https://x.com/arctreasury) | **Email:** info@arctreasury.biz
 

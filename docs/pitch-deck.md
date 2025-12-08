@@ -60,7 +60,7 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 - 🔁 Battle-tested smart contracts — 11 iterations, 50+ testnet deployments
 - ⚙️ Modern stack: React + TypeScript frontend, Supabase backend
 
-**The code is complete. Ready for mainnet launch following a formal security audit.**
+**Production-ready architecture. Battle-tested on testnet. Audit → Mainnet.**
 
 ---
 
@@ -134,30 +134,49 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 | Parameter | Value |
 |-----------|-------|
 | Round | Seed |
-| Target | **$1,000,000** |
-| Minimum | $600K |
-| Token allocation | 15-20% |
-| FDV | $5-6M |
+| Target | **$1,200,000** |
+| Minimum | $400K |
+| Token allocation | **20%** (at $1.2M) |
+| FDV | $6M |
 | Instrument | SAFT |
-| Vesting | 6-month cliff, 18-month linear |
+| Vesting | 6-month cliff, 18-month linear (3-month cliff for lead) |
 | Previous capital | $0 (bootstrapped) |
-| Lead investor | In discussions |
+
+**Flexible tiers:** $400K (6.7%) • $800K (13.3%) • $1.2M (20%) — all at $6M FDV
+
+**Multiple investors welcome. Pro-rata at $6M FDV. Seed cap: $1.2M (20%).**
 
 *Seed pricing reflects product risk, not market risk — we've built, tested, and aligned with the right L1 at the right time.*
 
 ---
 
-# Use of Funds ($1M)
+# Use of Funds
 
-| Category | Amount | % |
-|----------|--------|---|
-| Security Audit | $150K | 15% |
-| USYC Integration | $100K | 10% |
-| Team (6 hires Y1) | $250K | 25% |
-| Legal & Entity | $80K | 8% |
-| Marketing | $150K | 15% |
-| Operations | $120K | 12% |
-| Contingency | $150K | 15% |
+## $1M deployment
+
+| Category | Allocation | Purpose |
+|----------|------------|---------|
+| Security Audit | $150K (15%) | Trail of Bits / OpenZeppelin |
+| USYC Integration | $100K (10%) | Institutional onboarding |
+| Engineering | $250K (25%) | 6 hires Y1 |
+| Legal & Entity | $80K (8%) | Georgia LLC, compliance |
+| Marketing | $150K (15%) | Developer relations |
+| Operations | $120K (12%) | Infrastructure costs |
+| Contingency | $150K (15%) | Buffer |
+
+*Allocations are indicative estimates. Final breakdown negotiable with lead investor.*
+
+---
+
+# Future Funding Rounds
+
+| Round | Amount | FDV | Trigger |
+|-------|--------|-----|---------|
+| **Seed** (current) | $1.2M | $6M | 20% tokens |
+| **Strategic** | $2-3M | $15-25M | Post-mainnet, ecosystem partners |
+| **Public / TGE** | — | $40-60M | Post-mainnet |
+
+*Seed investors positioned for 3-10x upside to Strategic, 7-10x to TGE.*
 
 ---
 
