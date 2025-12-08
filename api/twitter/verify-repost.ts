@@ -121,8 +121,8 @@ export default async function handler(request: any, response: any) {
 
 async function refreshTwitterToken(refreshToken: string) {
   try {
-    const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID || '';
-    const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || '';
+    const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID || process.env.ClientID || '';
+    const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || process.env.ClientSecret || '';
 
     const response = await fetch('https://api.twitter.com/2/oauth2/token', {
       method: 'POST',

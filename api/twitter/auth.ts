@@ -4,8 +4,8 @@ import crypto from 'crypto';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tclvgmhluhayiflwvkfq.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
 
-const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID || '';
-const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || '';
+const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID || process.env.ClientID || '';
+const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || process.env.ClientSecret || '';
 const TWITTER_CALLBACK_URL = process.env.TWITTER_CALLBACK_URL || 'https://arctreasury.biz/api/twitter/callback';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
