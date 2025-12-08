@@ -265,7 +265,7 @@ User → Arc Treasury Frontend
 |---|---|
 | **Anton** — Founder & Lead Developer | **Robert** — Co-founder & Operations |
 | Full-stack blockchain (5+ years) | COO at BonusBlock |
-| 11 contracts, full frontend — solo build | Injective, Xion, Axelar, Theoriq |
+| 5 smart contracts, full frontend — solo build | Injective, Xion, Axelar, Theoriq |
 | Base Batches 002, Zama FHE Track | BD & partnerships across L1/L2 |
 
 **Lean team. Ship fast. Technical depth.**

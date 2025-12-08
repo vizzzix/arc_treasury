@@ -242,7 +242,7 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 | **Anton** — Founder & Lead Developer | **Robert** — Co-founder & Operations |
 | [@claimpilot](https://x.com/claimpilot) | [@Robsvr](https://x.com/Robsvr) |
 | • Full-stack blockchain dev (5+ years) | • COO at BonusBlock |
-| • Built Arc Treasury solo: 11 contracts, full frontend | • Worked with: Injective, Xion, Axelar, Theoriq |
+| • Built Arc Treasury solo: 5 smart contracts, full frontend | • Worked with: Injective, Xion, Axelar, Theoriq |
 | • Base Batches 002, Zama FHE Builder Track | • BD & partnerships across L1/L2 ecosystems |
 | • Built Stable2Pay — POS for Stable Network | |
 

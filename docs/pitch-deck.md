@@ -113,7 +113,7 @@ Arc Treasury is not a concept — it's a fully operational DeFi yield vault, alr
 
 **Anton** — Founder & Lead Developer
 - Full-stack blockchain dev (5+ years)
-- Built Arc Treasury solo: 11 contracts, full frontend, infra
+- Built Arc Treasury solo: 5 smart contracts, full frontend, infra
 - Base Batches 002, Zama FHE Builder Track participant
 - Built Stable2Pay — POS system for Stable Network
 
