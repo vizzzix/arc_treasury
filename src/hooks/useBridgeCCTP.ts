@@ -248,6 +248,10 @@ export const useBridgeCCTP = () => {
         return;
       }
 
+      // Clear any old pending burn from localStorage before starting new bridge
+      if (address) {
+        savePendingBurn(address, null);
+      }
       setState({ isBridging: true, isClaiming: false, error: null, result: null, transactions: [], mintConfirmed: false, pendingBurn: null });
       setAttestationStatus(null);
       mintConfirmedRef.current = false;
