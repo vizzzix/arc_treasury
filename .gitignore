@@ -155,3 +155,5 @@ docs/pitch-deck.pdf
 docs/pitch-deck-slides.md
 docs/PitchWeb.pdf
 docs/*.pptx
+public/docs/pitch-deck-dcvc-*
+public/docs/pitch-deck-hivemind-*
