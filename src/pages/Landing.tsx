@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
+import { UserMenu } from "@/components/UserMenu";
 import { WhitelistForm } from "@/components/WhitelistForm";
+import { useAccount } from "wagmi";
 import { Vault, Coins, TrendingUp, ArrowRight, Github, Twitter, Shield, Zap, Menu, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
@@ -11,6 +13,7 @@ import { Input } from "@/components/ui/input";
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { isConnected } = useAccount();
   const { apy, isLoading: isLoadingAPY } = useUSYCPrice();
   const { eurToUsd } = useExchangeRate();
   const [usdcAmount, setUsdcAmount] = useState("");
@@ -127,12 +130,12 @@ const Landing = () => {
               >
                 Bridge
               </Button>
-              <WalletConnect />
+              {isConnected ? <UserMenu /> : <WalletConnect />}
             </div>
 
             {/* Mobile Menu Button */}
             <div className="flex md:hidden items-center gap-2">
-              <WalletConnect />
+              {isConnected ? <UserMenu /> : <WalletConnect />}
               <Button
                 variant="ghost"
                 size="icon"
