@@ -63,6 +63,9 @@ contracts/apy_history.json
 tmp_emails.json
 *emails*.json
 *contacts*.json
+*angels*.json
+*influencers*.json
+enriched-*.json
 
 # Claude Code settings
 .claude/
