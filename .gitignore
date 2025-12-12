@@ -48,6 +48,7 @@ Thumbs.db
 
 # Private keys and sensitive data
 private.txt
+proxy.txt
 *.key
 *.pem
 deployed-addresses*.json
