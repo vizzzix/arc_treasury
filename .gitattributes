@@ -1,0 +1,25 @@
+# GitHub Linguist overrides
+# https://github.com/github/linguist
+
+# Exclude from language stats
+package-lock.json linguist-generated
+contracts/package-lock.json linguist-generated
+railway-bot/package-lock.json linguist-generated
+indexer/package-lock.json linguist-generated
+
+# Mark ABI files as generated (exclude from stats)
+src/lib/abis/*.json linguist-generated
+
+# Ensure these are detected correctly
+*.sol linguist-language=Solidity
+*.ts linguist-language=TypeScript
+*.tsx linguist-language=TypeScript
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.ico binary
