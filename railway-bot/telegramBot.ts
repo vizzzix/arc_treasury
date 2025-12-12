@@ -22,12 +22,12 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours for auto-alerts
 const POLL_INTERVAL_MS = 3000; // 3 seconds for command polling
-const FIXER_API_KEY = process.env.FIXER_API_KEY || "";
+const FIXER_API_KEY = process.env.FIXER_API_KEY || "80f6690ad5c8e6aafe4373f4a0ce6e96";
 const EXCHANGE_RATE_UPDATE_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours - update exchange rate twice a day
 
-// Supabase for tracking bridge users
-const SUPABASE_URL = process.env.SUPABASE_URL || "";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY || "";
+// Supabase for tracking bridge users (anon key is public, protected by RLS)
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://tclvgmhluhayiflwvkfq.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY || "***REDACTED_SUPABASE_ANON_KEY***";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const arcTestnet = defineChain({
