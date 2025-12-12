@@ -3,6 +3,16 @@
 <div align="center">
   <h3>Earn Real Yield on Your Stablecoins</h3>
   <p>DeFi treasury vault with real USYC integration on Arc Network</p>
+
+  <p>
+    <a href="https://github.com/vizzzix/arc_treasury/actions/workflows/ci.yml"><img src="https://github.com/vizzzix/arc_treasury/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <img src="https://img.shields.io/badge/TypeScript-5.6-3178c6?logo=typescript&logoColor=white" alt="TypeScript">
+    <img src="https://img.shields.io/badge/Solidity-0.8.20-363636?logo=solidity&logoColor=white" alt="Solidity">
+    <img src="https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white" alt="React">
+    <a href="https://arctreasury.biz"><img src="https://img.shields.io/badge/Website-Live-00d4aa" alt="Website"></a>
+    <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+  </p>
+
   <p>
     <a href="https://arctreasury.biz">Live App</a> •
     <a href="https://testnet.arcscan.app/address/0x17ca5232415430bC57F646A72fD15634807bF729">Smart Contract</a> •
