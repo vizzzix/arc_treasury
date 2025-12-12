@@ -31,8 +31,6 @@ jobs:
 
       - name: Build frontend
         run: npm run build
-        env:
-          VITE_WALLETCONNECT_PROJECT_ID: ${{ secrets.VITE_WALLETCONNECT_PROJECT_ID }}
 
   # Smart contracts compile and test
   contracts:
