@@ -62,10 +62,10 @@ contracts/apy_history.json
 # Windows reserved names
 nul
 
-# Tests
-test/
-*.test.ts
-*.test.js
+# Tests (keep contract tests in repo)
+# test/  # disabled - we need contract tests
+# *.test.ts
+# *.test.js
 .mocharc.json
 
 # Documentation (optional)
@@ -131,3 +131,6 @@ pnpm-lock.yaml
 
 # Source maps
 *.map
+
+# Scripts with sensitive data (API keys, emails, contacts)
+scripts/
