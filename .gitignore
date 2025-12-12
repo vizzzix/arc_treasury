@@ -135,3 +135,13 @@ pnpm-lock.yaml
 
 # Scripts with sensitive data (API keys, emails, contacts)
 scripts/
+
+# Private investor documents
+docs/investor-*
+docs/pitch-deck-dcvc-*
+docs/pitch-deck-hivemind-*
+docs/pitch-deck.md
+docs/pitch-deck.pdf
+docs/pitch-deck-slides.md
+docs/PitchWeb.pdf
+docs/*.pptx
