@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
 import { UserMenu } from "@/components/UserMenu";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Shield, Users, Zap, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
@@ -111,6 +111,44 @@ const Litepaper = () => {
             <p className="text-xs text-muted-foreground">
               *APY variable, based on ~{apy.toFixed(1)}% USYC yield minus 5% platform fee
             </p>
+          </section>
+
+          {/* Why Arc */}
+          <section className="space-y-4">
+            <h2 className="text-2xl font-bold text-primary">Why Arc?</h2>
+            <p className="text-muted-foreground">
+              Circle's own Layer 1 blockchain — institutional-grade infrastructure for stablecoins.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Native USDC</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">Not bridged tokens — real USDC from Circle</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Direct Relationship</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">With $60B stablecoin issuer</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <Zap className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">First Mover</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">Low competition advantage on new chain</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3 mb-2">
+                  <Target className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Enterprise Infrastructure</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">Institutional-grade security & compliance</p>
+              </div>
+            </div>
           </section>
 
           {/* Deposit Options */}
