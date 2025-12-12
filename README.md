@@ -103,6 +103,12 @@ USYC → redeem(shares, receiver, owner) → USDC returned + yield
 
 ## Technology Stack
 
+<p align="center">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=ts,react,vite,tailwind,solidity,nodejs,vercel,github" />
+  </a>
+</p>
+
 - **Frontend**: React 18, TypeScript, TailwindCSS, Vite
 - **Web3**: wagmi v2, viem, RainbowKit
 - **Bridge**: Circle CCTP (Cross-Chain Transfer Protocol)
