@@ -56,6 +56,13 @@ deployed-addresses*.json
 # Bot state files (contain runtime data)
 contracts/bot_state.json
 contracts/apy_history.json
+*-state.json
+*.state.json
+
+# Email/contact lists
+tmp_emails.json
+*emails*.json
+*contacts*.json
 
 # Claude Code settings
 .claude/
