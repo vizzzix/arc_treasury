@@ -45,6 +45,15 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Check contracts folder
+        run: |
+          echo "=== contracts folder ==="
+          ls -la contracts/
+          echo "=== contracts/contracts folder ==="
+          ls -la contracts/contracts/ | head -20
+          echo "=== package.json ==="
+          cat contracts/package.json
+
       - name: Install contract dependencies
         working-directory: ./contracts
         run: npm install --legacy-peer-deps
