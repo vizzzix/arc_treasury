@@ -234,15 +234,20 @@ const Bridge = () => {
     }
   };
 
+  // Gas reserve constants for Arc Testnet (USDC is gas token)
+  // Leave 0.5 USDC to cover gas for return trip (claim on Arc, bridge back, etc.)
+  const ARC_GAS_RESERVE = BigInt('500000000000000000'); // 0.5 USDC with 18 decimals
+  const ARC_GAS_RESERVE_DISPLAY = '0.5';
+
   const handleMax = () => {
     const rawBalance = getSourceRawBalance();
     if (!rawBalance || rawBalance <= 0n) return;
 
-    // Arc Testnet uses USDC for gas, so leave 0.1 USDC for fees
+    // Arc Testnet uses USDC for gas, so leave reserve for future transactions
     // Arc uses 18 decimals, Sepolia uses 6 decimals
     const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
     const gasReserve = fromNetwork === 'arcTestnet'
-      ? BigInt('100000000000000000') // 0.1 USDC with 18 decimals
+      ? ARC_GAS_RESERVE // 0.5 USDC for gas (claim on return trip, etc.)
       : 0n; // Sepolia uses ETH for gas, no USDC reserve needed
 
     const maxAmount = rawBalance > gasReserve ? rawBalance - gasReserve : 0n;
@@ -409,7 +414,7 @@ const Bridge = () => {
   // Get gas hint text
   const getGasHint = () => {
     if (fromNetwork === 'ethereumSepolia') return 'ETH on Sepolia';
-    if (fromNetwork === 'arcTestnet') return 'USDC on Arc Testnet';
+    if (fromNetwork === 'arcTestnet') return `USDC on Arc Testnet (MAX keeps ${ARC_GAS_RESERVE_DISPLAY} for gas)`;
     if (fromNetwork === 'solanaDevnet') return 'SOL on Solana';
     return '';
   };
