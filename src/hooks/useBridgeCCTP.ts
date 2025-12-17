@@ -767,10 +767,19 @@ export const useBridgeCCTP = () => {
 
       // Step 3: Switch to destination network if needed
       const destChainId = SUPPORTED_NETWORKS[destNetwork].chainId;
+      console.log('[useBridgeCCTP] Current chain:', account.chainId, 'Destination chain:', destChainId);
       if (account.chainId !== destChainId) {
         toast.info(`Switching to ${SUPPORTED_NETWORKS[destNetwork].name}...`);
-        await switchChainAsync?.({ chainId: destChainId });
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (!switchChainAsync) {
+          throw new Error(`Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually in MetaMask`);
+        }
+        try {
+          await switchChainAsync({ chainId: destChainId });
+          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for chain switch to complete
+        } catch (switchError: any) {
+          console.error('[useBridgeCCTP] Chain switch failed:', switchError);
+          throw new Error(`Failed to switch network. Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually.`);
+        }
       }
 
       // Step 4: Call receiveMessage on MessageTransmitter
