@@ -259,6 +259,12 @@ const Bridge = () => {
     setFromNetwork(toNetwork);
     setToNetwork(temp);
     setAmount("");
+    // Reset bridge state if previous bridge completed (so user can bridge again without F5)
+    if (attestationStatus === 'complete' || solanaState.attestationStatus === 'complete') {
+      resetCCTP();
+      resetSolana();
+      setSavedBridgeParams(null);
+    }
   };
 
   const selectFromNetwork = (network: NetworkType) => {
@@ -267,6 +273,12 @@ const Bridge = () => {
       setToNetwork(fromNetwork);
     }
     setFromNetwork(network);
+    // Reset if bridge was complete
+    if (attestationStatus === 'complete' || solanaState.attestationStatus === 'complete') {
+      resetCCTP();
+      resetSolana();
+      setSavedBridgeParams(null);
+    }
     setShowFromDropdown(false);
     setAmount("");
   };
@@ -277,6 +289,12 @@ const Bridge = () => {
       setFromNetwork(toNetwork);
     }
     setToNetwork(network);
+    // Reset if bridge was complete
+    if (attestationStatus === 'complete' || solanaState.attestationStatus === 'complete') {
+      resetCCTP();
+      resetSolana();
+      setSavedBridgeParams(null);
+    }
     setShowToDropdown(false);
   };
 
