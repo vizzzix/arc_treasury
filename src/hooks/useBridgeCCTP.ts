@@ -895,10 +895,13 @@ export const useBridgeCCTP = () => {
       }
 
       const messageData = data.messages[0];
+      const decodedBody = messageData.decodedMessage?.decodedMessageBody;
+      const feeExecuted = decodedBody?.feeExecuted ? parseInt(decodedBody.feeExecuted) : 0;
 
-      // Check if already claimed/complete
-      if (messageData.status === 'complete') {
-        // Clear any stored pending burn for this tx
+      // Check if already claimed/complete AND auto-relayed (feeExecuted > 0)
+      // If feeExecuted is 0, the mint wasn't auto-relayed and user needs to claim manually
+      if (messageData.status === 'complete' && feeExecuted > 0) {
+        // Auto-relay happened - clear any stored pending burn
         if (address) {
           savePendingBurn(address, null);
         }
@@ -908,6 +911,11 @@ export const useBridgeCCTP = () => {
       // Check attestation status
       if (!messageData.attestation || messageData.attestation === 'PENDING') {
         return { success: false, message: 'Attestation still pending. Please wait a few minutes and try again.', type: 'error' };
+      }
+
+      // If status is 'complete' but feeExecuted is 0, user needs to manually claim
+      if (messageData.status === 'complete' && feeExecuted === 0) {
+        console.log('[useBridgeCCTP] Status complete but feeExecuted=0, needs manual claim');
       }
 
       // Valid burn with attestation - restore it
