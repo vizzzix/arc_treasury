@@ -24,6 +24,13 @@ import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { supabase } from '@/lib/supabase';
 
+// Helper to safely stringify objects that may contain BigInt
+const safeStringify = (obj: any, space?: number): string => {
+  return JSON.stringify(obj, (_, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  , space);
+};
+
 // Track bridge initiated from our site
 const trackSiteBridge = async (txHash: string, walletAddress: string, amount: string, direction: 'to_arc' | 'to_sepolia') => {
   if (!supabase) return;
@@ -350,7 +357,7 @@ export const useBridgeCCTP = () => {
           amount: bridgeAmount,
           token: 'USDC',
           onProgress: (progress: any) => {
-            console.log('[useBridgeCCTP] Progress event:', JSON.stringify(progress));
+            console.log('[useBridgeCCTP] Progress event:', safeStringify(progress));
             console.log('[useBridgeCCTP] Progress keys:', Object.keys(progress));
 
             // Handle different progress stages
@@ -459,13 +466,13 @@ export const useBridgeCCTP = () => {
 
         // Analyze result.steps to determine what happened
         const steps = result?.steps || [];
-        console.log('[useBridgeCCTP] All steps:', JSON.stringify(steps, null, 2));
+        console.log('[useBridgeCCTP] All steps:', safeStringify(steps, 2));
         const burnStep = steps.find((s: any) =>
           s.name?.toLowerCase().includes('burn') ||
           s.name?.toLowerCase().includes('deposit') ||
           s.type?.toLowerCase().includes('burn')
         );
-        console.log('[useBridgeCCTP] Burn step details:', JSON.stringify(burnStep, null, 2));
+        console.log('[useBridgeCCTP] Burn step details:', safeStringify(burnStep, 2));
         const mintStep = steps.find((s: any) =>
           s.name?.toLowerCase().includes('mint') ||
           s.type?.toLowerCase().includes('mint')
@@ -606,7 +613,7 @@ export const useBridgeCCTP = () => {
 
       } catch (error: any) {
         console.error('[useBridgeCCTP] Bridge error:', error);
-        console.log('[useBridgeCCTP] Error object:', JSON.stringify(error, null, 2));
+        console.log('[useBridgeCCTP] Error object:', safeStringify(error, 2));
         console.log('[useBridgeCCTP] Error steps:', error?.steps);
         console.log('[useBridgeCCTP] On error - burnConfirmed ref:', burnConfirmedRef.current);
 

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, Info, ArrowLeft, Loader2, ExternalLink, XCircle, ArrowLeftRight, X, CheckCircle2, AlertCircle, Wallet, Clock, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAccount } from "wagmi";
+import { formatUnits } from "viem";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletConnect } from "@/components/WalletConnect";
 import { UserMenu } from "@/components/UserMenu";
@@ -139,9 +140,9 @@ const Bridge = () => {
 
   const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, reset: resetCCTP, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
 
-  // Get balances
-  const { balance: sepoliaBalance, isLoading: isLoadingSepolia, refetch: refetchSepolia } = useUSDCBalance('ethereumSepolia');
-  const { balance: arcBalance, isLoading: isLoadingArc, refetch: refetchArc } = useUSDCBalance('arcTestnet');
+  // Get balances (rawBalance for exact MAX, balance for display)
+  const { balance: sepoliaBalance, rawBalance: sepoliaRawBalance, isLoading: isLoadingSepolia, refetch: refetchSepolia } = useUSDCBalance('ethereumSepolia');
+  const { balance: arcBalance, rawBalance: arcRawBalance, isLoading: isLoadingArc, refetch: refetchArc } = useUSDCBalance('arcTestnet');
 
   // Get current source balance based on fromNetwork
   const getSourceBalance = () => {
@@ -149,6 +150,13 @@ const Bridge = () => {
     if (fromNetwork === 'arcTestnet') return arcBalance;
     if (fromNetwork === 'solanaDevnet') return solanaBalance || '0';
     return '0';
+  };
+
+  // Get raw balance for exact MAX calculations
+  const getSourceRawBalance = (): bigint | null => {
+    if (fromNetwork === 'ethereumSepolia') return sepoliaRawBalance;
+    if (fromNetwork === 'arcTestnet') return arcRawBalance;
+    return null;
   };
 
   const getDestBalance = () => {
@@ -214,14 +222,36 @@ const Bridge = () => {
   };
 
   const handleMax = () => {
-    // Use exact balance string to send full amount
-    if (parseFloat(sourceBalance) > 0) setAmount(sourceBalance);
+    const rawBalance = getSourceRawBalance();
+    if (!rawBalance || rawBalance <= 0n) return;
+
+    // Arc Testnet uses USDC for gas, so leave 0.1 USDC for fees
+    // Arc uses 18 decimals, Sepolia uses 6 decimals
+    const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
+    const gasReserve = fromNetwork === 'arcTestnet'
+      ? BigInt('100000000000000000') // 0.1 USDC with 18 decimals
+      : 0n; // Sepolia uses ETH for gas, no USDC reserve needed
+
+    const maxAmount = rawBalance > gasReserve ? rawBalance - gasReserve : 0n;
+    if (maxAmount <= 0n) return;
+
+    // Format with full precision, then floor to 6 decimals to avoid rounding up
+    const formatted = formatUnits(maxAmount, decimals);
+    const floored = (Math.floor(parseFloat(formatted) * 1000000) / 1000000).toString();
+    setAmount(floored);
   };
 
   const handleHalf = () => {
-    const balance = parseFloat(sourceBalance);
-    // Floor to 6 decimals (USDC precision)
-    if (balance > 0) setAmount((Math.floor((balance / 2) * 1000000) / 1000000).toString());
+    const rawBalance = getSourceRawBalance();
+    if (!rawBalance || rawBalance <= 0n) return;
+
+    const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
+    const halfBalance = rawBalance / 2n;
+
+    // Format with full precision, then floor to 6 decimals
+    const formatted = formatUnits(halfBalance, decimals);
+    const floored = (Math.floor(parseFloat(formatted) * 1000000) / 1000000).toString();
+    setAmount(floored);
   };
 
   const handleSwapNetworks = () => {
