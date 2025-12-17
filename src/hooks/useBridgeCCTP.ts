@@ -555,25 +555,28 @@ export const useBridgeCCTP = () => {
             pendingBurn: newPendingBurn,
           }));
         } else {
-          // Check if we have a pending burn transaction in state
-          // If yes, the burn was sent but SDK didn't detect it as success
+          // Check if we have a transaction hash anywhere - from state, result steps, or result itself
           const pendingBurnTx = state.transactions.find(tx => tx.step === 'Burn' || tx.step === 'Deposit');
 
-          if (pendingBurnTx?.hash) {
-            // Burn transaction was sent - treat as pending claim, NOT cancelled
-            console.log('[useBridgeCCTP] Burn tx was sent but SDK missed confirmation:', pendingBurnTx.hash);
+          // Also check if result has any step with a transaction hash (SDK might not flag it as 'burn')
+          const anyStepWithTx = steps.find((s: any) => s.txHash || s.transactionHash || s.hash);
+          const anyTxHash = pendingBurnTx?.hash || anyStepWithTx?.txHash || anyStepWithTx?.transactionHash || anyStepWithTx?.hash || result?.txHash || result?.transactionHash;
+
+          if (anyTxHash) {
+            // We have a transaction hash - treat as pending claim, NOT cancelled
+            console.log('[useBridgeCCTP] Found tx hash, treating as pending claim:', anyTxHash);
 
             const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-            trackSiteBridge(pendingBurnTx.hash, address!, amount, direction);
+            trackSiteBridge(anyTxHash, address!, amount, direction);
 
             setAttestationStatus('pending_mint');
             toast.warning('Your funds are safe!', {
-              description: 'Burn transaction sent. Click Claim to receive your USDC.',
+              description: 'Transaction sent. Waiting for attestation - this takes 5-10 minutes.',
               duration: 15000,
             });
 
             const newPendingBurn = {
-              txHash: pendingBurnTx.hash,
+              txHash: anyTxHash,
               fromNetwork,
               toNetwork,
               amount,
@@ -587,14 +590,14 @@ export const useBridgeCCTP = () => {
             setState(prev => ({
               ...prev,
               isBridging: false,
-              error: 'Mint was not completed. Your funds are safe - click Claim USDC.',
+              error: null,
               result: null,
               mintConfirmed: false,
               pendingBurn: newPendingBurn,
             }));
           } else {
-            // No burn transaction at all - truly cancelled
-            console.log('[useBridgeCCTP] Bridge returned but burn was not successful');
+            // No transaction at all - truly cancelled
+            console.log('[useBridgeCCTP] Bridge returned but no tx hash found - checking result:', safeStringify(result, 2));
             setAttestationStatus(null);
             toast.error('Bridge cancelled', {
               description: 'Transaction was not completed.',
