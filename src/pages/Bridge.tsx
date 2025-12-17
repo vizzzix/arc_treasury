@@ -293,6 +293,33 @@ const Bridge = () => {
     }
   }, [isComplete, refetchSepolia, refetchArc, refetchSolanaBalance]);
 
+  // Also refresh balances when mint is confirmed (after claim)
+  useEffect(() => {
+    if (mintConfirmed) {
+      // Aggressive refetch after claim - multiple times to catch state update
+      const timer1 = setTimeout(() => {
+        refetchSepolia(true);
+        refetchArc(true);
+        refetchSolanaBalance();
+      }, 1000);
+      const timer2 = setTimeout(() => {
+        refetchSepolia(true);
+        refetchArc(true);
+        refetchSolanaBalance();
+      }, 3000);
+      const timer3 = setTimeout(() => {
+        refetchSepolia(true);
+        refetchArc(true);
+        refetchSolanaBalance();
+      }, 6000);
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        clearTimeout(timer3);
+      };
+    }
+  }, [mintConfirmed, refetchSepolia, refetchArc, refetchSolanaBalance]);
+
   // Get gas hint text
   const getGasHint = () => {
     if (fromNetwork === 'ethereumSepolia') return 'ETH on Sepolia';

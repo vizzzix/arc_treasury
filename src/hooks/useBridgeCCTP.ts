@@ -173,53 +173,78 @@ export const useBridgeCCTP = () => {
   }, [bridgeKit]);
 
   // Load pending burn from localStorage on wallet connect
-  // If amount is missing, fetch it from Circle API
+  // IMPORTANT: Check Circle API first to see if already claimed
   useEffect(() => {
     if (address) {
       const savedPendingBurn = loadPendingBurn(address);
       if (savedPendingBurn) {
         console.log('[useBridgeCCTP] Loaded pending burn from storage:', savedPendingBurn);
 
-        // If amount is missing, try to fetch from Circle API
-        if (!savedPendingBurn.amount || savedPendingBurn.amount === '0') {
-          const fetchAmount = async () => {
-            try {
-              const sourceDomain = CCTP_DOMAINS[savedPendingBurn.fromNetwork];
-              const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${savedPendingBurn.txHash}`;
-              const response = await fetch(attestationUrl);
-              const data = await response.json();
+        // Always verify with Circle API before showing Claim button
+        const verifyAndLoad = async () => {
+          try {
+            const sourceDomain = CCTP_DOMAINS[savedPendingBurn.fromNetwork];
+            const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${savedPendingBurn.txHash}`;
+            const response = await fetch(attestationUrl);
+            const data = await response.json();
 
-              if (data.messages && data.messages.length > 0) {
-                // Amount is in the message, extract from burnAmount field (in smallest units)
-                const burnAmount = data.messages[0].burnAmount;
-                if (burnAmount) {
-                  // Convert from smallest units (6 decimals for USDC)
-                  const amountInUsdc = (parseFloat(burnAmount) / 1e6).toString();
-                  console.log('[useBridgeCCTP] Fetched amount from Circle API:', amountInUsdc);
+            if (data.messages && data.messages.length > 0) {
+              const messageData = data.messages[0];
 
-                  // Update state and localStorage
-                  const updatedPendingBurn = { ...savedPendingBurn, amount: amountInUsdc };
-                  savePendingBurn(address, updatedPendingBurn);
-                  setState(prev => ({ ...prev, pendingBurn: updatedPendingBurn }));
-                  return;
+              // Check if already claimed/complete
+              if (messageData.status === 'complete') {
+                console.log('[useBridgeCCTP] Transaction already complete, clearing pending burn');
+                savePendingBurn(address, null);
+                setState(prev => ({ ...prev, pendingBurn: null, mintConfirmed: true }));
+                setAttestationStatus('complete');
+                // Don't show toast - transaction already done
+                return;
+              }
+
+              // Get amount from API if missing
+              let amount = savedPendingBurn.amount;
+              if (!amount || amount === '0') {
+                const decodedBody = messageData.decodedMessage?.decodedMessageBody;
+                if (decodedBody?.amount) {
+                  amount = (parseFloat(decodedBody.amount) / 1e6).toString();
+                  console.log('[useBridgeCCTP] Fetched amount from Circle API:', amount);
                 }
               }
-            } catch (e) {
-              console.error('[useBridgeCCTP] Failed to fetch amount from Circle API:', e);
-            }
-            // If fetch failed, still show the pending burn
-            setState(prev => ({ ...prev, pendingBurn: savedPendingBurn }));
-          };
-          fetchAmount();
-        } else {
-          setState(prev => ({ ...prev, pendingBurn: savedPendingBurn }));
-        }
 
-        setAttestationStatus('pending_mint');
-        toast.info('You have unclaimed USDC!', {
-          description: 'Click Claim to receive your bridged funds.',
-          duration: 10000,
-        });
+              // Check attestation status
+              if (!messageData.attestation || messageData.attestation === 'PENDING') {
+                console.log('[useBridgeCCTP] Attestation still pending');
+                setAttestationStatus('pending');
+                toast.info('Bridge in progress...', {
+                  description: 'Waiting for Circle attestation.',
+                  duration: 5000,
+                });
+              } else {
+                // Has attestation, ready to claim
+                setAttestationStatus('pending_mint');
+                toast.info('You have unclaimed USDC!', {
+                  description: 'Click Claim to receive your bridged funds.',
+                  duration: 10000,
+                });
+              }
+
+              const updatedPendingBurn = { ...savedPendingBurn, amount };
+              savePendingBurn(address, updatedPendingBurn);
+              setState(prev => ({ ...prev, pendingBurn: updatedPendingBurn }));
+            } else {
+              // No message found - transaction might have failed or wrong hash
+              console.log('[useBridgeCCTP] No CCTP message found for stored tx, clearing');
+              savePendingBurn(address, null);
+              setState(prev => ({ ...prev, pendingBurn: null }));
+            }
+          } catch (e) {
+            console.error('[useBridgeCCTP] Failed to verify pending burn:', e);
+            // On error, still show the pending burn (conservative approach)
+            setState(prev => ({ ...prev, pendingBurn: savedPendingBurn }));
+            setAttestationStatus('pending_mint');
+          }
+        };
+        verifyAndLoad();
       }
     }
   }, [address]);
@@ -861,10 +886,13 @@ export const useBridgeCCTP = () => {
 
       const messageData = data.messages[0];
 
-      // Check if already claimed
-      if (messageData.status === 'complete' || messageData.eventNonce) {
-        // Try to check if the message was already received
-        // For now, show as claimable - claimPendingBridge will catch "already received" error
+      // Check if already claimed/complete
+      if (messageData.status === 'complete') {
+        // Clear any stored pending burn for this tx
+        if (address) {
+          savePendingBurn(address, null);
+        }
+        return { success: false, message: 'This transfer has already been completed! Your USDC should be in your wallet.', type: 'claimed' };
       }
 
       // Check attestation status
