@@ -159,6 +159,18 @@ const Bridge = () => {
     return null;
   };
 
+  // Get exact balance as number for validation (not rounded)
+  const getExactSourceBalance = (): number => {
+    const rawBalance = getSourceRawBalance();
+    if (!rawBalance) {
+      // Fallback to Solana balance
+      if (fromNetwork === 'solanaDevnet') return parseFloat(solanaBalance || '0');
+      return 0;
+    }
+    const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
+    return parseFloat(formatUnits(rawBalance, decimals));
+  };
+
   const getDestBalance = () => {
     if (toNetwork === 'ethereumSepolia') return sepoliaBalance;
     if (toNetwork === 'arcTestnet') return arcBalance;
@@ -168,6 +180,7 @@ const Bridge = () => {
 
   const sourceBalance = getSourceBalance();
   const destBalance = getDestBalance();
+  const exactSourceBalance = getExactSourceBalance();
   const isLoadingBalance = (fromNetwork === 'ethereumSepolia' && isLoadingSepolia) ||
                            (fromNetwork === 'arcTestnet' && isLoadingArc);
 
@@ -410,8 +423,8 @@ const Bridge = () => {
     if (!amount || parseFloat(amount) <= 0) return false;
     if (currentIsBridging) return false;
 
-    // Check if amount exceeds balance
-    if (parseFloat(amount) > parseFloat(sourceBalance)) return false;
+    // Check if amount exceeds balance (use exact balance, not rounded)
+    if (parseFloat(amount) > exactSourceBalance) return false;
 
     // Need EVM wallet for EVM networks
     if (fromNetwork !== 'solanaDevnet' && !isConnected) return false;
@@ -734,7 +747,7 @@ const Bridge = () => {
               Available: {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
             </p>
             {/* Insufficient balance warning */}
-            {amount && parseFloat(amount) > parseFloat(sourceBalance) && parseFloat(sourceBalance) >= 0 && (
+            {amount && parseFloat(amount) > exactSourceBalance && exactSourceBalance >= 0 && (
               <p className="text-xs text-yellow-400 mt-1">
                 ⚠️ Amount exceeds available balance
               </p>
