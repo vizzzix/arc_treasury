@@ -152,6 +152,7 @@ export const useBridgeCCTP = () => {
   // Use refs to track progress - avoid async state timing issues
   const mintConfirmedRef = useRef(false);
   const burnConfirmedRef = useRef(false);
+  const burnTxHashRef = useRef<string | null>(null);
 
   // Get public client for reading chain data
   const sepoliaClient = usePublicClient({ chainId: SUPPORTED_NETWORKS.ethereumSepolia.chainId });
@@ -282,6 +283,7 @@ export const useBridgeCCTP = () => {
       setAttestationStatus(null);
       mintConfirmedRef.current = false;
       burnConfirmedRef.current = false;
+      burnTxHashRef.current = null;
 
       // Check if user is on the correct network
       const currentChainId = account.chainId;
@@ -373,6 +375,7 @@ export const useBridgeCCTP = () => {
                 toast.info('Burning USDC on source chain...');
                 if (progress.txHash || progress.transactionHash) {
                   const hash = progress.txHash || progress.transactionHash;
+                  burnTxHashRef.current = hash; // Store in ref for reliable access later
                   setState(prev => ({
                     ...prev,
                     transactions: [{
@@ -395,6 +398,7 @@ export const useBridgeCCTP = () => {
                 // Backup tracking - in case BURN_STARTED didn't have txHash
                 if (progress.txHash || progress.transactionHash) {
                   const hash = progress.txHash || progress.transactionHash;
+                  if (!burnTxHashRef.current) burnTxHashRef.current = hash; // Backup store
                   const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
                   trackSiteBridge(hash, address!, amount, direction);
                 }
@@ -506,14 +510,10 @@ export const useBridgeCCTP = () => {
         } else if (burnSucceeded && !mintSucceeded) {
           // Burn succeeded but mint failed - funds are pending!
           console.log('[useBridgeCCTP] Burn succeeded but mint failed - funds are pending');
-          // Try to get burn tx hash from step, or fallback to transactions state
-          let burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
-          // Fallback: get from state.transactions if step doesn't have it
-          if (!burnTxHash) {
-            const burnTx = state.transactions.find(tx => tx.step === 'Burn' || tx.step === 'Deposit');
-            burnTxHash = burnTx?.hash;
-          }
-          console.log('[useBridgeCCTP] Burn tx hash from step or state:', burnTxHash);
+          // Try to get burn tx hash from ref (most reliable), then step
+          // NOTE: state.transactions may be stale due to React closure
+          let burnTxHash = burnTxHashRef.current || burnStep?.txHash || burnStep?.transactionHash;
+          console.log('[useBridgeCCTP] Burn tx hash from ref or step:', burnTxHash);
 
           // Track the bridge even if mint failed
           if (burnTxHash) {
@@ -549,12 +549,10 @@ export const useBridgeCCTP = () => {
             pendingBurn: newPendingBurn,
           }));
         } else {
-          // Check if we have a transaction hash anywhere - from state, result steps, or result itself
-          const pendingBurnTx = state.transactions.find(tx => tx.step === 'Burn' || tx.step === 'Deposit');
-
-          // Also check if result has any step with a transaction hash (SDK might not flag it as 'burn')
+          // Check if we have a transaction hash anywhere - from ref (most reliable), result steps, or result itself
+          // NOTE: state.transactions may be stale due to React closure, so we use burnTxHashRef
           const anyStepWithTx = steps.find((s: any) => s.txHash || s.transactionHash || s.hash);
-          const anyTxHash = pendingBurnTx?.hash || anyStepWithTx?.txHash || anyStepWithTx?.transactionHash || anyStepWithTx?.hash || result?.txHash || result?.transactionHash;
+          const anyTxHash = burnTxHashRef.current || anyStepWithTx?.txHash || anyStepWithTx?.transactionHash || anyStepWithTx?.hash || result?.txHash || result?.transactionHash;
 
           if (anyTxHash) {
             // We have a transaction hash - treat as pending claim, NOT cancelled
@@ -636,8 +634,9 @@ export const useBridgeCCTP = () => {
         // Check if burn was confirmed (either from ref or from error steps)
         if (burnConfirmedRef.current || burnSucceededInError) {
           console.log('[useBridgeCCTP] Burn was confirmed before error - funds are safe');
-          const burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
-          console.log('[useBridgeCCTP] Burn tx hash from error:', burnTxHash);
+          // Use ref first (most reliable), then error step
+          const burnTxHash = burnTxHashRef.current || burnStep?.txHash || burnStep?.transactionHash;
+          console.log('[useBridgeCCTP] Burn tx hash from ref or error:', burnTxHash);
 
           setAttestationStatus('pending_mint');
           toast.warning('Your funds are safe!', {
@@ -1010,6 +1009,7 @@ export const useBridgeCCTP = () => {
     setAttestationStatus(null);
     mintConfirmedRef.current = false;
     burnConfirmedRef.current = false;
+    burnTxHashRef.current = null;
   }, []);
 
   return {
