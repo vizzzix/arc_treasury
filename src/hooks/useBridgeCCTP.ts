@@ -197,10 +197,13 @@ export const useBridgeCCTP = () => {
 
             if (data.messages && data.messages.length > 0) {
               const messageData = data.messages[0];
+              const decodedBody = messageData.decodedMessage?.decodedMessageBody;
+              const feeExecuted = decodedBody?.feeExecuted ? parseInt(decodedBody.feeExecuted) : 0;
 
-              // Check if already claimed/complete
-              if (messageData.status === 'complete') {
-                console.log('[useBridgeCCTP] Transaction already complete, clearing pending burn');
+              // Check if already claimed/complete AND auto-relay happened (feeExecuted > 0)
+              // If feeExecuted is 0, auto-relay didn't happen - user needs to manually claim
+              if (messageData.status === 'complete' && feeExecuted > 0) {
+                console.log('[useBridgeCCTP] Transaction auto-relayed (feeExecuted:', feeExecuted, '), clearing pending burn');
                 savePendingBurn(address, null);
                 setState(prev => ({ ...prev, pendingBurn: null, mintConfirmed: true }));
                 setAttestationStatus('complete');
@@ -208,10 +211,15 @@ export const useBridgeCCTP = () => {
                 return;
               }
 
+              // If status is 'complete' but feeExecuted is 0, USDC wasn't auto-minted
+              // User needs to claim manually - DON'T clear pending burn!
+              if (messageData.status === 'complete' && feeExecuted === 0) {
+                console.log('[useBridgeCCTP] Status complete but feeExecuted=0 - needs manual claim');
+              }
+
               // Get amount from API if missing
               let amount = savedPendingBurn.amount;
               if (!amount || amount === '0') {
-                const decodedBody = messageData.decodedMessage?.decodedMessageBody;
                 if (decodedBody?.amount) {
                   amount = (parseFloat(decodedBody.amount) / 1e6).toString();
                   console.log('[useBridgeCCTP] Fetched amount from Circle API:', amount);
@@ -876,9 +884,10 @@ export const useBridgeCCTP = () => {
   /**
    * Manually restore a pending burn for claiming
    * Validates the transaction by checking Circle Attestation API
+   * Auto-detects direction by trying both domains
    * Returns: { success: boolean, message: string, type: 'success' | 'error' | 'claimed' }
    */
-  const restorePendingBurn = useCallback(async (burnTxHash: string, fromNetwork: BridgeNetwork, toNetwork: BridgeNetwork, amount: string): Promise<{ success: boolean; message: string; type: string }> => {
+  const restorePendingBurn = useCallback(async (burnTxHash: string, _fromNetwork: BridgeNetwork, _toNetwork: BridgeNetwork, _amount: string): Promise<{ success: boolean; message: string; type: string }> => {
     if (!burnTxHash || !burnTxHash.startsWith('0x')) {
       return { success: false, message: 'Invalid transaction hash format', type: 'error' };
     }
@@ -889,23 +898,52 @@ export const useBridgeCCTP = () => {
     }
 
     try {
-      // Check attestation from Circle API to validate this is a real burn tx
-      const sourceDomain = CCTP_DOMAINS[fromNetwork];
-      const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
+      // Try both domains to auto-detect the actual direction
+      // Domain 0 = Sepolia, Domain 26 = Arc Testnet
+      const domains = [
+        { domain: CCTP_DOMAINS.ethereumSepolia, from: 'ethereumSepolia' as BridgeNetwork, to: 'arcTestnet' as BridgeNetwork },
+        { domain: CCTP_DOMAINS.arcTestnet, from: 'arcTestnet' as BridgeNetwork, to: 'ethereumSepolia' as BridgeNetwork },
+      ];
 
-      console.log('[useBridgeCCTP] Checking attestation for:', burnTxHash);
-      const response = await fetch(attestationUrl);
-      const data = await response.json();
+      let messageData: any = null;
+      let detectedFrom: BridgeNetwork = 'ethereumSepolia';
+      let detectedTo: BridgeNetwork = 'arcTestnet';
 
-      console.log('[useBridgeCCTP] Attestation check response:', data);
+      for (const { domain, from, to } of domains) {
+        const attestationUrl = `${CIRCLE_ATTESTATION_API}/${domain}?transactionHash=${burnTxHash}`;
+        console.log('[useBridgeCCTP] Trying domain', domain, 'for:', burnTxHash);
 
-      if (!data.messages || data.messages.length === 0) {
+        try {
+          const response = await fetch(attestationUrl);
+          const data = await response.json();
+
+          if (data.messages && data.messages.length > 0) {
+            messageData = data.messages[0];
+            detectedFrom = from;
+            detectedTo = to;
+            console.log('[useBridgeCCTP] Found message on domain', domain, '- direction:', from, '→', to);
+            break;
+          }
+        } catch (e) {
+          console.log('[useBridgeCCTP] Domain', domain, 'failed, trying next...');
+        }
+      }
+
+      if (!messageData) {
         return { success: false, message: 'No CCTP burn found for this transaction. Make sure this is a valid burn tx hash.', type: 'error' };
       }
 
-      const messageData = data.messages[0];
+      console.log('[useBridgeCCTP] Attestation check response:', messageData);
+
       const decodedBody = messageData.decodedMessage?.decodedMessageBody;
       const feeExecuted = decodedBody?.feeExecuted ? parseInt(decodedBody.feeExecuted) : 0;
+
+      // Extract amount from Circle API (in smallest units, need to divide by 1e6)
+      let detectedAmount = '0';
+      if (decodedBody?.amount) {
+        detectedAmount = (parseFloat(decodedBody.amount) / 1e6).toFixed(2);
+        console.log('[useBridgeCCTP] Detected amount from API:', detectedAmount, 'USDC');
+      }
 
       // Check if already claimed/complete AND auto-relayed (feeExecuted > 0)
       // If feeExecuted is 0, the mint wasn't auto-relayed and user needs to claim manually
@@ -927,12 +965,12 @@ export const useBridgeCCTP = () => {
         console.log('[useBridgeCCTP] Status complete but feeExecuted=0, needs manual claim');
       }
 
-      // Valid burn with attestation - restore it
+      // Valid burn with attestation - restore it with auto-detected values
       const pendingBurn: PendingBurn = {
         txHash: burnTxHash,
-        fromNetwork,
-        toNetwork,
-        amount: amount || '0',
+        fromNetwork: detectedFrom,
+        toNetwork: detectedTo,
+        amount: detectedAmount,
         timestamp: Date.now(),
       };
 
@@ -944,7 +982,8 @@ export const useBridgeCCTP = () => {
       setState(prev => ({ ...prev, pendingBurn }));
       setAttestationStatus('pending_mint');
 
-      return { success: true, message: 'Burn verified! Click Claim to receive your USDC.', type: 'success' };
+      const directionText = detectedFrom === 'ethereumSepolia' ? 'Sepolia → Arc' : 'Arc → Sepolia';
+      return { success: true, message: `Found ${detectedAmount} USDC (${directionText}). Click Claim to receive!`, type: 'success' };
 
     } catch (error: any) {
       console.error('[useBridgeCCTP] Restore check error:', error);
