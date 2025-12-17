@@ -320,6 +320,31 @@ const Bridge = () => {
     }
   }, [mintConfirmed, refetchSepolia, refetchArc, refetchSolanaBalance]);
 
+  // Auto-refresh balances when tab becomes visible again
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetchSepolia(true);
+        refetchArc(true);
+        refetchSolanaBalance();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetchSepolia, refetchArc, refetchSolanaBalance]);
+
+  // Periodic balance refresh every 30 seconds (silent)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!currentIsBridging) {
+        refetchSepolia(true);
+        refetchArc(true);
+        refetchSolanaBalance();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentIsBridging, refetchSepolia, refetchArc, refetchSolanaBalance]);
+
   // Get gas hint text
   const getGasHint = () => {
     if (fromNetwork === 'ethereumSepolia') return 'ETH on Sepolia';
@@ -336,6 +361,9 @@ const Bridge = () => {
   const canBridge = () => {
     if (!amount || parseFloat(amount) <= 0) return false;
     if (currentIsBridging) return false;
+
+    // Check if amount exceeds balance
+    if (parseFloat(amount) > parseFloat(sourceBalance)) return false;
 
     // Need EVM wallet for EVM networks
     if (fromNetwork !== 'solanaDevnet' && !isConnected) return false;
@@ -657,10 +685,16 @@ const Bridge = () => {
             <p className="text-xs text-muted-foreground">
               Available: {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
             </p>
+            {/* Insufficient balance warning */}
+            {amount && parseFloat(amount) > parseFloat(sourceBalance) && parseFloat(sourceBalance) >= 0 && (
+              <p className="text-xs text-yellow-400 mt-1">
+                ⚠️ Amount exceeds available balance
+              </p>
+            )}
           </div>
 
           {/* Error */}
-          {currentError && currentAttestationStatus === 'idle' && (
+          {currentError && (!currentAttestationStatus || currentAttestationStatus === 'idle') && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20">
               <p className="text-sm text-red-400">{currentError}</p>
             </div>
