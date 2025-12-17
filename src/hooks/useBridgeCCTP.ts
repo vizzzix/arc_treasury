@@ -198,24 +198,10 @@ export const useBridgeCCTP = () => {
             if (data.messages && data.messages.length > 0) {
               const messageData = data.messages[0];
               const decodedBody = messageData.decodedMessage?.decodedMessageBody;
-              const feeExecuted = decodedBody?.feeExecuted ? parseInt(decodedBody.feeExecuted) : 0;
 
-              // Check if already claimed/complete AND auto-relay happened (feeExecuted > 0)
-              // If feeExecuted is 0, auto-relay didn't happen - user needs to manually claim
-              if (messageData.status === 'complete' && feeExecuted > 0) {
-                console.log('[useBridgeCCTP] Transaction auto-relayed (feeExecuted:', feeExecuted, '), clearing pending burn');
-                savePendingBurn(address, null);
-                setState(prev => ({ ...prev, pendingBurn: null, mintConfirmed: true }));
-                setAttestationStatus('complete');
-                // Don't show toast - transaction already done
-                return;
-              }
-
-              // If status is 'complete' but feeExecuted is 0, USDC wasn't auto-minted
-              // User needs to claim manually - DON'T clear pending burn!
-              if (messageData.status === 'complete' && feeExecuted === 0) {
-                console.log('[useBridgeCCTP] Status complete but feeExecuted=0 - needs manual claim');
-              }
+              // NOTE: feeExecuted does NOT indicate if auto-relay happened!
+              // It's just the fee amount. We cannot tell from Circle API if mint was done.
+              // Always show Claim button - if already claimed, receiveMessage will fail with "Nonce already used"
 
               // Get amount from API if missing
               let amount = savedPendingBurn.amount;
@@ -936,7 +922,6 @@ export const useBridgeCCTP = () => {
       console.log('[useBridgeCCTP] Attestation check response:', messageData);
 
       const decodedBody = messageData.decodedMessage?.decodedMessageBody;
-      const feeExecuted = decodedBody?.feeExecuted ? parseInt(decodedBody.feeExecuted) : 0;
 
       // Extract amount from Circle API (in smallest units, need to divide by 1e6)
       let detectedAmount = '0';
@@ -945,24 +930,13 @@ export const useBridgeCCTP = () => {
         console.log('[useBridgeCCTP] Detected amount from API:', detectedAmount, 'USDC');
       }
 
-      // Check if already claimed/complete AND auto-relayed (feeExecuted > 0)
-      // If feeExecuted is 0, the mint wasn't auto-relayed and user needs to claim manually
-      if (messageData.status === 'complete' && feeExecuted > 0) {
-        // Auto-relay happened - clear any stored pending burn
-        if (address) {
-          savePendingBurn(address, null);
-        }
-        return { success: false, message: 'This transfer has already been completed! Your USDC should be in your wallet.', type: 'claimed' };
-      }
+      // NOTE: We cannot reliably tell from Circle API if mint was already done
+      // feeExecuted is just the fee amount, NOT an indicator of completion
+      // Always allow claiming - if already claimed, receiveMessage will fail with "Nonce already used"
 
       // Check attestation status
       if (!messageData.attestation || messageData.attestation === 'PENDING') {
         return { success: false, message: 'Attestation still pending. Please wait a few minutes and try again.', type: 'error' };
-      }
-
-      // If status is 'complete' but feeExecuted is 0, user needs to manually claim
-      if (messageData.status === 'complete' && feeExecuted === 0) {
-        console.log('[useBridgeCCTP] Status complete but feeExecuted=0, needs manual claim');
       }
 
       // Valid burn with attestation - restore it with auto-detected values
