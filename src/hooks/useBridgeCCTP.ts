@@ -722,29 +722,49 @@ export const useBridgeCCTP = () => {
     setState(prev => ({ ...prev, isClaiming: true, error: null }));
 
     try {
-      // Determine source and destination
-      const sourceDomain = CCTP_DOMAINS[fromNetwork];
-      const destNetwork = toNetwork;
-      const destContracts = CCTP_CONTRACTS[destNetwork];
-
-      console.log('[useBridgeCCTP] Source domain:', sourceDomain);
-      console.log('[useBridgeCCTP] Dest network:', destNetwork);
-
       // Step 1: Fetch attestation from Circle API (includes message bytes)
+      // Try both domains to auto-detect direction (in case saved direction was wrong)
       toast.info('Fetching attestation from Circle...');
 
-      const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${txHash}`;
-      console.log('[useBridgeCCTP] Attestation URL:', attestationUrl);
+      const domains = [
+        { domain: CCTP_DOMAINS[fromNetwork], from: fromNetwork, to: toNetwork }, // Try saved direction first
+        { domain: CCTP_DOMAINS[fromNetwork === 'ethereumSepolia' ? 'arcTestnet' : 'ethereumSepolia'],
+          from: fromNetwork === 'ethereumSepolia' ? 'arcTestnet' as BridgeNetwork : 'ethereumSepolia' as BridgeNetwork,
+          to: fromNetwork === 'ethereumSepolia' ? 'ethereumSepolia' as BridgeNetwork : 'arcTestnet' as BridgeNetwork },
+      ];
 
-      const attestationResponse = await fetch(attestationUrl);
-      const attestationData = await attestationResponse.json();
-      console.log('[useBridgeCCTP] Attestation response:', attestationData);
+      let messageData: any = null;
+      let detectedDestNetwork: BridgeNetwork = toNetwork;
 
-      if (!attestationData.messages || attestationData.messages.length === 0) {
+      for (const { domain, to } of domains) {
+        const attestationUrl = `${CIRCLE_ATTESTATION_API}/${domain}?transactionHash=${txHash}`;
+        console.log('[useBridgeCCTP] Trying domain', domain, 'URL:', attestationUrl);
+
+        try {
+          const attestationResponse = await fetch(attestationUrl);
+          const attestationData = await attestationResponse.json();
+          console.log('[useBridgeCCTP] Attestation response for domain', domain, ':', attestationData);
+
+          if (attestationData.messages && attestationData.messages.length > 0) {
+            messageData = attestationData.messages[0];
+            detectedDestNetwork = to;
+            console.log('[useBridgeCCTP] Found message on domain', domain, '- dest:', to);
+            break;
+          }
+        } catch (e) {
+          console.log('[useBridgeCCTP] Domain', domain, 'failed, trying next...');
+        }
+      }
+
+      if (!messageData) {
         throw new Error('Attestation not ready yet. Please try again in a few minutes.');
       }
 
-      const messageData = attestationData.messages[0];
+      const destNetwork = detectedDestNetwork;
+      const destContracts = CCTP_CONTRACTS[destNetwork];
+
+      console.log('[useBridgeCCTP] Dest network:', destNetwork);
+
       const attestation = messageData.attestation;
       const messageBytes = messageData.message; // Circle API returns the message bytes!
 
