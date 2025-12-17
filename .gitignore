@@ -91,6 +91,10 @@ supabase.json
 firebase.json
 *.secret.*
 
+# Playwright test artifacts
+playwright-report/
+test-results/
+
 # Build artifacts & cache
 .cache/
 .parcel-cache/
