@@ -116,7 +116,7 @@ export const TOKEN_ADDRESSES = {
   // Arc Testnet
   arcTestnet: {
     USDC: '0x3600000000000000000000000000000000000000' as `0x${string}`, // Native currency
-    EURC: '0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a' as `0x${string}`, // EURC on Arc Testnet - Main EURC token contract, uses 6 decimals
+    EURC: '0x742b2d045d430fe718b57046645ba33295914b69' as `0x${string}`, // SwapEURC (mintable) - same as swap pool, uses 6 decimals
     USYC: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C' as `0x${string}`, // USYC on Arc Testnet - Main USYC token contract, uses 6 decimals
   },
   // Ethereum Sepolia
