@@ -1,10 +1,34 @@
 import { useEffect, useState } from 'react';
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, createPublicClient, http } from 'viem';
-import { TREASURY_CONTRACTS } from '@/lib/constants';
+import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import TreasuryVaultABI from '@/lib/abis/TreasuryVault.json';
 import { useUSYCPrice } from './useUSYCPrice';
 import { arcTestnet } from '@/lib/wagmi';
+
+// ERC20 ABI for approve and allowance
+const ERC20_ABI = [
+  {
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
 
 // Create public client for waiting on receipts
 const client = createPublicClient({
@@ -119,10 +143,22 @@ export function useLockedPositions(address?: `0x${string}`) {
  * Hook to deposit with lock
  */
 export function useDepositLocked() {
+  const { address } = useAccount();
   const { data: hash, writeContractAsync, isPending, error } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
+  });
+
+  // Check EURC allowance
+  const { data: eurcAllowance, refetch: refetchEURCAllowance } = useReadContract({
+    address: TOKEN_ADDRESSES.arcTestnet.EURC,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: address ? [address, TREASURY_CONTRACTS.TreasuryVault] : undefined,
+    query: {
+      enabled: !!address,
+    },
   });
 
   const depositLockedUSDC = async (amount: string, lockPeriodMonths: 1 | 3 | 12) => {
@@ -151,16 +187,45 @@ export function useDepositLocked() {
       throw new Error('Write function not available');
     }
 
+    const eurcAddress = TOKEN_ADDRESSES.arcTestnet.EURC;
     const amountWei = parseUnits(amount, 6);
 
+    // Check EURC allowance and approve if needed
+    const currentAllowance = eurcAllowance || 0n;
+
+    if (currentAllowance < amountWei) {
+      // Approve first
+      const approveHash = await writeContractAsync({
+        address: eurcAddress,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [TREASURY_CONTRACTS.TreasuryVault, amountWei],
+        chainId: arcTestnet.id,
+      });
+
+      // Wait for approval confirmation
+      const approveReceipt = await client.waitForTransactionReceipt({
+        hash: approveHash,
+        timeout: 120000,
+      });
+
+      if (approveReceipt.status === 'reverted') {
+        throw new Error('EURC approval failed');
+      }
+
+      // Refetch allowance
+      await refetchEURCAllowance();
+    }
+
+    // Now deposit
     const txHash = await writeContractAsync({
       address: TREASURY_CONTRACTS.TreasuryVault,
       abi: TreasuryVaultABI.abi,
       functionName: 'depositLockedEURC',
       args: [amountWei, lockPeriodMonths],
+      chainId: arcTestnet.id,
     });
 
-    // Don't wait for confirmation - let wagmi's useWaitForTransactionReceipt handle it
     return txHash;
   };
 
