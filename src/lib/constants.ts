@@ -146,8 +146,8 @@ export const CCTP_DOMAINS = {
   solanaDevnet: 5, // Solana Devnet domain
 } as const;
 
-// Circle Attestation API (Testnet)
-export const CIRCLE_ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages' as const;
+// Circle Attestation API - use proxy to avoid CORS
+export const CIRCLE_ATTESTATION_API = '/api/circle/v2/messages' as const;
 
 // Estimated bridge times (in minutes)
 export const BRIDGE_ESTIMATED_TIME = {
