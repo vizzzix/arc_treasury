@@ -549,17 +549,13 @@ export const useBridgeCCTP = () => {
             pendingBurn: newPendingBurn,
           }));
         } else {
-          // Check if we have a transaction hash anywhere - from ref (most reliable), result steps, or result itself
-          // NOTE: state.transactions may be stale due to React closure, so we use burnTxHashRef
-          const anyStepWithTx = steps.find((s: any) => s.txHash || s.transactionHash || s.hash);
-          const anyTxHash = burnTxHashRef.current || anyStepWithTx?.txHash || anyStepWithTx?.transactionHash || anyStepWithTx?.hash || result?.txHash || result?.transactionHash;
-
-          if (anyTxHash) {
-            // We have a transaction hash - treat as pending claim, NOT cancelled
-            console.log('[useBridgeCCTP] Found tx hash, treating as pending claim:', anyTxHash);
+          // Only save pending burn if burn was actually confirmed
+          // This prevents false positives from approval tx hashes
+          if (burnConfirmedRef.current && burnTxHashRef.current) {
+            console.log('[useBridgeCCTP] Burn confirmed but result unclear, treating as pending claim:', burnTxHashRef.current);
 
             const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-            trackSiteBridge(anyTxHash, address!, amount, direction);
+            trackSiteBridge(burnTxHashRef.current, address!, amount, direction);
 
             setAttestationStatus('pending_mint');
             toast.warning('Your funds are safe!', {
@@ -568,7 +564,7 @@ export const useBridgeCCTP = () => {
             });
 
             const newPendingBurn = {
-              txHash: anyTxHash,
+              txHash: burnTxHashRef.current,
               fromNetwork,
               toNetwork,
               amount,
@@ -588,8 +584,8 @@ export const useBridgeCCTP = () => {
               pendingBurn: newPendingBurn,
             }));
           } else {
-            // No transaction at all - truly cancelled
-            console.log('[useBridgeCCTP] Bridge returned but no tx hash found - checking result:', safeStringify(result, 2));
+            // No confirmed burn - treat as cancelled (may have only been approval)
+            console.log('[useBridgeCCTP] Bridge returned but no confirmed burn - checking result:', safeStringify(result, 2));
             setAttestationStatus(null);
             toast.error('Bridge cancelled', {
               description: 'Transaction was not completed.',
@@ -623,20 +619,15 @@ export const useBridgeCCTP = () => {
           errorMsg = 'Token approval failed';
         }
 
-        // Check if error contains steps info (Bridge Kit may include partial result in error)
-        const errorSteps = error?.steps || error?.result?.steps || [];
-        const burnStep = errorSteps.find((s: any) => s.name?.toLowerCase().includes('burn'));
-        const burnSucceededInError = burnStep?.state === 'success';
+        // Only trust burnConfirmedRef - it's set when BURN_CONFIRMED event is received
+        // Don't trust error.steps as it may incorrectly report approval as burn
+        console.log('[useBridgeCCTP] On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
 
-        console.log('[useBridgeCCTP] Burn step in error:', burnStep);
-        console.log('[useBridgeCCTP] burnSucceededInError:', burnSucceededInError);
-
-        // Check if burn was confirmed (either from ref or from error steps)
-        if (burnConfirmedRef.current || burnSucceededInError) {
+        // Check if burn was actually confirmed (BURN_CONFIRMED event was received)
+        if (burnConfirmedRef.current && burnTxHashRef.current) {
           console.log('[useBridgeCCTP] Burn was confirmed before error - funds are safe');
-          // Use ref first (most reliable), then error step
-          const burnTxHash = burnTxHashRef.current || burnStep?.txHash || burnStep?.transactionHash;
-          console.log('[useBridgeCCTP] Burn tx hash from ref or error:', burnTxHash);
+          const burnTxHash = burnTxHashRef.current;
+          console.log('[useBridgeCCTP] Burn tx hash:', burnTxHash);
 
           setAttestationStatus('pending_mint');
           toast.warning('Your funds are safe!', {
@@ -644,16 +635,16 @@ export const useBridgeCCTP = () => {
             duration: 15000,
           });
 
-          const newPendingBurn = burnTxHash ? {
+          const newPendingBurn = {
             txHash: burnTxHash,
             fromNetwork,
             toNetwork,
             amount,
             timestamp: Date.now(),
-          } : null;
+          };
 
           // Save to localStorage so it persists across page refresh
-          if (newPendingBurn && address) {
+          if (address) {
             savePendingBurn(address, newPendingBurn);
           }
 
@@ -668,7 +659,7 @@ export const useBridgeCCTP = () => {
           return;
         }
 
-        // No burn happened - regular error
+        // No burn happened - regular error (possibly just approval was done)
         setAttestationStatus(null);
 
         setState(prev => ({
