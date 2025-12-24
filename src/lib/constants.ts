@@ -99,9 +99,9 @@ export const TREASURY_CONTRACTS = {
   TreasuryVault: '0x17ca5232415430bC57F646A72fD15634807bF729' as `0x${string}`, // V8 Proxy: Upgradeable vault with permanent points
   TreasuryVaultV4: '0x34d504dda5bcd436d4d86ef9b3930ea8c0cd8b2f' as `0x${string}`, // V4: Deprecated, funds returned to users
   EarlySupporterBadge: '0xb26a5b1d783646a7236ca956f2e954e002bf8d13' as `0x${string}`, // Early Supporter Badge + 1.2x multiplier (max 5000)
-  // Swap Pool contracts V2 - deployed 2025-12-24 (0.05% fee)
-  SwapEURC: '0x44627ef4589a14cebf803df7c72b97994e6f3496' as `0x${string}`, // Mintable EURC for swap pool
-  StablecoinSwap: '0x99b4be626090f6345c7fdc4d3da4f4c2115c39a9' as `0x${string}`, // USDC/EURC AMM swap pool V2 (0.05% fee)
+  // Swap Pool contracts - deployed 2025-11-29
+  SwapEURC: '0x742b2d045d430fe718b57046645ba33295914b69' as `0x${string}`, // Mintable EURC for swap pool
+  StablecoinSwap: '0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf' as `0x${string}`, // USDC/EURC AMM swap pool (0.2% fee)
 } as const;
 
 // Guild.xyz configuration for sybil protection
@@ -116,7 +116,7 @@ export const TOKEN_ADDRESSES = {
   // Arc Testnet
   arcTestnet: {
     USDC: '0x3600000000000000000000000000000000000000' as `0x${string}`, // Native currency
-    EURC: '0x44627ef4589a14cebf803df7c72b97994e6f3496' as `0x${string}`, // SwapEURC V2 (mintable) - same as swap pool, uses 6 decimals
+    EURC: '0x742b2d045d430fe718b57046645ba33295914b69' as `0x${string}`, // SwapEURC (mintable) - same as swap pool, uses 6 decimals
     USYC: '0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C' as `0x${string}`, // USYC on Arc Testnet - Main USYC token contract, uses 6 decimals
   },
   // Ethereum Sepolia

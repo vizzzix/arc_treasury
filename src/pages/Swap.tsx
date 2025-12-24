@@ -207,7 +207,7 @@ const Swap = () => {
           </div>
           <h2 className="text-3xl font-bold mb-2">Stablecoin Swap</h2>
           <p className="text-sm text-muted-foreground">
-            Swap USDC and EURC with 0.05% fee
+            Swap USDC and EURC with 0.2% fee
           </p>
         </div>
 
@@ -255,7 +255,7 @@ const Swap = () => {
                   <Droplets className="w-5 h-5 text-blue-500" />
                 </div>
                 <h3 className="font-semibold text-sm mb-1">Earn Fees</h3>
-                <p className="text-xs text-muted-foreground">0.05% LP rewards</p>
+                <p className="text-xs text-muted-foreground">0.2% LP rewards</p>
               </Card>
 
               <Card className="p-4 text-center border-border/50 bg-card/50">
@@ -309,7 +309,7 @@ const Swap = () => {
                   </div>
                   <div className="flex justify-between mt-1">
                     <span>Fee</span>
-                    <span>0.05%</span>
+                    <span>0.2%</span>
                   </div>
                 </div>
               </div>
@@ -335,7 +335,7 @@ const Swap = () => {
                 </div>
                 <div className="p-2 rounded-lg bg-white/5 text-center">
                   <span className="text-xs text-muted-foreground block">LP APY</span>
-                  <p className="font-bold text-green-500">0.05% fees</p>
+                  <p className="font-bold text-green-500">0.2% fees</p>
                 </div>
               </div>
             </Card>
@@ -526,7 +526,7 @@ const Swap = () => {
             {/* Swap details */}
             <div className="mt-4 p-3 rounded-lg bg-white/5 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Fee (0.05%)</span>
+                <span className="text-muted-foreground">Fee (0.2%)</span>
                 <span>{feeAmount} {toToken}</span>
               </div>
               <div className="flex justify-between">
@@ -611,7 +611,7 @@ const Swap = () => {
             <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Info className="w-3.5 h-3.5" />
-                <span>0.05% fee</span>
+                <span>0.2% fee</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span>{isLoadingRate ? '...' : `1 EUR = $${liveRate.toFixed(4)}`}</span>
@@ -666,7 +666,7 @@ const Swap = () => {
                 </div>
                 <div className="p-3 rounded-lg bg-white/5">
                   <span className="text-xs text-muted-foreground">Swap Fee</span>
-                  <p className="text-lg font-bold text-green-500">0.05%</p>
+                  <p className="text-lg font-bold text-green-500">0.2%</p>
                 </div>
               </div>
             </Card>
