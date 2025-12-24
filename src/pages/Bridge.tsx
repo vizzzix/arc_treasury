@@ -753,8 +753,8 @@ const Bridge = () => {
             <p className="text-xs text-muted-foreground">
               Available: {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
             </p>
-            {/* Insufficient balance warning - use epsilon for floating point precision */}
-            {amount && parseFloat(amount) > exactSourceBalance + 0.000001 && exactSourceBalance >= 0 && (
+            {/* Insufficient balance warning - hide during bridging since balance changes after burn */}
+            {amount && !currentIsBridging && parseFloat(amount) > exactSourceBalance + 0.000001 && exactSourceBalance >= 0 && (
               <p className="text-xs text-yellow-400 mt-1">
                 ⚠️ Amount exceeds available balance
               </p>
