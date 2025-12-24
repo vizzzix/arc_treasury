@@ -428,8 +428,10 @@ const Bridge = () => {
     if (!amount || parseFloat(amount) <= 0) return false;
     if (currentIsBridging) return false;
 
-    // Check if amount exceeds balance (use exact balance, not rounded)
-    if (parseFloat(amount) > exactSourceBalance) return false;
+    // Check if amount exceeds balance (use small epsilon for floating point precision)
+    const amountNum = parseFloat(amount);
+    const epsilon = 0.000001; // 1 micro-unit tolerance
+    if (amountNum > exactSourceBalance + epsilon) return false;
 
     // Need EVM wallet for EVM networks
     if (fromNetwork !== 'solanaDevnet' && !isConnected) return false;
@@ -751,8 +753,8 @@ const Bridge = () => {
             <p className="text-xs text-muted-foreground">
               Available: {isLoadingBalance ? '...' : `${formatBalance(sourceBalance)} USDC`}
             </p>
-            {/* Insufficient balance warning */}
-            {amount && parseFloat(amount) > exactSourceBalance && exactSourceBalance >= 0 && (
+            {/* Insufficient balance warning - use epsilon for floating point precision */}
+            {amount && parseFloat(amount) > exactSourceBalance + 0.000001 && exactSourceBalance >= 0 && (
               <p className="text-xs text-yellow-400 mt-1">
                 ⚠️ Amount exceeds available balance
               </p>
