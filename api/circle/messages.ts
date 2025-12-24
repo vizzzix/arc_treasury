@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
  * Proxy for Circle messages API (attestation status)
- * GET /api/circle/v2/messages/{domain}?transactionHash=0x...
+ * GET /api/circle/messages?domain=0&transactionHash=0x...
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,8 +19,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { domain, transactionHash } = req.query;
 
-  if (!transactionHash) {
-    return res.status(400).json({ error: 'Missing transactionHash parameter' });
+  if (!domain || !transactionHash) {
+    return res.status(400).json({ error: 'Missing domain or transactionHash' });
   }
 
   try {

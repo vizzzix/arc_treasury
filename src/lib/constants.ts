@@ -147,7 +147,8 @@ export const CCTP_DOMAINS = {
 } as const;
 
 // Circle Attestation API - use proxy to avoid CORS
-export const CIRCLE_ATTESTATION_API = '/api/circle/v2/messages' as const;
+// Format: /api/circle/messages?domain={domain}&transactionHash={hash}
+export const CIRCLE_ATTESTATION_API = '/api/circle/messages' as const;
 
 // Estimated bridge times (in minutes)
 export const BRIDGE_ESTIMATED_TIME = {

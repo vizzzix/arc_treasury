@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
  * Proxy for Circle fees API
- * GET /api/circle/v2/burn/USDC/fees/{destDomain}/{srcDomain}
+ * GET /api/circle/fees?destDomain=26&srcDomain=0
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,6 +18,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { destDomain, srcDomain } = req.query;
+
+  if (!destDomain || !srcDomain) {
+    return res.status(400).json({ error: 'Missing destDomain or srcDomain' });
+  }
 
   try {
     const circleUrl = `https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${destDomain}/${srcDomain}`;

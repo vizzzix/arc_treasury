@@ -192,7 +192,7 @@ export const useBridgeCCTP = () => {
         const verifyAndLoad = async () => {
           try {
             const sourceDomain = CCTP_DOMAINS[savedPendingBurn.fromNetwork];
-            const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${savedPendingBurn.txHash}`;
+            const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=${sourceDomain}&transactionHash=${savedPendingBurn.txHash}`;
             const response = await fetch(attestationUrl);
             const data = await response.json();
 
@@ -727,7 +727,7 @@ export const useBridgeCCTP = () => {
       let detectedDestNetwork: BridgeNetwork = toNetwork;
 
       for (const { domain, to } of domains) {
-        const attestationUrl = `${CIRCLE_ATTESTATION_API}/${domain}?transactionHash=${txHash}`;
+        const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=${domain}&transactionHash=${txHash}`;
         console.log('[useBridgeCCTP] Trying domain', domain, 'URL:', attestationUrl);
 
         try {
@@ -906,7 +906,7 @@ export const useBridgeCCTP = () => {
       let detectedTo: BridgeNetwork = 'arcTestnet';
 
       for (const { domain, from, to } of domains) {
-        const attestationUrl = `${CIRCLE_ATTESTATION_API}/${domain}?transactionHash=${burnTxHash}`;
+        const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=${domain}&transactionHash=${burnTxHash}`;
         console.log('[useBridgeCCTP] Trying domain', domain, 'for:', burnTxHash);
 
         try {
