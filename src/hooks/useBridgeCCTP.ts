@@ -153,6 +153,7 @@ export const useBridgeCCTP = () => {
   const mintConfirmedRef = useRef(false);
   const burnConfirmedRef = useRef(false);
   const burnTxHashRef = useRef<string | null>(null);
+  const approvalConfirmedRef = useRef(false);
 
   // Get public client for reading chain data
   const sepoliaClient = usePublicClient({ chainId: SUPPORTED_NETWORKS.ethereumSepolia.chainId });
@@ -284,6 +285,7 @@ export const useBridgeCCTP = () => {
       mintConfirmedRef.current = false;
       burnConfirmedRef.current = false;
       burnTxHashRef.current = null;
+      approvalConfirmedRef.current = false;
 
       // Check if user is on the correct network
       const currentChainId = account.chainId;
@@ -368,6 +370,7 @@ export const useBridgeCCTP = () => {
 
               case 'APPROVAL_CONFIRMED':
                 toast.success('USDC approved!');
+                approvalConfirmedRef.current = true;
                 break;
 
               case 'burn':
@@ -584,21 +587,39 @@ export const useBridgeCCTP = () => {
               pendingBurn: newPendingBurn,
             }));
           } else {
-            // No confirmed burn - treat as cancelled (may have only been approval)
-            console.log('[useBridgeCCTP] Bridge returned but no confirmed burn - checking result:', safeStringify(result, 2));
+            // No confirmed burn - check if approval happened
+            console.log('[useBridgeCCTP] Bridge returned but no confirmed burn - approvalConfirmed:', approvalConfirmedRef.current, 'result:', safeStringify(result, 2));
             setAttestationStatus(null);
-            toast.error('Bridge cancelled', {
-              description: 'Transaction was not completed.',
-              duration: 5000,
-            });
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              error: 'Transaction was cancelled',
-              result: null,
-              transactions: [],
-              mintConfirmed: false,
-            }));
+
+            if (approvalConfirmedRef.current) {
+              // Approval succeeded but burn didn't start - likely user rejected burn tx or timeout
+              toast.warning('Approval successful', {
+                description: 'USDC approved. Please try bridging again to complete the transfer.',
+                duration: 10000,
+              });
+              setState(prev => ({
+                ...prev,
+                isBridging: false,
+                error: 'Approval completed. Please try again to bridge.',
+                result: null,
+                transactions: [],
+                mintConfirmed: false,
+              }));
+            } else {
+              // Nothing happened - truly cancelled
+              toast.error('Bridge cancelled', {
+                description: 'Transaction was not completed.',
+                duration: 5000,
+              });
+              setState(prev => ({
+                ...prev,
+                isBridging: false,
+                error: 'Transaction was cancelled',
+                result: null,
+                transactions: [],
+                mintConfirmed: false,
+              }));
+            }
           }
         }
 
@@ -1001,6 +1022,7 @@ export const useBridgeCCTP = () => {
     mintConfirmedRef.current = false;
     burnConfirmedRef.current = false;
     burnTxHashRef.current = null;
+    approvalConfirmedRef.current = false;
   }, []);
 
   return {
