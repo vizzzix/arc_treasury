@@ -154,6 +154,8 @@ export const useBridgeCCTP = () => {
   const burnConfirmedRef = useRef(false);
   const burnTxHashRef = useRef<string | null>(null);
   const approvalConfirmedRef = useRef(false);
+  const approvalStartedRef = useRef(false);
+  const approvalTxHashRef = useRef<string | null>(null);
 
   // Get public client for reading chain data
   const sepoliaClient = usePublicClient({ chainId: SUPPORTED_NETWORKS.ethereumSepolia.chainId });
@@ -286,6 +288,8 @@ export const useBridgeCCTP = () => {
       burnConfirmedRef.current = false;
       burnTxHashRef.current = null;
       approvalConfirmedRef.current = false;
+      approvalStartedRef.current = false;
+      approvalTxHashRef.current = null;
 
       // Check if user is on the correct network
       const currentChainId = account.chainId;
@@ -366,6 +370,12 @@ export const useBridgeCCTP = () => {
               case 'approval':
               case 'APPROVAL_STARTED':
                 toast.info('Approving USDC...');
+                approvalStartedRef.current = true;
+                // Capture tx hash if available
+                if (progress.txHash || progress.transactionHash) {
+                  approvalTxHashRef.current = progress.txHash || progress.transactionHash;
+                  console.log('[useBridgeCCTP] Approval tx hash:', approvalTxHashRef.current);
+                }
                 break;
 
               case 'APPROVAL_CONFIRMED':
@@ -587,8 +597,8 @@ export const useBridgeCCTP = () => {
               pendingBurn: newPendingBurn,
             }));
           } else {
-            // No confirmed burn - check if approval happened
-            console.log('[useBridgeCCTP] Bridge returned but no confirmed burn - approvalConfirmed:', approvalConfirmedRef.current, 'result:', safeStringify(result, 2));
+            // No confirmed burn - check approval status
+            console.log('[useBridgeCCTP] Bridge returned but no confirmed burn - approvalStarted:', approvalStartedRef.current, 'approvalConfirmed:', approvalConfirmedRef.current, 'approvalTxHash:', approvalTxHashRef.current);
             setAttestationStatus(null);
 
             if (approvalConfirmedRef.current) {
@@ -601,6 +611,23 @@ export const useBridgeCCTP = () => {
                 ...prev,
                 isBridging: false,
                 error: 'Approval completed. Please try again to bridge.',
+                result: null,
+                transactions: [],
+                mintConfirmed: false,
+              }));
+            } else if (approvalStartedRef.current) {
+              // Approval was started but not confirmed yet - tx might still be pending
+              const txLink = approvalTxHashRef.current
+                ? `Check tx: ${SUPPORTED_NETWORKS[fromNetwork].explorerUrl}/tx/${approvalTxHashRef.current}`
+                : '';
+              toast.warning('Approval pending', {
+                description: `Transaction may still be processing. Wait a moment and try again. ${txLink}`,
+                duration: 15000,
+              });
+              setState(prev => ({
+                ...prev,
+                isBridging: false,
+                error: 'Approval transaction pending. Please wait and try again.',
                 result: null,
                 transactions: [],
                 mintConfirmed: false,
@@ -1023,6 +1050,8 @@ export const useBridgeCCTP = () => {
     burnConfirmedRef.current = false;
     burnTxHashRef.current = null;
     approvalConfirmedRef.current = false;
+    approvalStartedRef.current = false;
+    approvalTxHashRef.current = null;
   }, []);
 
   return {
