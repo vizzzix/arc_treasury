@@ -16,67 +16,13 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount, useConnectorClient, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { parseUnits } from 'viem';
-import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
+import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { supabase } from '@/lib/supabase';
-
-// ERC20 ABI for approval and allowance check
-const ERC20_ABI = [
-  {
-    name: 'approve',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  },
-  {
-    name: 'allowance',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' }
-    ],
-    outputs: [{ name: '', type: 'uint256' }]
-  }
-] as const;
-
-// ARC Bridge Contract ABI - bridgeWithPreapproval function
-// Takes 9 separate parameters (NOT a tuple/struct!)
-// Function selector: 0xd0d4229a
-// Verified from successful tx: 0x290a59bec167ac5805057007f75436b946c0549d7265d5f65ca9de0618b3814e
-const ARC_BRIDGE_ABI = [
-  {
-    name: 'bridgeWithPreapproval',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'amount', type: 'uint256' },
-      { name: 'destinationDomain', type: 'uint32' },
-      { name: 'minFinalityThreshold', type: 'uint32' },
-      { name: 'mintRecipient', type: 'address' },
-      { name: 'feeRecipient', type: 'bytes32' },
-      { name: 'burnToken', type: 'address' },
-      { name: 'destinationCaller', type: 'address' },
-      { name: 'sourceDomain', type: 'uint32' },
-      { name: 'maxFee', type: 'uint256' }
-    ],
-    outputs: [{ name: 'nonce', type: 'uint64' }]
-  }
-] as const;
-
-// Arc Testnet destination domain for Sepolia → Arc bridging
-// From successful tx 0x290a59be...: destinationDomain = 550 (0x226), sourceDomain = 26 (0x1a)
-const ARC_DESTINATION_DOMAIN = 550; // 0x226 - Arc destination from Sepolia
-const ARC_SOURCE_DOMAIN = 26; // 0x1a - Arc's CCTP domain
 
 // Helper to safely stringify objects that may contain BigInt
 const safeStringify = (obj: any, space?: number): string => {
@@ -188,6 +134,7 @@ export const useBridgeCCTP = () => {
   const account = useAccount();
   const address = account?.address;
   const isConnected = account?.isConnected ?? false;
+  const { data: connectorClient } = useConnectorClient();
   const { switchChainAsync } = useSwitchChain();
 
   const [state, setState] = useState<BridgeState>({
@@ -312,12 +259,7 @@ export const useBridgeCCTP = () => {
    */
   const bridge = useCallback(
     async ({ fromNetwork, toNetwork, amount }: BridgeParams) => {
-      console.log('[useBridgeCCTP] ========== BRIDGE STARTED ==========');
-      console.log('[useBridgeCCTP] Params:', { fromNetwork, toNetwork, amount });
-      console.log('[useBridgeCCTP] Account state:', { isConnected, address, hasConnector: !!account.connector, chainId: account.chainId });
-
-      if (!isConnected || !address || !account.connector) {
-        console.log('[useBridgeCCTP] EARLY EXIT: wallet not connected');
+      if (!isConnected || !address || !connectorClient) {
         toast.error('Please connect your wallet first');
         return;
       }
@@ -370,232 +312,28 @@ export const useBridgeCCTP = () => {
       }
 
       try {
-        console.log('[useBridgeCCTP] Entering main try block...');
+        // Get the EIP-1193 provider from connector client
+        // wagmi's connectorClient exposes transport.value or we can use window.ethereum
+        const provider = (connectorClient as any)?.transport ||
+                         (window as any).ethereum;
 
-        // For Sepolia → Arc, use direct contract call to ARC_BRIDGE_CONTRACT
-        // Bridge Kit doesn't support the custom bridgeWithPreapproval function
-        if (isSepoliaToArc) {
-          console.log('[useBridgeCCTP] Using direct bridgeWithPreapproval for Sepolia → Arc');
-
-          if (!sepoliaClient) {
-            console.error('[useBridgeCCTP] sepoliaClient is not ready');
-            toast.error('Network connection issue. Please refresh the page.');
-            setState(prev => ({ ...prev, isBridging: false, error: 'Network not ready' }));
-            return;
-          }
-
-          // Get wallet client from connector (more reliable after chain switch)
-          const connector = account.connector;
-          if (!connector) {
-            console.error('[useBridgeCCTP] No connector available');
-            toast.error('Wallet not connected. Please reconnect.');
-            setState(prev => ({ ...prev, isBridging: false, error: 'Wallet not connected' }));
-            return;
-          }
-
-          // Use viem's createWalletClient with the provider from connector
-          const { createWalletClient, custom } = await import('viem');
-          const provider = await connector.getProvider();
-
-          const activeWalletClient = createWalletClient({
-            account: address,
-            chain: sepolia,
-            transport: custom(provider),
-          });
-
-          console.log('[useBridgeCCTP] Created wallet client for Sepolia');
-
-          const usdcAddress = TOKEN_ADDRESSES.ethereumSepolia.USDC;
-          const amountWei = parseUnits(amount, 6); // USDC on Sepolia uses 6 decimals
-
-          try {
-            // Step 1: Check and approve if needed
-            const currentAllowance = await sepoliaClient.readContract({
-            address: usdcAddress,
-            abi: ERC20_ABI,
-            functionName: 'allowance',
-            args: [address, ARC_BRIDGE_CONTRACT],
-          }) as bigint;
-
-          console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
-
-          if (currentAllowance < amountWei) {
-            toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
-            approvalStartedRef.current = true;
-
-            const approvalHash = await activeWalletClient.writeContract({
-              chain: sepolia,
-              address: usdcAddress,
-              abi: ERC20_ABI,
-              functionName: 'approve',
-              args: [ARC_BRIDGE_CONTRACT, amountWei],
-            });
-
-            approvalTxHashRef.current = approvalHash;
-            console.log('[useBridgeCCTP] Approval tx sent:', approvalHash);
-            toast.info('Waiting for approval confirmation...');
-
-            const approvalReceipt = await sepoliaClient.waitForTransactionReceipt({
-              hash: approvalHash,
-              confirmations: 1,
-            });
-
-            if (approvalReceipt.status !== 'success') {
-              throw new Error('Approval transaction failed');
-            }
-
-            approvalConfirmedRef.current = true;
-            toast.success('USDC approved!');
-            console.log('[useBridgeCCTP] Approval confirmed');
-          } else {
-            console.log('[useBridgeCCTP] Allowance sufficient, skipping approval');
-            approvalConfirmedRef.current = true;
-          }
-
-          // Step 2: Call bridgeWithPreapproval
-          toast.info('Initiating bridge...', { description: 'Please confirm in your wallet' });
-
-          // feeRecipient is zero bytes32 (no fee recipient)
-          const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
-
-          // Build args array matching successful transaction format EXACTLY
-          // Verified from tx 0x290a59bec167ac5805057007f75436b946c0549d7265d5f65ca9de0618b3814e
-          const bridgeArgs = [
-            amountWei,                    // amount: uint256
-            ARC_DESTINATION_DOMAIN,       // destinationDomain: uint32 (550 = 0x226)
-            0,                            // minFinalityThreshold: uint32
-            address,                      // mintRecipient: address (NOT bytes32!)
-            zeroBytes32,                  // feeRecipient: bytes32
-            usdcAddress,                  // burnToken: address
-            ARC_BRIDGE_CONTRACT,          // destinationCaller: address (MUST be bridge contract!)
-            ARC_SOURCE_DOMAIN,            // sourceDomain: uint32 (26 = 0x1a)
-            1000n,                        // maxFee: uint256 (0.001 USDC)
-          ] as const;
-
-          console.log('[useBridgeCCTP] Calling bridgeWithPreapproval with args:', {
-            amount: amountWei.toString(),
-            destinationDomain: ARC_DESTINATION_DOMAIN,
-            minFinalityThreshold: 0,
-            mintRecipient: address,
-            feeRecipient: zeroBytes32,
-            burnToken: usdcAddress,
-            destinationCaller: ARC_BRIDGE_CONTRACT,
-            sourceDomain: ARC_SOURCE_DOMAIN,
-            maxFee: '1000',
-          });
-
-          const burnHash = await activeWalletClient.writeContract({
-            chain: sepolia,
-            address: ARC_BRIDGE_CONTRACT,
-            abi: ARC_BRIDGE_ABI,
-            functionName: 'bridgeWithPreapproval',
-            args: bridgeArgs,
-            gas: 500_000n, // Explicit gas limit to avoid estimation issues
-          });
-
-          burnTxHashRef.current = burnHash;
-          burnConfirmedRef.current = true;
-          console.log('[useBridgeCCTP] Bridge tx sent:', burnHash);
-
-          setState(prev => ({
-            ...prev,
-            transactions: [{
-              hash: burnHash,
-              network: SUPPORTED_NETWORKS.ethereumSepolia.name,
-              explorerUrl: `${SUPPORTED_NETWORKS.ethereumSepolia.explorerUrl}/tx/${burnHash}`,
-              status: 'pending',
-              step: 'Burn',
-            }],
-          }));
-
-          toast.info('Waiting for confirmation...');
-
-          const burnReceipt = await sepoliaClient.waitForTransactionReceipt({
-            hash: burnHash,
-            confirmations: 1,
-          });
-
-          if (burnReceipt.status !== 'success') {
-            throw new Error('Bridge transaction failed');
-          }
-
-          // Track this bridge
-          trackSiteBridge(burnHash, address!, amount, 'to_arc');
-
-          toast.success('Bridge initiated!', {
-            description: 'Waiting for attestation (~30 sec). Your USDC will arrive on Arc automatically.',
-            duration: 10000,
-          });
-
-          // Save pending burn for claim if needed
-          const newPendingBurn = {
-            txHash: burnHash,
-            fromNetwork,
-            toNetwork,
-            amount,
-            timestamp: Date.now(),
-          };
-          savePendingBurn(address, newPendingBurn);
-
-          setAttestationStatus('pending');
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            transactions: prev.transactions.map(tx => ({ ...tx, status: 'success' as const })),
-            pendingBurn: newPendingBurn,
-          }));
-
-          } catch (sepoliaError: any) {
-            console.error('[useBridgeCCTP] Sepolia → Arc error:', sepoliaError);
-
-            let errorMsg = sepoliaError?.message || 'Bridge failed';
-
-            // Handle user rejection
-            if (errorMsg.toLowerCase().includes('user rejected') ||
-                errorMsg.toLowerCase().includes('user denied')) {
-              errorMsg = 'Transaction rejected by user';
-              toast.error('Transaction rejected');
-            } else if (errorMsg.includes('insufficient')) {
-              toast.error('Insufficient funds', { description: errorMsg });
-            } else {
-              toast.error('Bridge failed', { description: errorMsg });
-            }
-
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              error: errorMsg,
-            }));
-          }
-
-          return; // Early return for Sepolia → Arc (success or error handled above)
-        }
-
-        // For Arc → Sepolia, use Bridge Kit
-        console.log('[useBridgeCCTP] Using Bridge Kit for Arc → Sepolia');
-
-        // Use window.ethereum directly like arc_bridge does
-        const provider = (window as any).ethereum;
         if (!provider) {
-          throw new Error('No wallet provider found. Please install MetaMask.');
+          throw new Error('No wallet provider available');
         }
 
-        console.log('[useBridgeCCTP] Using window.ethereum provider');
+        console.log('[useBridgeCCTP] Creating adapter from provider...');
 
         // Create adapter using Bridge Kit's factory
-        console.log('[useBridgeCCTP] Creating adapter...');
-        let adapter;
-        try {
-          adapter = await createAdapterFromProvider({
-            provider,
-          });
-          console.log('[useBridgeCCTP] Adapter created successfully');
-        } catch (adapterError) {
-          console.error('[useBridgeCCTP] Failed to create adapter:', adapterError);
-          throw new Error('Failed to create wallet adapter. Please refresh and try again.');
-        }
+        const adapter = await createAdapterFromProvider({
+          provider,
+        });
 
+        console.log('[useBridgeCCTP] Adapter created successfully');
+
+        // Bridge Kit expects human-readable amount (e.g., '20' = 20 USDC)
+        // The SDK handles decimal conversion internally
         const bridgeAmount = amount;
+
         const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
         const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
 
@@ -606,10 +344,9 @@ export const useBridgeCCTP = () => {
           address,
         });
 
-        toast.info('Starting bridge transfer...');
-        console.log('[useBridgeCCTP] Calling Bridge Kit...');
+        toast.info('Initiating bridge via Circle Bridge Kit...');
 
-        // Execute bridge using Bridge Kit (same pattern as arc_bridge)
+        // Execute bridge using Bridge Kit
         const result = await bridgeKit.bridge({
           from: {
             adapter,
@@ -620,6 +357,7 @@ export const useBridgeCCTP = () => {
             chain: toChain,
           },
           amount: bridgeAmount,
+          token: 'USDC',
           onProgress: (progress: any) => {
             console.log('[useBridgeCCTP] Progress event:', safeStringify(progress));
             console.log('[useBridgeCCTP] Progress keys:', Object.keys(progress));
@@ -895,16 +633,15 @@ export const useBridgeCCTP = () => {
                 mintConfirmed: false,
               }));
             } else {
-              // No refs set - Bridge Kit returned without progress events
-              // Don't assume cancelled - transaction might still be pending
-              toast.warning('Bridge interrupted', {
-                description: 'If you approved a transaction, please wait for it to confirm and try again.',
-                duration: 15000,
+              // Nothing happened - truly cancelled
+              toast.error('Bridge cancelled', {
+                description: 'Transaction was not completed.',
+                duration: 5000,
               });
               setState(prev => ({
                 ...prev,
                 isBridging: false,
-                error: 'Bridge interrupted. If you approved a transaction, please wait for it to confirm and try again.',
+                error: 'Transaction was cancelled',
                 result: null,
                 transactions: [],
                 mintConfirmed: false,
@@ -930,49 +667,8 @@ export const useBridgeCCTP = () => {
           errorMsg = 'Token approval failed';
         }
 
-        // Extract approval/burn status from error.steps (Bridge Kit includes step info in errors)
-        // This is needed because onProgress may not fire before the error is thrown
-        const errorSteps = error?.steps || [];
-        console.log('[useBridgeCCTP] Error steps:', safeStringify(errorSteps, 2));
-
-        // Look for approval step in error
-        const approvalStep = errorSteps.find((s: any) =>
-          s.name?.toLowerCase().includes('approv') ||
-          s.type?.toLowerCase().includes('approv') ||
-          s.name?.toLowerCase().includes('allowance')
-        );
-
-        if (approvalStep) {
-          console.log('[useBridgeCCTP] Found approval step in error:', safeStringify(approvalStep, 2));
-          // Extract tx hash from approval step
-          if (approvalStep.txHash || approvalStep.transactionHash) {
-            approvalTxHashRef.current = approvalStep.txHash || approvalStep.transactionHash;
-          }
-          // Check approval state
-          if (approvalStep.state === 'success' || approvalStep.status === 'success') {
-            approvalConfirmedRef.current = true;
-          } else if (approvalStep.state === 'pending' || approvalStep.status === 'pending' || approvalStep.txHash) {
-            approvalStartedRef.current = true;
-          }
-        }
-
-        // Also look for burn step
-        const burnStep = errorSteps.find((s: any) =>
-          s.name?.toLowerCase().includes('burn') ||
-          s.name?.toLowerCase().includes('deposit') ||
-          s.type?.toLowerCase().includes('burn')
-        );
-
-        if (burnStep) {
-          console.log('[useBridgeCCTP] Found burn step in error:', safeStringify(burnStep, 2));
-          if (burnStep.txHash || burnStep.transactionHash) {
-            burnTxHashRef.current = burnStep.txHash || burnStep.transactionHash;
-          }
-          if (burnStep.state === 'success' || burnStep.status === 'success') {
-            burnConfirmedRef.current = true;
-          }
-        }
-
+        // Only trust burnConfirmedRef - it's set when BURN_CONFIRMED event is received
+        // Don't trust error.steps as it may incorrectly report approval as burn
         console.log('[useBridgeCCTP] On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
 
         // Check if burn was actually confirmed (BURN_CONFIRMED event was received)
@@ -1011,86 +707,25 @@ export const useBridgeCCTP = () => {
           return;
         }
 
-        // No burn happened - check approval status
-        console.log('[useBridgeCCTP] On error - approvalStarted:', approvalStartedRef.current, 'approvalConfirmed:', approvalConfirmedRef.current, 'approvalTxHash:', approvalTxHashRef.current);
+        // No burn happened - regular error (possibly just approval was done)
+        setAttestationStatus(null);
 
-        if (approvalConfirmedRef.current) {
-          // Approval succeeded but burn didn't start
-          setAttestationStatus(null);
-          toast.warning('Approval successful', {
-            description: 'USDC approved. Please try bridging again to complete the transfer.',
-            duration: 10000,
-          });
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            error: 'Approval completed. Please try again to bridge.',
-            result: null,
-            transactions: [],
-            mintConfirmed: false,
-          }));
-        } else if (approvalStartedRef.current || approvalTxHashRef.current) {
-          // Approval was started but not confirmed yet - tx might still be pending
-          const txLink = approvalTxHashRef.current
-            ? ` Check tx: ${SUPPORTED_NETWORKS[fromNetwork].explorerUrl}/tx/${approvalTxHashRef.current}`
-            : '';
-          setAttestationStatus(null);
-          toast.warning('Approval pending', {
-            description: `Transaction may still be processing. Wait for confirmation and try again.${txLink}`,
-            duration: 15000,
-          });
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            error: 'Approval transaction may still be pending. Please wait and try again.',
-            result: null,
-            transactions: [],
-            mintConfirmed: false,
-          }));
-        } else {
-          // Check if this was an explicit USER rejection (not just any "cancelled" error)
-          // Only treat as user rejection if message explicitly says "User rejected" or "User denied"
-          const originalError = error?.message?.toLowerCase() || '';
-          const wasUserRejection = originalError.includes('user rejected') ||
-                                   originalError.includes('user denied') ||
-                                   originalError.includes('rejected the request') ||
-                                   originalError.includes('denied transaction');
+        setState(prev => ({
+          ...prev,
+          isBridging: false,
+          error: errorMsg,
+          result: null,
+          transactions: [],
+          mintConfirmed: false,
+        }));
 
-          setAttestationStatus(null);
-
-          if (wasUserRejection) {
-            // User explicitly rejected in wallet
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              error: 'Transaction rejected by user',
-              result: null,
-              transactions: [],
-              mintConfirmed: false,
-            }));
-            toast.error('Transaction rejected', {
-              description: 'You rejected the transaction in your wallet.',
-              duration: 10000,
-            });
-          } else {
-            // Any other error - transaction might still be pending
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              error: 'Bridge interrupted. If you approved a transaction, please wait for it to confirm and try again.',
-              result: null,
-              transactions: [],
-              mintConfirmed: false,
-            }));
-            toast.warning('Bridge interrupted', {
-              description: 'If you approved a transaction in your wallet, please wait for it to confirm and try again.',
-              duration: 15000,
-            });
-          }
-        }
+        toast.error('Bridge cancelled', {
+          description: errorMsg,
+          duration: 10000,
+        });
       }
     },
-    [isConnected, address, account.connector, switchChainAsync, account.chainId, bridgeKit]
+    [isConnected, address, connectorClient, switchChainAsync, account.chainId, bridgeKit]
   );
 
   /**
