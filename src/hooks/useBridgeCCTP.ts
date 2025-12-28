@@ -16,7 +16,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useAccount, useConnectorClient, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API } from '@/lib/constants';
 import { toast } from 'sonner';
@@ -134,7 +134,6 @@ export const useBridgeCCTP = () => {
   const account = useAccount();
   const address = account?.address;
   const isConnected = account?.isConnected ?? false;
-  const { data: connectorClient } = useConnectorClient();
   const { switchChainAsync } = useSwitchChain();
 
   const [state, setState] = useState<BridgeState>({
@@ -259,7 +258,7 @@ export const useBridgeCCTP = () => {
    */
   const bridge = useCallback(
     async ({ fromNetwork, toNetwork, amount }: BridgeParams) => {
-      if (!isConnected || !address || !connectorClient) {
+      if (!isConnected || !address || !account.connector) {
         toast.error('Please connect your wallet first');
         return;
       }
@@ -312,16 +311,19 @@ export const useBridgeCCTP = () => {
       }
 
       try {
-        // Get the EIP-1193 provider from connector client
-        // wagmi's connectorClient exposes transport.value or we can use window.ethereum
-        const provider = (connectorClient as any)?.transport ||
-                         (window as any).ethereum;
+        // Get the EIP-1193 provider from wagmi connector (correct way for wagmi v3)
+        // account.connector.getProvider() returns the native wallet provider
+        const connector = account.connector;
+        if (!connector) {
+          throw new Error('No wallet connector available');
+        }
 
+        const provider = await connector.getProvider();
         if (!provider) {
           throw new Error('No wallet provider available');
         }
 
-        console.log('[useBridgeCCTP] Creating adapter from provider...');
+        console.log('[useBridgeCCTP] Got provider from connector:', connector.name);
 
         // Create adapter using Bridge Kit's factory
         const adapter = await createAdapterFromProvider({
@@ -725,7 +727,7 @@ export const useBridgeCCTP = () => {
         });
       }
     },
-    [isConnected, address, connectorClient, switchChainAsync, account.chainId, bridgeKit]
+    [isConnected, address, account.connector, switchChainAsync, account.chainId, bridgeKit]
   );
 
   /**
