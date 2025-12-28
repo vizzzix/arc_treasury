@@ -1250,7 +1250,7 @@ export const useBridgeCCTP = () => {
       }
 
       if (!messageData) {
-        throw new Error('Attestation not ready yet. Please try again in a few minutes.');
+        throw new Error('Attestation is still being processed. This usually takes 1-3 minutes. Please wait a moment and try again.');
       }
 
       const destNetwork = detectedDestNetwork;
@@ -1262,7 +1262,7 @@ export const useBridgeCCTP = () => {
       const messageBytes = messageData.message; // Circle API returns the message bytes!
 
       if (!attestation || attestation === 'PENDING') {
-        throw new Error('Attestation still pending. Please try again in a few minutes.');
+        throw new Error('Attestation is still being processed. This usually takes 1-3 minutes. Please wait a moment and try again.');
       }
 
       if (!messageBytes) {
@@ -1494,7 +1494,7 @@ export const useBridgeCCTP = () => {
 
       // Check attestation status
       if (!messageData.attestation || messageData.attestation === 'PENDING') {
-        return { success: false, message: 'Attestation still pending. Please wait a few minutes and try again.', type: 'error' };
+        return { success: false, message: 'Attestation is still being processed. This usually takes 1-3 minutes. Please wait a moment and try again.', type: 'error' };
       }
 
       // Valid burn with attestation - restore it with auto-detected values

@@ -39,6 +39,38 @@ const NETWORK_OPTIONS: { id: NetworkType; name: string }[] = [
   { id: 'solanaDevnet', name: 'Solana Devnet' },
 ];
 
+// Component to show attestation waiting with live seconds counter
+const AttestationCounter = () => {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    setSeconds(0); // Reset when component mounts
+    const interval = setInterval(() => {
+      setSeconds(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+      <div className="flex items-start gap-3">
+        <Clock className="w-5 h-5 text-blue-400 animate-pulse flex-shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-blue-400 mb-1">
+            Waiting for Circle Attestation
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {seconds < 30 
+              ? `This usually takes under 30 seconds... (${seconds}s)`
+              : `Still waiting... (${seconds}s)`}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Bridge = () => {
   const navigate = useNavigate();
   const account = useAccount();
@@ -777,21 +809,7 @@ const Bridge = () => {
           {isEVMtoEVM && (
             <>
               {/* Attestation Status - Pending */}
-              {attestationStatus === 'pending' && (
-                <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                  <div className="flex items-start gap-3">
-                    <Clock className="w-5 h-5 text-blue-400 animate-pulse flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-400 mb-1">
-                        Waiting for Circle Attestation
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        This usually takes under 30 seconds...
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {attestationStatus === 'pending' && <AttestationCounter />}
 
               {/* Attestation received, waiting for mint */}
               {attestationStatus === 'attested' && (
