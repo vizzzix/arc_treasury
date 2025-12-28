@@ -387,7 +387,8 @@ export const useBridgeCCTP = () => {
 
           const BRIDGE_SELECTOR = '0xd0d4229a' as `0x${string}`;
           const ARC_DESTINATION_DOMAIN = 26; // Arc Testnet CCTP domain
-          const BRIDGE_FEE = 3000n; // Fee for Circle relayer (0.003 USDC)
+          const MAX_FEE = 220n; // Max fee for relayer (0.00022 USDC) - matches successful txs
+          const MIN_FINALITY = 1000n; // Finality threshold - matches successful txs
           const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
 
           const encodedParams = encodeAbiParameters(
@@ -398,14 +399,14 @@ export const useBridgeCCTP = () => {
             ],
             [
               amountWei,                    // amount to bridge
-              BRIDGE_FEE,                   // maxFee for relayer
+              MAX_FEE,                      // maxFee for relayer
               0n,                           // nonce (0 = auto)
               address,                      // mintRecipient
               zeroBytes32,                  // destinationCaller (0x0 = anyone can relay)
               usdcAddress,                  // burnToken (USDC on Sepolia)
               ARC_BRIDGE_CONTRACT,          // hook address
               BigInt(ARC_DESTINATION_DOMAIN), // destinationDomain (Arc = 26)
-              BRIDGE_FEE,                   // fee for relayer
+              MIN_FINALITY,                 // minFinalityThreshold
             ]
           );
 
