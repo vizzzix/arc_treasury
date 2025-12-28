@@ -18,25 +18,15 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { parseUnits, maxUint256 } from 'viem';
-import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
+import { parseUnits } from 'viem';
+import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { supabase } from '@/lib/supabase';
 
-// ERC20 ABI for approval
+// ERC20 ABI for allowance check (not doing manual approval anymore - let Bridge Kit handle it)
 const ERC20_ABI = [
-  {
-    name: 'approve',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  },
   {
     name: 'allowance',
     type: 'function',
@@ -343,21 +333,16 @@ export const useBridgeCCTP = () => {
       try {
         console.log('[useBridgeCCTP] Entering main try block...');
 
-        // Get the EIP-1193 provider from wagmi connector (correct way for wagmi v3)
-        // account.connector.getProvider() returns the native wallet provider
-        const connector = account.connector;
-        if (!connector) {
-          throw new Error('No wallet connector available');
-        }
-
-        const provider = await connector.getProvider();
+        // Use window.ethereum directly like arc_bridge does
+        // This is simpler and more reliable than going through wagmi connector
+        const provider = (window as any).ethereum;
         if (!provider) {
-          throw new Error('No wallet provider available');
+          throw new Error('No wallet provider found. Please install MetaMask.');
         }
 
-        console.log('[useBridgeCCTP] Got provider from connector:', connector.name);
+        console.log('[useBridgeCCTP] Using window.ethereum provider');
 
-        // Create adapter using Bridge Kit's factory
+        // Create adapter using Bridge Kit's factory (same as arc_bridge)
         console.log('[useBridgeCCTP] Creating adapter...');
         let adapter;
         try {
@@ -376,99 +361,6 @@ export const useBridgeCCTP = () => {
         const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
         const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
 
-        // === MANUAL APPROVAL STEP ===
-        // Handle approval ourselves to ensure we wait for confirmation
-        // Bridge Kit sometimes times out during approval, leaving tx pending
-        const usdcAddress = TOKEN_ADDRESSES[fromNetwork].USDC;
-
-        // Different approval targets based on direction:
-        // - Sepolia → Arc: uses ARC_BRIDGE_CONTRACT (Arc's custom bridge)
-        // - Arc → Sepolia: uses TokenMessenger (standard CCTP)
-        const approvalTarget = fromNetwork === 'ethereumSepolia'
-          ? ARC_BRIDGE_CONTRACT
-          : CCTP_CONTRACTS[fromNetwork].TokenMessenger;
-
-        console.log('[useBridgeCCTP] Approval target:', approvalTarget, 'for direction:', fromNetwork, '→', toNetwork);
-
-        // Get decimals based on network (Arc uses 18, Sepolia uses 6)
-        const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
-        const amountWei = parseUnits(amount, decimals);
-
-        // Get the public client for the source chain
-        const sourceClient = fromNetwork === 'arcTestnet' ? arcClient : sepoliaClient;
-
-        if (!sourceClient || !walletClient) {
-          console.error('[useBridgeCCTP] Missing client - sourceClient:', !!sourceClient, 'walletClient:', !!walletClient);
-          throw new Error('Wallet not ready. Please try again.');
-        }
-
-        // Check current allowance
-        console.log('[useBridgeCCTP] Checking allowance for', address, 'to', approvalTarget, 'on', usdcAddress);
-        let currentAllowance: bigint;
-        try {
-          currentAllowance = await sourceClient.readContract({
-            address: usdcAddress,
-            abi: ERC20_ABI,
-            functionName: 'allowance',
-            args: [address, approvalTarget],
-          }) as bigint;
-        } catch (allowanceError) {
-          console.error('[useBridgeCCTP] Failed to read allowance:', allowanceError);
-          throw new Error('Failed to check token allowance. Please try again.');
-        }
-
-        console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
-
-        // If allowance is insufficient, approve MAX to avoid Bridge Kit doing its own approval
-        // This ensures Bridge Kit will skip approval step entirely
-        if (currentAllowance < amountWei) {
-          toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
-          approvalStartedRef.current = true;
-
-          try {
-            // Get the correct chain for the wallet client
-            const sourceChain = fromNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
-
-            // Approve max uint256 so Bridge Kit never needs to do its own approval
-            const approvalHash = await walletClient.writeContract({
-              chain: sourceChain,
-              address: usdcAddress,
-              abi: ERC20_ABI,
-              functionName: 'approve',
-              args: [approvalTarget, maxUint256],
-            });
-
-            approvalTxHashRef.current = approvalHash;
-            console.log('[useBridgeCCTP] Approval tx sent:', approvalHash);
-            toast.info('Waiting for approval confirmation...');
-
-            // Wait for approval to be confirmed
-            const approvalReceipt = await sourceClient.waitForTransactionReceipt({
-              hash: approvalHash,
-              confirmations: 1,
-            });
-
-            if (approvalReceipt.status === 'success') {
-              approvalConfirmedRef.current = true;
-              toast.success('USDC approved!');
-              console.log('[useBridgeCCTP] Approval confirmed');
-            } else {
-              throw new Error('Approval transaction failed');
-            }
-          } catch (approvalError: any) {
-            console.error('[useBridgeCCTP] Approval error:', approvalError);
-            // Check if user rejected
-            if (approvalError?.message?.toLowerCase().includes('user rejected') ||
-                approvalError?.message?.toLowerCase().includes('user denied')) {
-              throw new Error('User rejected the approval');
-            }
-            throw approvalError;
-          }
-        } else {
-          console.log('[useBridgeCCTP] Allowance sufficient, skipping approval');
-          approvalConfirmedRef.current = true;
-        }
-
         console.log('[useBridgeCCTP] Bridge params:', {
           from: fromChain,
           to: toChain,
@@ -476,10 +368,12 @@ export const useBridgeCCTP = () => {
           address,
         });
 
+        // Let Bridge Kit handle EVERYTHING (approval, burn, mint)
+        // This is what arc_bridge does - no manual approval interference
         toast.info('Starting bridge transfer...');
-        console.log('[useBridgeCCTP] Calling Bridge Kit...');
+        console.log('[useBridgeCCTP] Calling Bridge Kit (letting it handle approval)...');
 
-        // Execute bridge using Bridge Kit
+        // Execute bridge using Bridge Kit (same pattern as arc_bridge)
         const result = await bridgeKit.bridge({
           from: {
             adapter,
@@ -490,7 +384,6 @@ export const useBridgeCCTP = () => {
             chain: toChain,
           },
           amount: bridgeAmount,
-          token: 'USDC',
           onProgress: (progress: any) => {
             console.log('[useBridgeCCTP] Progress event:', safeStringify(progress));
             console.log('[useBridgeCCTP] Progress keys:', Object.keys(progress));
