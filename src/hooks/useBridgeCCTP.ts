@@ -18,15 +18,25 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { parseUnits } from 'viem';
-import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES } from '@/lib/constants';
+import { parseUnits, pad, encodeFunctionData } from 'viem';
+import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { supabase } from '@/lib/supabase';
 
-// ERC20 ABI for allowance check (not doing manual approval anymore - let Bridge Kit handle it)
+// ERC20 ABI for approval and allowance check
 const ERC20_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
   {
     name: 'allowance',
     type: 'function',
@@ -38,6 +48,28 @@ const ERC20_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   }
 ] as const;
+
+// ARC Bridge Contract ABI - bridgeWithPreapproval function
+// Based on successful transactions on Sepolia
+const ARC_BRIDGE_ABI = [
+  {
+    name: 'bridgeWithPreapproval',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'amount', type: 'uint256' },
+      { name: 'destinationDomain', type: 'uint32' },
+      { name: 'mintRecipient', type: 'bytes32' },
+      { name: 'burnToken', type: 'address' },
+      { name: 'maxFee', type: 'uint256' },
+      { name: 'minFinalityThreshold', type: 'uint32' }
+    ],
+    outputs: [{ name: 'nonce', type: 'uint64' }]
+  }
+] as const;
+
+// Arc Testnet destination domain for Sepolia → Arc bridging
+const ARC_DESTINATION_DOMAIN = 26; // Arc Testnet CCTP domain
 
 // Helper to safely stringify objects that may contain BigInt
 const safeStringify = (obj: any, space?: number): string => {
@@ -333,8 +365,150 @@ export const useBridgeCCTP = () => {
       try {
         console.log('[useBridgeCCTP] Entering main try block...');
 
+        // For Sepolia → Arc, use direct contract call to ARC_BRIDGE_CONTRACT
+        // Bridge Kit doesn't support the custom bridgeWithPreapproval function
+        if (isSepoliaToArc) {
+          console.log('[useBridgeCCTP] Using direct bridgeWithPreapproval for Sepolia → Arc');
+
+          if (!walletClient || !sepoliaClient) {
+            throw new Error('Wallet not ready. Please try again.');
+          }
+
+          const usdcAddress = TOKEN_ADDRESSES.ethereumSepolia.USDC;
+          const amountWei = parseUnits(amount, 6); // USDC on Sepolia uses 6 decimals
+
+          // Step 1: Check and approve if needed
+          const currentAllowance = await sepoliaClient.readContract({
+            address: usdcAddress,
+            abi: ERC20_ABI,
+            functionName: 'allowance',
+            args: [address, ARC_BRIDGE_CONTRACT],
+          }) as bigint;
+
+          console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
+
+          if (currentAllowance < amountWei) {
+            toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
+            approvalStartedRef.current = true;
+
+            const approvalHash = await walletClient.writeContract({
+              chain: sepolia,
+              address: usdcAddress,
+              abi: ERC20_ABI,
+              functionName: 'approve',
+              args: [ARC_BRIDGE_CONTRACT, amountWei],
+            });
+
+            approvalTxHashRef.current = approvalHash;
+            console.log('[useBridgeCCTP] Approval tx sent:', approvalHash);
+            toast.info('Waiting for approval confirmation...');
+
+            const approvalReceipt = await sepoliaClient.waitForTransactionReceipt({
+              hash: approvalHash,
+              confirmations: 1,
+            });
+
+            if (approvalReceipt.status !== 'success') {
+              throw new Error('Approval transaction failed');
+            }
+
+            approvalConfirmedRef.current = true;
+            toast.success('USDC approved!');
+            console.log('[useBridgeCCTP] Approval confirmed');
+          } else {
+            console.log('[useBridgeCCTP] Allowance sufficient, skipping approval');
+            approvalConfirmedRef.current = true;
+          }
+
+          // Step 2: Call bridgeWithPreapproval
+          toast.info('Initiating bridge...', { description: 'Please confirm in your wallet' });
+
+          // Convert address to bytes32 for mintRecipient
+          const mintRecipient = pad(address as `0x${string}`, { size: 32 });
+
+          console.log('[useBridgeCCTP] Calling bridgeWithPreapproval:', {
+            amount: amountWei.toString(),
+            destinationDomain: ARC_DESTINATION_DOMAIN,
+            mintRecipient,
+            burnToken: usdcAddress,
+            maxFee: 1000n, // 0.001 USDC max fee
+            minFinalityThreshold: 1000,
+          });
+
+          const burnHash = await walletClient.writeContract({
+            chain: sepolia,
+            address: ARC_BRIDGE_CONTRACT,
+            abi: ARC_BRIDGE_ABI,
+            functionName: 'bridgeWithPreapproval',
+            args: [
+              amountWei,
+              ARC_DESTINATION_DOMAIN,
+              mintRecipient,
+              usdcAddress,
+              1000n, // maxFee
+              1000, // minFinalityThreshold
+            ],
+          });
+
+          burnTxHashRef.current = burnHash;
+          burnConfirmedRef.current = true;
+          console.log('[useBridgeCCTP] Bridge tx sent:', burnHash);
+
+          setState(prev => ({
+            ...prev,
+            transactions: [{
+              hash: burnHash,
+              network: SUPPORTED_NETWORKS.ethereumSepolia.name,
+              explorerUrl: `${SUPPORTED_NETWORKS.ethereumSepolia.explorerUrl}/tx/${burnHash}`,
+              status: 'pending',
+              step: 'Burn',
+            }],
+          }));
+
+          toast.info('Waiting for confirmation...');
+
+          const burnReceipt = await sepoliaClient.waitForTransactionReceipt({
+            hash: burnHash,
+            confirmations: 1,
+          });
+
+          if (burnReceipt.status !== 'success') {
+            throw new Error('Bridge transaction failed');
+          }
+
+          // Track this bridge
+          trackSiteBridge(burnHash, address!, amount, 'to_arc');
+
+          toast.success('Bridge initiated!', {
+            description: 'Waiting for attestation (~30 sec). Your USDC will arrive on Arc automatically.',
+            duration: 10000,
+          });
+
+          // Save pending burn for claim if needed
+          const newPendingBurn = {
+            txHash: burnHash,
+            fromNetwork,
+            toNetwork,
+            amount,
+            timestamp: Date.now(),
+          };
+          savePendingBurn(address, newPendingBurn);
+
+          setAttestationStatus('pending');
+          setState(prev => ({
+            ...prev,
+            isBridging: false,
+            transactions: prev.transactions.map(tx => ({ ...tx, status: 'success' as const })),
+            pendingBurn: newPendingBurn,
+          }));
+
+          return; // Early return for Sepolia → Arc
+        }
+
+        // For Arc → Sepolia, use Bridge Kit
+        console.log('[useBridgeCCTP] Using Bridge Kit for Arc → Sepolia');
+
         // Use window.ethereum directly like arc_bridge does
-        // This is simpler and more reliable than going through wagmi connector
         const provider = (window as any).ethereum;
         if (!provider) {
           throw new Error('No wallet provider found. Please install MetaMask.');
@@ -342,7 +516,7 @@ export const useBridgeCCTP = () => {
 
         console.log('[useBridgeCCTP] Using window.ethereum provider');
 
-        // Create adapter using Bridge Kit's factory (same as arc_bridge)
+        // Create adapter using Bridge Kit's factory
         console.log('[useBridgeCCTP] Creating adapter...');
         let adapter;
         try {
@@ -355,9 +529,7 @@ export const useBridgeCCTP = () => {
           throw new Error('Failed to create wallet adapter. Please refresh and try again.');
         }
 
-        // Bridge Kit expects human-readable amount (e.g., '20' = 20 USDC)
         const bridgeAmount = amount;
-
         const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
         const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
 
@@ -368,10 +540,8 @@ export const useBridgeCCTP = () => {
           address,
         });
 
-        // Let Bridge Kit handle EVERYTHING (approval, burn, mint)
-        // This is what arc_bridge does - no manual approval interference
         toast.info('Starting bridge transfer...');
-        console.log('[useBridgeCCTP] Calling Bridge Kit (letting it handle approval)...');
+        console.log('[useBridgeCCTP] Calling Bridge Kit...');
 
         // Execute bridge using Bridge Kit (same pattern as arc_bridge)
         const result = await bridgeKit.bridge({
