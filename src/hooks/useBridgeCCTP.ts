@@ -624,7 +624,16 @@ export const useBridgeCCTP = () => {
             console.error('[useBridgeCCTP] Mint error:', mintError);
             
             // Check if error is about network switch
-            if (mintError.message?.includes('chain') || mintError.message?.includes('network') || mintError.message?.includes('Chain ID')) {
+            const errorMsg = mintError.message || mintError.toString() || '';
+            const isNetworkError = errorMsg.includes('chain') || 
+                                   errorMsg.includes('network') || 
+                                   errorMsg.includes('Chain ID') ||
+                                   errorMsg.includes('not switched') ||
+                                   errorMsg.includes('does not match') ||
+                                   errorMsg.includes('current') && errorMsg.includes('expected');
+            
+            if (isNetworkError) {
+              console.log('[useBridgeCCTP] Network switch error detected:', errorMsg);
               toast.error('Network switch required', { 
                 description: 'Please switch to Arc Testnet manually and try claiming again.',
                 duration: 15000,
@@ -1086,6 +1095,29 @@ export const useBridgeCCTP = () => {
         // Only trust burnConfirmedRef - it's set when BURN_CONFIRMED event is received
         // Don't trust error.steps as it may incorrectly report approval as burn
         console.log('[useBridgeCCTP] On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
+
+        // Check if error is about network switch - don't show "Your funds are safe" for network errors
+        const isNetworkError = errorMsg.includes('chain') || 
+                               errorMsg.includes('network') || 
+                               errorMsg.includes('Chain ID') ||
+                               errorMsg.includes('not switched') ||
+                               errorMsg.includes('does not match') ||
+                               (errorMsg.includes('current') && errorMsg.includes('expected'));
+        
+        if (isNetworkError && burnConfirmedRef.current) {
+          console.log('[useBridgeCCTP] Network switch error after burn - show network error, not "Your funds are safe"');
+          toast.error('Network switch required', { 
+            description: 'Please switch to Arc Testnet manually and try claiming again.',
+            duration: 15000,
+          });
+          const burnTxHash = burnTxHashRef.current;
+          setState(prev => ({
+            ...prev,
+            isBridging: false,
+            pendingBurn: { txHash: burnTxHash, fromNetwork, toNetwork, amount, timestamp: Date.now() }
+          }));
+          return;
+        }
 
         // Check if burn was actually confirmed (BURN_CONFIRMED event was received)
         if (burnConfirmedRef.current && burnTxHashRef.current) {
