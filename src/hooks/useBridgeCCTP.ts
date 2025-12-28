@@ -787,21 +787,44 @@ export const useBridgeCCTP = () => {
             mintConfirmed: false,
           }));
         } else {
-          // Nothing happened - truly cancelled
-          setAttestationStatus(null);
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            error: errorMsg,
-            result: null,
-            transactions: [],
-            mintConfirmed: false,
-          }));
+          // Check if this was an explicit user rejection
+          const wasUserRejection = errorMsg.includes('rejected') ||
+                                   errorMsg.includes('denied') ||
+                                   errorMsg.includes('cancelled') ||
+                                   errorMsg.includes('canceled');
 
-          toast.error('Bridge cancelled', {
-            description: errorMsg,
-            duration: 10000,
-          });
+          setAttestationStatus(null);
+
+          if (wasUserRejection) {
+            // User explicitly rejected - show cancelled
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              error: errorMsg,
+              result: null,
+              transactions: [],
+              mintConfirmed: false,
+            }));
+            toast.error('Bridge cancelled', {
+              description: errorMsg,
+              duration: 10000,
+            });
+          } else {
+            // Unknown error - transaction might still be pending
+            // Don't say "cancelled" as it might confuse user with pending tx
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              error: 'Bridge interrupted. If you approved a transaction, please wait for it to confirm and try again.',
+              result: null,
+              transactions: [],
+              mintConfirmed: false,
+            }));
+            toast.warning('Bridge interrupted', {
+              description: 'If you approved a transaction in your wallet, please wait for it to confirm and try again.',
+              duration: 15000,
+            });
+          }
         }
       }
     },
