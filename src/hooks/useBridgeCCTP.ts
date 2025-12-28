@@ -19,7 +19,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useConnectorClient, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
-import { parseUnits, encodeAbiParameters, concat } from 'viem';
+import { parseUnits, encodeAbiParameters, concat, createWalletClient, custom } from 'viem';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
@@ -479,11 +479,28 @@ export const useBridgeCCTP = () => {
             // Switch to Arc Testnet
             if (account.chainId !== SUPPORTED_NETWORKS.arcTestnet.chainId) {
               await switchChainAsync({ chainId: SUPPORTED_NETWORKS.arcTestnet.chainId });
+              // Wait for network switch to complete
+              await new Promise(resolve => setTimeout(resolve, 2000));
             }
 
-            // Call receiveMessage on Arc's MessageTransmitter
-            const mintHash = await walletClient.writeContract({
+            // Get fresh provider after network switch and create new wallet client
+            const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+            if (!provider) {
+              throw new Error('No wallet provider available after network switch');
+            }
+
+            // Create new wallet client for Arc network
+            const arcWalletClient = createWalletClient({
               chain: arcTestnetChain,
+              transport: custom(provider),
+            });
+
+            console.log('[useBridgeCCTP] Created Arc wallet client, calling receiveMessage...');
+
+            // Call receiveMessage on Arc's MessageTransmitter
+            const mintHash = await arcWalletClient.writeContract({
+              chain: arcTestnetChain,
+              account: address as `0x${string}`,
               address: CCTP_CONTRACTS.arcTestnet.MessageTransmitter,
               abi: [{
                 name: 'receiveMessage',
@@ -1102,7 +1119,7 @@ export const useBridgeCCTP = () => {
         }
         try {
           await switchChainAsync({ chainId: destChainId });
-          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for chain switch to complete
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for chain switch to complete
         } catch (switchError: any) {
           console.error('[useBridgeCCTP] Chain switch failed:', switchError);
           throw new Error(`Failed to switch network. Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually.`);
@@ -1111,6 +1128,23 @@ export const useBridgeCCTP = () => {
 
       // Step 4: Call receiveMessage on MessageTransmitter
       toast.info('Claiming your USDC...');
+
+      // Get fresh provider after network switch and create new wallet client
+      const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+      if (!provider) {
+        throw new Error('No wallet provider available after network switch');
+      }
+
+      // Get the correct chain object for the destination
+      const destChain = destNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
+
+      // Create new wallet client for destination network
+      const destWalletClient = createWalletClient({
+        chain: destChain,
+        transport: custom(provider),
+      });
+
+      console.log('[useBridgeCCTP] Created destination wallet client, calling receiveMessage...');
 
       // MessageTransmitter ABI for receiveMessage
       const messageTransmitterABI = [
@@ -1126,11 +1160,9 @@ export const useBridgeCCTP = () => {
         }
       ] as const;
 
-      // Get the correct chain object for the destination
-      const destChain = destNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
-
-      const hash = await walletClient.writeContract({
+      const hash = await destWalletClient.writeContract({
         chain: destChain,
+        account: address as `0x${string}`,
         address: destContracts.MessageTransmitter,
         abi: messageTransmitterABI,
         functionName: 'receiveMessage',
