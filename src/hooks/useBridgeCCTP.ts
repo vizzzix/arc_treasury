@@ -445,31 +445,72 @@ export const useBridgeCCTP = () => {
           setAttestationStatus('pending');
           toast.success('Bridge initiated!', { description: 'Waiting for attestation (~30 sec)...' });
 
-          // Poll Circle API for attestation
+          // Poll Circle API for attestation (up to 5 minutes)
           let attempts = 0;
           let messageBytes: `0x${string}` | null = null;
           let attestationBytes: `0x${string}` | null = null;
+          const MAX_ATTEMPTS = 150; // 150 * 2 sec = 5 minutes
 
-          while (attempts < 60) {
+          console.log('[useBridgeCCTP] Starting attestation polling for tx:', burnHash);
+          while (attempts < MAX_ATTEMPTS) {
             await new Promise(r => setTimeout(r, 2000));
             attempts++;
+            
+            // Show progress every 30 seconds
+            if (attempts % 15 === 0) {
+              toast.info(`Waiting for attestation... (${attempts * 2}s)`, { duration: 3000 });
+            }
+            
             try {
               const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=0&transactionHash=${burnHash}`;
               const response = await fetch(attestationUrl);
+              
+              if (!response.ok) {
+                console.log(`[useBridgeCCTP] Attestation API error: ${response.status}, attempt ${attempts}`);
+                continue;
+              }
+              
               const data = await response.json();
+              console.log(`[useBridgeCCTP] Attestation check ${attempts}:`, data.messages?.[0]?.status || 'no status');
+              
               if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
                 console.log('[useBridgeCCTP] Attestation received!');
                 messageBytes = data.messages[0].message as `0x${string}`;
                 attestationBytes = data.messages[0].attestation as `0x${string}`;
                 break;
               }
-            } catch (e) { /* continue polling */ }
+            } catch (e) {
+              console.error(`[useBridgeCCTP] Attestation polling error (attempt ${attempts}):`, e);
+              // Continue polling on error
+            }
           }
 
           if (!messageBytes || !attestationBytes) {
-            // Timeout - show pending
-            toast.warning('Bridge in progress', { description: 'USDC will arrive on Arc shortly.' });
-            setState(prev => ({ ...prev, isBridging: false }));
+            // Timeout - save as pending burn so user can claim manually
+            console.log('[useBridgeCCTP] Attestation timeout after', attempts * 2, 'seconds');
+            toast.warning('Attestation taking longer than expected', { 
+              description: 'Your funds are safe. Click Claim when ready.',
+              duration: 15000,
+            });
+            
+            const newPendingBurn = {
+              txHash: burnHash,
+              fromNetwork,
+              toNetwork,
+              amount,
+              timestamp: Date.now(),
+            };
+            
+            if (address) {
+              savePendingBurn(address, newPendingBurn);
+            }
+            
+            setAttestationStatus('pending_mint');
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              pendingBurn: newPendingBurn,
+            }));
             return;
           }
 
