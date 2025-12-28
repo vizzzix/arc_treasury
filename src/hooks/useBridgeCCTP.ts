@@ -18,11 +18,36 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API } from '@/lib/constants';
+import { parseUnits } from 'viem';
+import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { supabase } from '@/lib/supabase';
+
+// ERC20 ABI for approval
+const ERC20_ABI = [
+  {
+    name: 'approve',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  }
+] as const;
 
 // Helper to safely stringify objects that may contain BigInt
 const safeStringify = (obj: any, space?: number): string => {
@@ -333,11 +358,83 @@ export const useBridgeCCTP = () => {
         console.log('[useBridgeCCTP] Adapter created successfully');
 
         // Bridge Kit expects human-readable amount (e.g., '20' = 20 USDC)
-        // The SDK handles decimal conversion internally
         const bridgeAmount = amount;
 
         const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
         const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
+
+        // === MANUAL APPROVAL STEP ===
+        // Handle approval ourselves to ensure we wait for confirmation
+        // Bridge Kit sometimes times out during approval, leaving tx pending
+        const usdcAddress = TOKEN_ADDRESSES[fromNetwork].USDC;
+        const tokenMessengerAddress = CCTP_CONTRACTS[fromNetwork].TokenMessenger;
+
+        // Get decimals based on network (Arc uses 18, Sepolia uses 6)
+        const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
+        const amountWei = parseUnits(amount, decimals);
+
+        // Get the public client for the source chain
+        const sourceClient = fromNetwork === 'arcTestnet' ? arcClient : sepoliaClient;
+
+        if (sourceClient && walletClient) {
+          // Check current allowance
+          const currentAllowance = await sourceClient.readContract({
+            address: usdcAddress,
+            abi: ERC20_ABI,
+            functionName: 'allowance',
+            args: [address, tokenMessengerAddress],
+          }) as bigint;
+
+          console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
+
+          // If allowance is insufficient, approve
+          if (currentAllowance < amountWei) {
+            toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
+            approvalStartedRef.current = true;
+
+            try {
+              // Get the correct chain for the wallet client
+              const sourceChain = fromNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
+
+              const approvalHash = await walletClient.writeContract({
+                chain: sourceChain,
+                address: usdcAddress,
+                abi: ERC20_ABI,
+                functionName: 'approve',
+                args: [tokenMessengerAddress, amountWei],
+              });
+
+              approvalTxHashRef.current = approvalHash;
+              console.log('[useBridgeCCTP] Approval tx sent:', approvalHash);
+              toast.info('Waiting for approval confirmation...');
+
+              // Wait for approval to be confirmed
+              const approvalReceipt = await sourceClient.waitForTransactionReceipt({
+                hash: approvalHash,
+                confirmations: 1,
+              });
+
+              if (approvalReceipt.status === 'success') {
+                approvalConfirmedRef.current = true;
+                toast.success('USDC approved!');
+                console.log('[useBridgeCCTP] Approval confirmed');
+              } else {
+                throw new Error('Approval transaction failed');
+              }
+            } catch (approvalError: any) {
+              console.error('[useBridgeCCTP] Approval error:', approvalError);
+              // Check if user rejected
+              if (approvalError?.message?.toLowerCase().includes('user rejected') ||
+                  approvalError?.message?.toLowerCase().includes('user denied')) {
+                throw new Error('User rejected the approval');
+              }
+              throw approvalError;
+            }
+          } else {
+            console.log('[useBridgeCCTP] Allowance sufficient, skipping approval');
+            approvalConfirmedRef.current = true;
+          }
+        }
 
         console.log('[useBridgeCCTP] Bridge params:', {
           from: fromChain,
@@ -346,7 +443,7 @@ export const useBridgeCCTP = () => {
           address,
         });
 
-        toast.info('Initiating bridge via Circle Bridge Kit...');
+        toast.info('Starting bridge transfer...');
 
         // Execute bridge using Bridge Kit
         const result = await bridgeKit.bridge({
