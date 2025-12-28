@@ -387,8 +387,16 @@ export const useBridgeCCTP = () => {
 
           const BRIDGE_SELECTOR = '0xd0d4229a' as `0x${string}`;
           const ARC_DESTINATION_DOMAIN = 26; // Arc Testnet CCTP domain
-          const RELAYER_FEE = 3000n; // Fee for Circle relayer (0.003 USDC)
+          // Calculate fee: 1 bps (0.01%) of amount for Fast Transfer
+          // For Standard Transfer (free but slower): use minFinalityThreshold = 2000
+          const feeBps = 1n; // 1 basis point = 0.01%
+          const calculatedFee = (amountWei * feeBps) / 10000n;
+          const MIN_FEE = 1000n; // Minimum fee floor
+          const maxFee = calculatedFee > MIN_FEE ? calculatedFee : MIN_FEE;
+          const minFinalityThreshold = 1000n; // Fast Transfer threshold
           const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
+
+          console.log('[useBridgeCCTP] Calculated fee:', { amountWei: amountWei.toString(), maxFee: maxFee.toString() });
 
           const encodedParams = encodeAbiParameters(
             [
@@ -398,14 +406,14 @@ export const useBridgeCCTP = () => {
             ],
             [
               amountWei,                    // amount to bridge
-              RELAYER_FEE,                  // maxFee for relayer (must be >= 3000)
+              maxFee,                       // maxFee for relayer (1 bps of amount)
               0n,                           // nonce (0 = auto)
               address,                      // mintRecipient
               zeroBytes32,                  // destinationCaller (0x0 = anyone can relay)
               usdcAddress,                  // burnToken (USDC on Sepolia)
               ARC_BRIDGE_CONTRACT,          // hook address
               BigInt(ARC_DESTINATION_DOMAIN), // destinationDomain (Arc = 26)
-              RELAYER_FEE,                  // fee for relayer
+              minFinalityThreshold,         // minFinalityThreshold (1000 for Fast Transfer)
             ]
           );
 
