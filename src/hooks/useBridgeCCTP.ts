@@ -19,7 +19,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
 import { parseUnits } from 'viem';
-import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES } from '@/lib/constants';
+import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
@@ -367,7 +367,15 @@ export const useBridgeCCTP = () => {
         // Handle approval ourselves to ensure we wait for confirmation
         // Bridge Kit sometimes times out during approval, leaving tx pending
         const usdcAddress = TOKEN_ADDRESSES[fromNetwork].USDC;
-        const tokenMessengerAddress = CCTP_CONTRACTS[fromNetwork].TokenMessenger;
+
+        // Different approval targets based on direction:
+        // - Sepolia → Arc: uses ARC_BRIDGE_CONTRACT (Arc's custom bridge)
+        // - Arc → Sepolia: uses TokenMessenger (standard CCTP)
+        const approvalTarget = fromNetwork === 'ethereumSepolia'
+          ? ARC_BRIDGE_CONTRACT
+          : CCTP_CONTRACTS[fromNetwork].TokenMessenger;
+
+        console.log('[useBridgeCCTP] Approval target:', approvalTarget, 'for direction:', fromNetwork, '→', toNetwork);
 
         // Get decimals based on network (Arc uses 18, Sepolia uses 6)
         const decimals = fromNetwork === 'arcTestnet' ? 18 : 6;
@@ -382,7 +390,7 @@ export const useBridgeCCTP = () => {
             address: usdcAddress,
             abi: ERC20_ABI,
             functionName: 'allowance',
-            args: [address, tokenMessengerAddress],
+            args: [address, approvalTarget],
           }) as bigint;
 
           console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
@@ -401,7 +409,7 @@ export const useBridgeCCTP = () => {
                 address: usdcAddress,
                 abi: ERC20_ABI,
                 functionName: 'approve',
-                args: [tokenMessengerAddress, amountWei],
+                args: [approvalTarget, amountWei],
               });
 
               approvalTxHashRef.current = approvalHash;
