@@ -675,7 +675,51 @@ export const useBridgeCCTP = () => {
                 mintConfirmed: false,
               }));
             } else {
-              // Nothing happened - truly cancelled
+              // Nothing happened according to refs - but Bridge Kit 1.2.0 may not fire events properly
+              // Check if bridge actually completed by looking at the result object
+              console.log('[useBridgeCCTP] Checking result object for success:', safeStringify(result, 2));
+
+              // Try to find any transaction hash in the result
+              const anyTxHash = result?.steps?.find((s: any) => s.txHash || s.transactionHash)?.txHash ||
+                               result?.steps?.find((s: any) => s.txHash || s.transactionHash)?.transactionHash ||
+                               result?.txHash || result?.transactionHash;
+
+              if (anyTxHash) {
+                // Found a transaction - check Circle API
+                console.log('[useBridgeCCTP] Found tx hash in result, checking Circle API:', anyTxHash);
+                try {
+                  const sourceDomain = CCTP_DOMAINS[fromNetwork];
+                  const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=${sourceDomain}&transactionHash=${anyTxHash}`;
+                  const response = await fetch(attestationUrl);
+                  const data = await response.json();
+
+                  if (data.messages && data.messages.length > 0) {
+                    const msg = data.messages[0];
+                    if (msg.attestation && msg.attestation !== 'PENDING') {
+                      // Bridge completed! Show success
+                      console.log('[useBridgeCCTP] Bridge actually completed! Attestation found.');
+                      trackSiteBridge(anyTxHash, address!, amount, toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia');
+                      setAttestationStatus('complete');
+                      toast.success('Bridge completed!', {
+                        description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
+                        duration: 10000,
+                      });
+                      setState(prev => ({
+                        ...prev,
+                        isBridging: false,
+                        result: null,
+                        mintConfirmed: true,
+                        pendingBurn: null,
+                      }));
+                      return; // Exit early - bridge was successful
+                    }
+                  }
+                } catch (e) {
+                  console.log('[useBridgeCCTP] Could not verify via Circle API:', e);
+                }
+              }
+
+              // Truly nothing happened
               toast.error('Bridge cancelled', {
                 description: 'Transaction was not completed.',
                 duration: 5000,
