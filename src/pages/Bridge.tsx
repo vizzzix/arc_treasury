@@ -215,10 +215,15 @@ const Bridge = () => {
 
   // Handle bridge based on networks
   const handleBridge = async () => {
-    if (!amount || parseFloat(amount) <= 0) return;
+    console.log('[Bridge.tsx] handleBridge called!', { amount, fromNetwork, toNetwork, isEVMtoEVM });
+    if (!amount || parseFloat(amount) <= 0) {
+      console.log('[Bridge.tsx] Early return - invalid amount');
+      return;
+    }
     setSavedBridgeParams({ amount, toNetwork });
 
     if (isEVMtoEVM) {
+      console.log('[Bridge.tsx] Calling EVM bridge...');
       // EVM to EVM bridge
       await bridge({
         fromNetwork: fromNetwork as 'ethereumSepolia' | 'arcTestnet',
