@@ -669,8 +669,49 @@ export const useBridgeCCTP = () => {
           errorMsg = 'Token approval failed';
         }
 
-        // Only trust burnConfirmedRef - it's set when BURN_CONFIRMED event is received
-        // Don't trust error.steps as it may incorrectly report approval as burn
+        // Extract approval/burn status from error.steps (Bridge Kit includes step info in errors)
+        // This is needed because onProgress may not fire before the error is thrown
+        const errorSteps = error?.steps || [];
+        console.log('[useBridgeCCTP] Error steps:', safeStringify(errorSteps, 2));
+
+        // Look for approval step in error
+        const approvalStep = errorSteps.find((s: any) =>
+          s.name?.toLowerCase().includes('approv') ||
+          s.type?.toLowerCase().includes('approv') ||
+          s.name?.toLowerCase().includes('allowance')
+        );
+
+        if (approvalStep) {
+          console.log('[useBridgeCCTP] Found approval step in error:', safeStringify(approvalStep, 2));
+          // Extract tx hash from approval step
+          if (approvalStep.txHash || approvalStep.transactionHash) {
+            approvalTxHashRef.current = approvalStep.txHash || approvalStep.transactionHash;
+          }
+          // Check approval state
+          if (approvalStep.state === 'success' || approvalStep.status === 'success') {
+            approvalConfirmedRef.current = true;
+          } else if (approvalStep.state === 'pending' || approvalStep.status === 'pending' || approvalStep.txHash) {
+            approvalStartedRef.current = true;
+          }
+        }
+
+        // Also look for burn step
+        const burnStep = errorSteps.find((s: any) =>
+          s.name?.toLowerCase().includes('burn') ||
+          s.name?.toLowerCase().includes('deposit') ||
+          s.type?.toLowerCase().includes('burn')
+        );
+
+        if (burnStep) {
+          console.log('[useBridgeCCTP] Found burn step in error:', safeStringify(burnStep, 2));
+          if (burnStep.txHash || burnStep.transactionHash) {
+            burnTxHashRef.current = burnStep.txHash || burnStep.transactionHash;
+          }
+          if (burnStep.state === 'success' || burnStep.status === 'success') {
+            burnConfirmedRef.current = true;
+          }
+        }
+
         console.log('[useBridgeCCTP] On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
 
         // Check if burn was actually confirmed (BURN_CONFIRMED event was received)
