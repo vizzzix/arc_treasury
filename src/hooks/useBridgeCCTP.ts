@@ -445,6 +445,9 @@ export const useBridgeCCTP = () => {
 
           // Poll Circle API for attestation
           let attempts = 0;
+          let messageBytes: `0x${string}` | null = null;
+          let attestationBytes: `0x${string}` | null = null;
+
           while (attempts < 60) {
             await new Promise(r => setTimeout(r, 2000));
             attempts++;
@@ -454,17 +457,77 @@ export const useBridgeCCTP = () => {
               const data = await response.json();
               if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
                 console.log('[useBridgeCCTP] Attestation received!');
-                setAttestationStatus('complete');
-                toast.success('Bridge completed!', { description: 'Your USDC has arrived on Arc Testnet' });
-                setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
-                return;
+                messageBytes = data.messages[0].message as `0x${string}`;
+                attestationBytes = data.messages[0].attestation as `0x${string}`;
+                break;
               }
             } catch (e) { /* continue polling */ }
           }
 
-          // Timeout - show pending
-          toast.warning('Bridge in progress', { description: 'USDC will arrive on Arc shortly.' });
-          setState(prev => ({ ...prev, isBridging: false }));
+          if (!messageBytes || !attestationBytes) {
+            // Timeout - show pending
+            toast.warning('Bridge in progress', { description: 'USDC will arrive on Arc shortly.' });
+            setState(prev => ({ ...prev, isBridging: false }));
+            return;
+          }
+
+          // Step 3: Call receiveMessage on Arc to mint USDC
+          toast.info('Minting on Arc...', { description: 'Please confirm to receive your USDC' });
+          setAttestationStatus('pending_mint');
+
+          try {
+            // Switch to Arc Testnet
+            if (account.chainId !== SUPPORTED_NETWORKS.arcTestnet.chainId) {
+              await switchChainAsync({ chainId: SUPPORTED_NETWORKS.arcTestnet.chainId });
+            }
+
+            // Call receiveMessage on Arc's MessageTransmitter
+            const mintHash = await walletClient.writeContract({
+              chain: arcTestnetChain,
+              address: CCTP_CONTRACTS.arcTestnet.MessageTransmitter,
+              abi: [{
+                name: 'receiveMessage',
+                type: 'function',
+                stateMutability: 'nonpayable',
+                inputs: [
+                  { name: 'message', type: 'bytes' },
+                  { name: 'attestation', type: 'bytes' }
+                ],
+                outputs: [{ name: 'success', type: 'bool' }]
+              }],
+              functionName: 'receiveMessage',
+              args: [messageBytes, attestationBytes],
+            });
+
+            console.log('[useBridgeCCTP] Mint tx sent:', mintHash);
+            toast.info('Waiting for mint confirmation...');
+
+            const mintReceipt = await arcClient!.waitForTransactionReceipt({ hash: mintHash });
+
+            if (mintReceipt.status === 'success') {
+              console.log('[useBridgeCCTP] Mint confirmed!');
+              setAttestationStatus('complete');
+              toast.success('Bridge completed!', { description: 'Your USDC has arrived on Arc Testnet' });
+              setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
+            } else {
+              throw new Error('Mint transaction failed');
+            }
+          } catch (mintError: any) {
+            console.error('[useBridgeCCTP] Mint error:', mintError);
+            // Check if already minted (nonce already used)
+            if (mintError.message?.includes('Nonce already used') || mintError.message?.includes('already')) {
+              setAttestationStatus('complete');
+              toast.success('Bridge completed!', { description: 'USDC already minted on Arc' });
+              setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
+            } else {
+              toast.error('Mint failed', { description: mintError.message || 'Please try claiming manually' });
+              setState(prev => ({
+                ...prev,
+                isBridging: false,
+                pendingBurn: { txHash: burnHash, fromNetwork, toNetwork, amount, timestamp: Date.now() }
+              }));
+            }
+          }
           return;
         }
 
