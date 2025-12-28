@@ -351,11 +351,17 @@ export const useBridgeCCTP = () => {
         console.log('[useBridgeCCTP] Got provider from connector:', connector.name);
 
         // Create adapter using Bridge Kit's factory
-        const adapter = await createAdapterFromProvider({
-          provider,
-        });
-
-        console.log('[useBridgeCCTP] Adapter created successfully');
+        console.log('[useBridgeCCTP] Creating adapter...');
+        let adapter;
+        try {
+          adapter = await createAdapterFromProvider({
+            provider,
+          });
+          console.log('[useBridgeCCTP] Adapter created successfully');
+        } catch (adapterError) {
+          console.error('[useBridgeCCTP] Failed to create adapter:', adapterError);
+          throw new Error('Failed to create wallet adapter. Please refresh and try again.');
+        }
 
         // Bridge Kit expects human-readable amount (e.g., '20' = 20 USDC)
         const bridgeAmount = amount;
@@ -390,12 +396,19 @@ export const useBridgeCCTP = () => {
         }
 
         // Check current allowance
-        const currentAllowance = await sourceClient.readContract({
-          address: usdcAddress,
-          abi: ERC20_ABI,
-          functionName: 'allowance',
-          args: [address, approvalTarget],
-        }) as bigint;
+        console.log('[useBridgeCCTP] Checking allowance for', address, 'to', approvalTarget, 'on', usdcAddress);
+        let currentAllowance: bigint;
+        try {
+          currentAllowance = await sourceClient.readContract({
+            address: usdcAddress,
+            abi: ERC20_ABI,
+            functionName: 'allowance',
+            args: [address, approvalTarget],
+          }) as bigint;
+        } catch (allowanceError) {
+          console.error('[useBridgeCCTP] Failed to read allowance:', allowanceError);
+          throw new Error('Failed to check token allowance. Please try again.');
+        }
 
         console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
 
@@ -457,6 +470,7 @@ export const useBridgeCCTP = () => {
         });
 
         toast.info('Starting bridge transfer...');
+        console.log('[useBridgeCCTP] Calling Bridge Kit...');
 
         // Execute bridge using Bridge Kit
         const result = await bridgeKit.bridge({
