@@ -709,22 +709,59 @@ export const useBridgeCCTP = () => {
           return;
         }
 
-        // No burn happened - regular error (possibly just approval was done)
-        setAttestationStatus(null);
+        // No burn happened - check approval status
+        console.log('[useBridgeCCTP] On error - approvalStarted:', approvalStartedRef.current, 'approvalConfirmed:', approvalConfirmedRef.current, 'approvalTxHash:', approvalTxHashRef.current);
 
-        setState(prev => ({
-          ...prev,
-          isBridging: false,
-          error: errorMsg,
-          result: null,
-          transactions: [],
-          mintConfirmed: false,
-        }));
+        if (approvalConfirmedRef.current) {
+          // Approval succeeded but burn didn't start
+          setAttestationStatus(null);
+          toast.warning('Approval successful', {
+            description: 'USDC approved. Please try bridging again to complete the transfer.',
+            duration: 10000,
+          });
+          setState(prev => ({
+            ...prev,
+            isBridging: false,
+            error: 'Approval completed. Please try again to bridge.',
+            result: null,
+            transactions: [],
+            mintConfirmed: false,
+          }));
+        } else if (approvalStartedRef.current || approvalTxHashRef.current) {
+          // Approval was started but not confirmed yet - tx might still be pending
+          const txLink = approvalTxHashRef.current
+            ? ` Check tx: ${SUPPORTED_NETWORKS[fromNetwork].explorerUrl}/tx/${approvalTxHashRef.current}`
+            : '';
+          setAttestationStatus(null);
+          toast.warning('Approval pending', {
+            description: `Transaction may still be processing. Wait for confirmation and try again.${txLink}`,
+            duration: 15000,
+          });
+          setState(prev => ({
+            ...prev,
+            isBridging: false,
+            error: 'Approval transaction may still be pending. Please wait and try again.',
+            result: null,
+            transactions: [],
+            mintConfirmed: false,
+          }));
+        } else {
+          // Nothing happened - truly cancelled
+          setAttestationStatus(null);
+          setState(prev => ({
+            ...prev,
+            isBridging: false,
+            error: errorMsg,
+            result: null,
+            transactions: [],
+            mintConfirmed: false,
+          }));
 
-        toast.error('Bridge cancelled', {
-          description: errorMsg,
-          duration: 10000,
-        });
+          toast.error('Bridge cancelled', {
+            description: errorMsg,
+            duration: 10000,
+          });
+        }
       }
     },
     [isConnected, address, account.connector, switchChainAsync, account.chainId, bridgeKit]
