@@ -50,26 +50,38 @@ const ERC20_ABI = [
 ] as const;
 
 // ARC Bridge Contract ABI - bridgeWithPreapproval function
-// Based on successful transactions on Sepolia
+// Takes a tuple (struct) as parameter based on successful transaction analysis
+// Function selector: 0xd0d4229a
 const ARC_BRIDGE_ABI = [
   {
     name: 'bridgeWithPreapproval',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      { name: 'amount', type: 'uint256' },
-      { name: 'destinationDomain', type: 'uint32' },
-      { name: 'mintRecipient', type: 'bytes32' },
-      { name: 'burnToken', type: 'address' },
-      { name: 'maxFee', type: 'uint256' },
-      { name: 'minFinalityThreshold', type: 'uint32' }
+      {
+        name: 'params',
+        type: 'tuple',
+        components: [
+          { name: 'amount', type: 'uint256' },
+          { name: 'destinationDomain', type: 'uint32' },
+          { name: 'minFinalityThreshold', type: 'uint32' },
+          { name: 'mintRecipient', type: 'bytes32' },
+          { name: 'feeRecipient', type: 'bytes32' },
+          { name: 'burnToken', type: 'address' },
+          { name: 'destinationCaller', type: 'address' },
+          { name: 'sourceDomain', type: 'uint32' },
+          { name: 'maxFee', type: 'uint256' }
+        ]
+      }
     ],
     outputs: [{ name: 'nonce', type: 'uint64' }]
   }
 ] as const;
 
 // Arc Testnet destination domain for Sepolia → Arc bridging
-const ARC_DESTINATION_DOMAIN = 26; // Arc Testnet CCTP domain
+// From successful transaction: destinationDomain = 110 (0x6e), sourceDomain = 26 (0x1a)
+const ARC_DESTINATION_DOMAIN = 110; // 0x6e - Arc destination from Sepolia
+const ARC_SOURCE_DOMAIN = 26; // 0x1a - Arc's CCTP domain
 
 // Helper to safely stringify objects that may contain BigInt
 const safeStringify = (obj: any, space?: number): string => {
@@ -448,16 +460,30 @@ export const useBridgeCCTP = () => {
           // Step 2: Call bridgeWithPreapproval
           toast.info('Initiating bridge...', { description: 'Please confirm in your wallet' });
 
-          // Convert address to bytes32 for mintRecipient
+          // Convert address to bytes32 for mintRecipient (pad to 32 bytes)
           const mintRecipient = pad(address as `0x${string}`, { size: 32 });
+          // feeRecipient is zero (no fee recipient)
+          const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
+          // destinationCaller is zero address (anyone can relay)
+          const zeroAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`;
 
-          console.log('[useBridgeCCTP] Calling bridgeWithPreapproval:', {
-            amount: amountWei.toString(),
-            destinationDomain: ARC_DESTINATION_DOMAIN,
-            mintRecipient,
+          // Build the params struct matching successful transaction format
+          const bridgeParams = {
+            amount: amountWei,
+            destinationDomain: ARC_DESTINATION_DOMAIN, // 110 (0x6e)
+            minFinalityThreshold: 0, // 0 in successful tx
+            mintRecipient: mintRecipient,
+            feeRecipient: zeroBytes32, // 0 in successful tx
             burnToken: usdcAddress,
+            destinationCaller: zeroAddress, // ARC_BRIDGE_CONTRACT in successful tx, but try zero first
+            sourceDomain: ARC_SOURCE_DOMAIN, // 26 (0x1a)
             maxFee: 1000n, // 0.001 USDC max fee
-            minFinalityThreshold: 1000,
+          };
+
+          console.log('[useBridgeCCTP] Calling bridgeWithPreapproval with params:', {
+            ...bridgeParams,
+            amount: bridgeParams.amount.toString(),
+            maxFee: bridgeParams.maxFee.toString(),
           });
 
           const burnHash = await activeWalletClient.writeContract({
@@ -465,14 +491,7 @@ export const useBridgeCCTP = () => {
             address: ARC_BRIDGE_CONTRACT,
             abi: ARC_BRIDGE_ABI,
             functionName: 'bridgeWithPreapproval',
-            args: [
-              amountWei,
-              ARC_DESTINATION_DOMAIN,
-              mintRecipient,
-              usdcAddress,
-              1000n, // maxFee
-              1000, // minFinalityThreshold
-            ],
+            args: [bridgeParams],
           });
 
           burnTxHashRef.current = burnHash;
