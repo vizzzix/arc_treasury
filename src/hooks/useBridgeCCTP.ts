@@ -635,15 +635,16 @@ export const useBridgeCCTP = () => {
                 mintConfirmed: false,
               }));
             } else {
-              // Nothing happened - truly cancelled
-              toast.error('Bridge cancelled', {
-                description: 'Transaction was not completed.',
-                duration: 5000,
+              // No refs set - Bridge Kit returned without progress events
+              // Don't assume cancelled - transaction might still be pending
+              toast.warning('Bridge interrupted', {
+                description: 'If you approved a transaction, please wait for it to confirm and try again.',
+                duration: 15000,
               });
               setState(prev => ({
                 ...prev,
                 isBridging: false,
-                error: 'Transaction was cancelled',
+                error: 'Bridge interrupted. If you approved a transaction, please wait for it to confirm and try again.',
                 result: null,
                 transactions: [],
                 mintConfirmed: false,
@@ -787,31 +788,32 @@ export const useBridgeCCTP = () => {
             mintConfirmed: false,
           }));
         } else {
-          // Check if this was an explicit user rejection
-          const wasUserRejection = errorMsg.includes('rejected') ||
-                                   errorMsg.includes('denied') ||
-                                   errorMsg.includes('cancelled') ||
-                                   errorMsg.includes('canceled');
+          // Check if this was an explicit USER rejection (not just any "cancelled" error)
+          // Only treat as user rejection if message explicitly says "User rejected" or "User denied"
+          const originalError = error?.message?.toLowerCase() || '';
+          const wasUserRejection = originalError.includes('user rejected') ||
+                                   originalError.includes('user denied') ||
+                                   originalError.includes('rejected the request') ||
+                                   originalError.includes('denied transaction');
 
           setAttestationStatus(null);
 
           if (wasUserRejection) {
-            // User explicitly rejected - show cancelled
+            // User explicitly rejected in wallet
             setState(prev => ({
               ...prev,
               isBridging: false,
-              error: errorMsg,
+              error: 'Transaction rejected by user',
               result: null,
               transactions: [],
               mintConfirmed: false,
             }));
-            toast.error('Bridge cancelled', {
-              description: errorMsg,
+            toast.error('Transaction rejected', {
+              description: 'You rejected the transaction in your wallet.',
               duration: 10000,
             });
           } else {
-            // Unknown error - transaction might still be pending
-            // Don't say "cancelled" as it might confuse user with pending tx
+            // Any other error - transaction might still be pending
             setState(prev => ({
               ...prev,
               isBridging: false,
