@@ -386,8 +386,8 @@ export const useBridgeCCTP = () => {
           toast.info('Bridging to Arc...', { description: 'Please confirm in wallet' });
 
           const BRIDGE_SELECTOR = '0xd0d4229a' as `0x${string}`;
-          const ARC_DESTINATION_DOMAIN = 550; // Arc domain
-          const ARC_SOURCE_DOMAIN = 26; // Sepolia's CCTP domain
+          const ARC_DESTINATION_DOMAIN = 26; // Arc Testnet CCTP domain
+          const BRIDGE_FEE = 3000n; // Fee for Circle relayer (0.003 USDC)
           const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
 
           const encodedParams = encodeAbiParameters(
@@ -397,9 +397,15 @@ export const useBridgeCCTP = () => {
               { type: 'address' }, { type: 'uint256' }, { type: 'uint256' },
             ],
             [
-              amountWei, BigInt(ARC_DESTINATION_DOMAIN), 0n,
-              address, zeroBytes32, usdcAddress,
-              ARC_BRIDGE_CONTRACT, BigInt(ARC_SOURCE_DOMAIN), 1000n,
+              amountWei,                    // amount to bridge
+              BRIDGE_FEE,                   // maxFee for relayer
+              0n,                           // nonce (0 = auto)
+              address,                      // mintRecipient
+              zeroBytes32,                  // destinationCaller (0x0 = anyone can relay)
+              usdcAddress,                  // burnToken (USDC on Sepolia)
+              ARC_BRIDGE_CONTRACT,          // hook address
+              BigInt(ARC_DESTINATION_DOMAIN), // destinationDomain (Arc = 26)
+              BRIDGE_FEE,                   // fee for relayer
             ]
           );
 
