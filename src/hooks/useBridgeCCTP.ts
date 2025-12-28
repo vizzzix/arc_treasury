@@ -18,7 +18,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { parseUnits, pad, encodeFunctionData } from 'viem';
+import { parseUnits } from 'viem';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
@@ -50,37 +50,32 @@ const ERC20_ABI = [
 ] as const;
 
 // ARC Bridge Contract ABI - bridgeWithPreapproval function
-// Takes a tuple (struct) as parameter based on successful transaction analysis
+// Takes 9 separate parameters (NOT a tuple/struct!)
 // Function selector: 0xd0d4229a
+// Verified from successful tx: 0x290a59bec167ac5805057007f75436b946c0549d7265d5f65ca9de0618b3814e
 const ARC_BRIDGE_ABI = [
   {
     name: 'bridgeWithPreapproval',
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [
-      {
-        name: 'params',
-        type: 'tuple',
-        components: [
-          { name: 'amount', type: 'uint256' },
-          { name: 'destinationDomain', type: 'uint32' },
-          { name: 'minFinalityThreshold', type: 'uint32' },
-          { name: 'mintRecipient', type: 'bytes32' },
-          { name: 'feeRecipient', type: 'bytes32' },
-          { name: 'burnToken', type: 'address' },
-          { name: 'destinationCaller', type: 'address' },
-          { name: 'sourceDomain', type: 'uint32' },
-          { name: 'maxFee', type: 'uint256' }
-        ]
-      }
+      { name: 'amount', type: 'uint256' },
+      { name: 'destinationDomain', type: 'uint32' },
+      { name: 'minFinalityThreshold', type: 'uint32' },
+      { name: 'mintRecipient', type: 'address' },
+      { name: 'feeRecipient', type: 'bytes32' },
+      { name: 'burnToken', type: 'address' },
+      { name: 'destinationCaller', type: 'address' },
+      { name: 'sourceDomain', type: 'uint32' },
+      { name: 'maxFee', type: 'uint256' }
     ],
     outputs: [{ name: 'nonce', type: 'uint64' }]
   }
 ] as const;
 
 // Arc Testnet destination domain for Sepolia → Arc bridging
-// From successful transaction: destinationDomain = 110 (0x6e), sourceDomain = 26 (0x1a)
-const ARC_DESTINATION_DOMAIN = 110; // 0x6e - Arc destination from Sepolia
+// From successful tx 0x290a59be...: destinationDomain = 550 (0x226), sourceDomain = 26 (0x1a)
+const ARC_DESTINATION_DOMAIN = 550; // 0x226 - Arc destination from Sepolia
 const ARC_SOURCE_DOMAIN = 26; // 0x1a - Arc's CCTP domain
 
 // Helper to safely stringify objects that may contain BigInt
@@ -460,32 +455,33 @@ export const useBridgeCCTP = () => {
           // Step 2: Call bridgeWithPreapproval
           toast.info('Initiating bridge...', { description: 'Please confirm in your wallet' });
 
-          // Convert address to bytes32 for mintRecipient (pad to 32 bytes)
-          const mintRecipient = pad(address as `0x${string}`, { size: 32 });
-          // feeRecipient is zero (no fee recipient)
+          // feeRecipient is zero bytes32 (no fee recipient)
           const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
-          // destinationCaller is zero address (anyone can relay)
-          const zeroAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`;
 
-          // Build the params struct matching successful transaction format EXACTLY
-          // From tx 0xc5481f68783785a05068e64d3f311b0ca14f21cb8f6593316e89142ba5d7deba:
-          // destinationCaller was ARC_BRIDGE_CONTRACT, not zero!
-          const bridgeParams = {
-            amount: amountWei,
-            destinationDomain: ARC_DESTINATION_DOMAIN, // 110 (0x6e)
-            minFinalityThreshold: 0, // 0 in successful tx
-            mintRecipient: mintRecipient,
-            feeRecipient: zeroBytes32, // 0 in successful tx
+          // Build args array matching successful transaction format EXACTLY
+          // Verified from tx 0x290a59bec167ac5805057007f75436b946c0549d7265d5f65ca9de0618b3814e
+          const bridgeArgs = [
+            amountWei,                    // amount: uint256
+            ARC_DESTINATION_DOMAIN,       // destinationDomain: uint32 (550 = 0x226)
+            0,                            // minFinalityThreshold: uint32
+            address,                      // mintRecipient: address (NOT bytes32!)
+            zeroBytes32,                  // feeRecipient: bytes32
+            usdcAddress,                  // burnToken: address
+            ARC_BRIDGE_CONTRACT,          // destinationCaller: address (MUST be bridge contract!)
+            ARC_SOURCE_DOMAIN,            // sourceDomain: uint32 (26 = 0x1a)
+            1000n,                        // maxFee: uint256 (0.001 USDC)
+          ] as const;
+
+          console.log('[useBridgeCCTP] Calling bridgeWithPreapproval with args:', {
+            amount: amountWei.toString(),
+            destinationDomain: ARC_DESTINATION_DOMAIN,
+            minFinalityThreshold: 0,
+            mintRecipient: address,
+            feeRecipient: zeroBytes32,
             burnToken: usdcAddress,
-            destinationCaller: ARC_BRIDGE_CONTRACT, // MUST be ARC_BRIDGE_CONTRACT, not zero!
-            sourceDomain: ARC_SOURCE_DOMAIN, // 26 (0x1a)
-            maxFee: 1000n, // 0.001 USDC max fee
-          };
-
-          console.log('[useBridgeCCTP] Calling bridgeWithPreapproval with params:', {
-            ...bridgeParams,
-            amount: bridgeParams.amount.toString(),
-            maxFee: bridgeParams.maxFee.toString(),
+            destinationCaller: ARC_BRIDGE_CONTRACT,
+            sourceDomain: ARC_SOURCE_DOMAIN,
+            maxFee: '1000',
           });
 
           const burnHash = await activeWalletClient.writeContract({
@@ -493,7 +489,8 @@ export const useBridgeCCTP = () => {
             address: ARC_BRIDGE_CONTRACT,
             abi: ARC_BRIDGE_ABI,
             functionName: 'bridgeWithPreapproval',
-            args: [bridgeParams],
+            args: bridgeArgs,
+            gas: 500_000n, // Explicit gas limit to avoid estimation issues
           });
 
           burnTxHashRef.current = burnHash;

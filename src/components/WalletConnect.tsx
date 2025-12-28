@@ -42,13 +42,17 @@ export const WalletConnect = () => {
   // Check if we're on mobile
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  // On mobile, show modal for WalletConnect; on desktop, connect directly to browser wallet
+  // Check if injected provider (MetaMask, Rabby, etc.) is available
+  const hasInjectedProvider = typeof window !== 'undefined' && !!(window as any).ethereum;
+
+  // On mobile or when no injected provider, show modal for WalletConnect
+  // On desktop with browser wallet, connect directly
   const handleButtonClick = () => {
-    if (isMobile) {
-      // On mobile, show modal to choose WalletConnect
+    if (isMobile || !hasInjectedProvider) {
+      // Show modal to choose WalletConnect or Browser Wallet
       setShowModal(true);
     } else {
-      // On desktop, connect directly to browser extension (MetaMask, Rabby, etc.)
+      // On desktop with browser extension, connect directly (MetaMask, Rabby, etc.)
       const injectedConnector = connectors.find(c => c.id === 'injected');
       if (injectedConnector) {
         connect({ connector: injectedConnector });
