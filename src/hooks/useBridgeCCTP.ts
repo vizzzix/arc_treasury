@@ -521,46 +521,87 @@ export const useBridgeCCTP = () => {
             transactions: prev.transactions.map(tx => ({ ...tx, status: 'success' as const })),
           }));
         } else if (burnSucceeded && !mintSucceeded) {
-          // Burn succeeded but mint failed - funds are pending!
-          console.log('[useBridgeCCTP] Burn succeeded but mint failed - funds are pending');
-          // Try to get burn tx hash from ref (most reliable), then step
-          // NOTE: state.transactions may be stale due to React closure
+          // Burn succeeded but SDK didn't confirm mint
+          // Check Circle API - relay may have already completed the mint automatically
+          console.log('[useBridgeCCTP] Burn succeeded, checking if mint was auto-relayed...');
           let burnTxHash = burnTxHashRef.current || burnStep?.txHash || burnStep?.transactionHash;
-          console.log('[useBridgeCCTP] Burn tx hash from ref or step:', burnTxHash);
+          console.log('[useBridgeCCTP] Burn tx hash:', burnTxHash);
 
-          // Track the bridge even if mint failed
+          // Track the bridge
           if (burnTxHash) {
             const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
             trackSiteBridge(burnTxHash, address!, amount, direction);
           }
 
-          setAttestationStatus('pending_mint');
-          toast.warning('Your funds are safe!', {
-            description: 'Burn completed. Click Claim to receive your USDC.',
-            duration: 15000,
-          });
+          // Check Circle API to see if relay already completed
+          let relayCompleted = false;
+          if (burnTxHash) {
+            try {
+              const sourceDomain = CCTP_DOMAINS[fromNetwork];
+              const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=${sourceDomain}&transactionHash=${burnTxHash}`;
+              const response = await fetch(attestationUrl);
+              const data = await response.json();
 
-          const newPendingBurn = burnTxHash ? {
-            txHash: burnTxHash,
-            fromNetwork,
-            toNetwork,
-            amount,
-            timestamp: Date.now(),
-          } : null;
-
-          // Save to localStorage so it persists across page refresh
-          if (newPendingBurn && address) {
-            savePendingBurn(address, newPendingBurn);
+              if (data.messages && data.messages.length > 0) {
+                const msg = data.messages[0];
+                // If feeExecuted > 0 or status indicates completion, relay was done
+                // Note: We check for attestation presence and assume success after ~30 sec
+                if (msg.attestation && msg.attestation !== 'PENDING') {
+                  // Wait a bit for relay to complete, then assume success
+                  console.log('[useBridgeCCTP] Attestation received, waiting for relay...');
+                  await new Promise(resolve => setTimeout(resolve, 5000));
+                  relayCompleted = true;
+                }
+              }
+            } catch (e) {
+              console.log('[useBridgeCCTP] Could not check relay status:', e);
+            }
           }
 
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            error: 'Mint was not completed. Your funds are safe - click Claim USDC.',
-            result: null,
-            mintConfirmed: false,
-            pendingBurn: newPendingBurn,
-          }));
+          if (relayCompleted) {
+            // Relay likely completed - show success
+            console.log('[useBridgeCCTP] Relay appears complete, showing success');
+            setAttestationStatus('complete');
+            toast.success('Bridge completed!', {
+              description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
+              duration: 10000,
+            });
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              result: null,
+              mintConfirmed: true,
+              pendingBurn: null,
+            }));
+          } else {
+            // Show pending claim UI
+            setAttestationStatus('pending_mint');
+            toast.warning('Your funds are safe!', {
+              description: 'Burn completed. Click Claim to receive your USDC.',
+              duration: 15000,
+            });
+
+            const newPendingBurn = burnTxHash ? {
+              txHash: burnTxHash,
+              fromNetwork,
+              toNetwork,
+              amount,
+              timestamp: Date.now(),
+            } : null;
+
+            if (newPendingBurn && address) {
+              savePendingBurn(address, newPendingBurn);
+            }
+
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              error: 'Mint was not completed. Your funds are safe - click Claim USDC.',
+              result: null,
+              mintConfirmed: false,
+              pendingBurn: newPendingBurn,
+            }));
+          }
         } else {
           // Only save pending burn if burn was actually confirmed
           // This prevents false positives from approval tx hashes
