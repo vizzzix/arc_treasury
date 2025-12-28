@@ -369,16 +369,28 @@ export const useBridgeCCTP = () => {
         // Bridge Kit doesn't support the custom bridgeWithPreapproval function
         if (isSepoliaToArc) {
           console.log('[useBridgeCCTP] Using direct bridgeWithPreapproval for Sepolia → Arc');
+          console.log('[useBridgeCCTP] walletClient:', !!walletClient, 'sepoliaClient:', !!sepoliaClient);
 
-          if (!walletClient || !sepoliaClient) {
-            throw new Error('Wallet not ready. Please try again.');
+          if (!walletClient) {
+            console.error('[useBridgeCCTP] walletClient is not ready');
+            toast.error('Wallet not connected properly. Please reconnect.');
+            setState(prev => ({ ...prev, isBridging: false, error: 'Wallet not ready' }));
+            return;
+          }
+
+          if (!sepoliaClient) {
+            console.error('[useBridgeCCTP] sepoliaClient is not ready');
+            toast.error('Network connection issue. Please refresh the page.');
+            setState(prev => ({ ...prev, isBridging: false, error: 'Network not ready' }));
+            return;
           }
 
           const usdcAddress = TOKEN_ADDRESSES.ethereumSepolia.USDC;
           const amountWei = parseUnits(amount, 6); // USDC on Sepolia uses 6 decimals
 
-          // Step 1: Check and approve if needed
-          const currentAllowance = await sepoliaClient.readContract({
+          try {
+            // Step 1: Check and approve if needed
+            const currentAllowance = await sepoliaClient.readContract({
             address: usdcAddress,
             abi: ERC20_ABI,
             functionName: 'allowance',
@@ -502,7 +514,30 @@ export const useBridgeCCTP = () => {
             pendingBurn: newPendingBurn,
           }));
 
-          return; // Early return for Sepolia → Arc
+          } catch (sepoliaError: any) {
+            console.error('[useBridgeCCTP] Sepolia → Arc error:', sepoliaError);
+
+            let errorMsg = sepoliaError?.message || 'Bridge failed';
+
+            // Handle user rejection
+            if (errorMsg.toLowerCase().includes('user rejected') ||
+                errorMsg.toLowerCase().includes('user denied')) {
+              errorMsg = 'Transaction rejected by user';
+              toast.error('Transaction rejected');
+            } else if (errorMsg.includes('insufficient')) {
+              toast.error('Insufficient funds', { description: errorMsg });
+            } else {
+              toast.error('Bridge failed', { description: errorMsg });
+            }
+
+            setState(prev => ({
+              ...prev,
+              isBridging: false,
+              error: errorMsg,
+            }));
+          }
+
+          return; // Early return for Sepolia → Arc (success or error handled above)
         }
 
         // For Arc → Sepolia, use Bridge Kit
