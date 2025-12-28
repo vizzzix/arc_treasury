@@ -369,14 +369,6 @@ export const useBridgeCCTP = () => {
         // Bridge Kit doesn't support the custom bridgeWithPreapproval function
         if (isSepoliaToArc) {
           console.log('[useBridgeCCTP] Using direct bridgeWithPreapproval for Sepolia → Arc');
-          console.log('[useBridgeCCTP] walletClient:', !!walletClient, 'sepoliaClient:', !!sepoliaClient);
-
-          if (!walletClient) {
-            console.error('[useBridgeCCTP] walletClient is not ready');
-            toast.error('Wallet not connected properly. Please reconnect.');
-            setState(prev => ({ ...prev, isBridging: false, error: 'Wallet not ready' }));
-            return;
-          }
 
           if (!sepoliaClient) {
             console.error('[useBridgeCCTP] sepoliaClient is not ready');
@@ -384,6 +376,27 @@ export const useBridgeCCTP = () => {
             setState(prev => ({ ...prev, isBridging: false, error: 'Network not ready' }));
             return;
           }
+
+          // Get wallet client from connector (more reliable after chain switch)
+          const connector = account.connector;
+          if (!connector) {
+            console.error('[useBridgeCCTP] No connector available');
+            toast.error('Wallet not connected. Please reconnect.');
+            setState(prev => ({ ...prev, isBridging: false, error: 'Wallet not connected' }));
+            return;
+          }
+
+          // Use viem's createWalletClient with the provider from connector
+          const { createWalletClient, custom } = await import('viem');
+          const provider = await connector.getProvider();
+
+          const activeWalletClient = createWalletClient({
+            account: address,
+            chain: sepolia,
+            transport: custom(provider),
+          });
+
+          console.log('[useBridgeCCTP] Created wallet client for Sepolia');
 
           const usdcAddress = TOKEN_ADDRESSES.ethereumSepolia.USDC;
           const amountWei = parseUnits(amount, 6); // USDC on Sepolia uses 6 decimals
@@ -403,7 +416,7 @@ export const useBridgeCCTP = () => {
             toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
             approvalStartedRef.current = true;
 
-            const approvalHash = await walletClient.writeContract({
+            const approvalHash = await activeWalletClient.writeContract({
               chain: sepolia,
               address: usdcAddress,
               abi: ERC20_ABI,
@@ -447,7 +460,7 @@ export const useBridgeCCTP = () => {
             minFinalityThreshold: 1000,
           });
 
-          const burnHash = await walletClient.writeContract({
+          const burnHash = await activeWalletClient.writeContract({
             chain: sepolia,
             address: ARC_BRIDGE_CONTRACT,
             abi: ARC_BRIDGE_ABI,
