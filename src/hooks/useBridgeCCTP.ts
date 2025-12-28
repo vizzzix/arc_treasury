@@ -18,7 +18,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { parseUnits } from 'viem';
+import { parseUnits, maxUint256 } from 'viem';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
@@ -384,64 +384,69 @@ export const useBridgeCCTP = () => {
         // Get the public client for the source chain
         const sourceClient = fromNetwork === 'arcTestnet' ? arcClient : sepoliaClient;
 
-        if (sourceClient && walletClient) {
-          // Check current allowance
-          const currentAllowance = await sourceClient.readContract({
-            address: usdcAddress,
-            abi: ERC20_ABI,
-            functionName: 'allowance',
-            args: [address, approvalTarget],
-          }) as bigint;
+        if (!sourceClient || !walletClient) {
+          console.error('[useBridgeCCTP] Missing client - sourceClient:', !!sourceClient, 'walletClient:', !!walletClient);
+          throw new Error('Wallet not ready. Please try again.');
+        }
 
-          console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
+        // Check current allowance
+        const currentAllowance = await sourceClient.readContract({
+          address: usdcAddress,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address, approvalTarget],
+        }) as bigint;
 
-          // If allowance is insufficient, approve
-          if (currentAllowance < amountWei) {
-            toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
-            approvalStartedRef.current = true;
+        console.log('[useBridgeCCTP] Current allowance:', currentAllowance.toString(), 'Needed:', amountWei.toString());
 
-            try {
-              // Get the correct chain for the wallet client
-              const sourceChain = fromNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
+        // If allowance is insufficient, approve MAX to avoid Bridge Kit doing its own approval
+        // This ensures Bridge Kit will skip approval step entirely
+        if (currentAllowance < amountWei) {
+          toast.info('Approving USDC...', { description: 'Please confirm in your wallet' });
+          approvalStartedRef.current = true;
 
-              const approvalHash = await walletClient.writeContract({
-                chain: sourceChain,
-                address: usdcAddress,
-                abi: ERC20_ABI,
-                functionName: 'approve',
-                args: [approvalTarget, amountWei],
-              });
+          try {
+            // Get the correct chain for the wallet client
+            const sourceChain = fromNetwork === 'arcTestnet' ? arcTestnetChain : sepolia;
 
-              approvalTxHashRef.current = approvalHash;
-              console.log('[useBridgeCCTP] Approval tx sent:', approvalHash);
-              toast.info('Waiting for approval confirmation...');
+            // Approve max uint256 so Bridge Kit never needs to do its own approval
+            const approvalHash = await walletClient.writeContract({
+              chain: sourceChain,
+              address: usdcAddress,
+              abi: ERC20_ABI,
+              functionName: 'approve',
+              args: [approvalTarget, maxUint256],
+            });
 
-              // Wait for approval to be confirmed
-              const approvalReceipt = await sourceClient.waitForTransactionReceipt({
-                hash: approvalHash,
-                confirmations: 1,
-              });
+            approvalTxHashRef.current = approvalHash;
+            console.log('[useBridgeCCTP] Approval tx sent:', approvalHash);
+            toast.info('Waiting for approval confirmation...');
 
-              if (approvalReceipt.status === 'success') {
-                approvalConfirmedRef.current = true;
-                toast.success('USDC approved!');
-                console.log('[useBridgeCCTP] Approval confirmed');
-              } else {
-                throw new Error('Approval transaction failed');
-              }
-            } catch (approvalError: any) {
-              console.error('[useBridgeCCTP] Approval error:', approvalError);
-              // Check if user rejected
-              if (approvalError?.message?.toLowerCase().includes('user rejected') ||
-                  approvalError?.message?.toLowerCase().includes('user denied')) {
-                throw new Error('User rejected the approval');
-              }
-              throw approvalError;
+            // Wait for approval to be confirmed
+            const approvalReceipt = await sourceClient.waitForTransactionReceipt({
+              hash: approvalHash,
+              confirmations: 1,
+            });
+
+            if (approvalReceipt.status === 'success') {
+              approvalConfirmedRef.current = true;
+              toast.success('USDC approved!');
+              console.log('[useBridgeCCTP] Approval confirmed');
+            } else {
+              throw new Error('Approval transaction failed');
             }
-          } else {
-            console.log('[useBridgeCCTP] Allowance sufficient, skipping approval');
-            approvalConfirmedRef.current = true;
+          } catch (approvalError: any) {
+            console.error('[useBridgeCCTP] Approval error:', approvalError);
+            // Check if user rejected
+            if (approvalError?.message?.toLowerCase().includes('user rejected') ||
+                approvalError?.message?.toLowerCase().includes('user denied')) {
+              throw new Error('User rejected the approval');
+            }
+            throw approvalError;
           }
+        } else {
+          console.log('[useBridgeCCTP] Allowance sufficient, skipping approval');
+          approvalConfirmedRef.current = true;
         }
 
         console.log('[useBridgeCCTP] Bridge params:', {
