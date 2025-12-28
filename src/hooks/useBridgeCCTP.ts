@@ -283,7 +283,12 @@ export const useBridgeCCTP = () => {
    */
   const bridge = useCallback(
     async ({ fromNetwork, toNetwork, amount }: BridgeParams) => {
+      console.log('[useBridgeCCTP] ========== BRIDGE STARTED ==========');
+      console.log('[useBridgeCCTP] Params:', { fromNetwork, toNetwork, amount });
+      console.log('[useBridgeCCTP] Account state:', { isConnected, address, hasConnector: !!account.connector, chainId: account.chainId });
+
       if (!isConnected || !address || !account.connector) {
+        console.log('[useBridgeCCTP] EARLY EXIT: wallet not connected');
         toast.error('Please connect your wallet first');
         return;
       }
@@ -336,6 +341,8 @@ export const useBridgeCCTP = () => {
       }
 
       try {
+        console.log('[useBridgeCCTP] Entering main try block...');
+
         // Get the EIP-1193 provider from wagmi connector (correct way for wagmi v3)
         // account.connector.getProvider() returns the native wallet provider
         const connector = account.connector;
