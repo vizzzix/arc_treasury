@@ -467,7 +467,9 @@ export const useBridgeCCTP = () => {
           // destinationCaller is zero address (anyone can relay)
           const zeroAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`;
 
-          // Build the params struct matching successful transaction format
+          // Build the params struct matching successful transaction format EXACTLY
+          // From tx 0xc5481f68783785a05068e64d3f311b0ca14f21cb8f6593316e89142ba5d7deba:
+          // destinationCaller was ARC_BRIDGE_CONTRACT, not zero!
           const bridgeParams = {
             amount: amountWei,
             destinationDomain: ARC_DESTINATION_DOMAIN, // 110 (0x6e)
@@ -475,7 +477,7 @@ export const useBridgeCCTP = () => {
             mintRecipient: mintRecipient,
             feeRecipient: zeroBytes32, // 0 in successful tx
             burnToken: usdcAddress,
-            destinationCaller: zeroAddress, // ARC_BRIDGE_CONTRACT in successful tx, but try zero first
+            destinationCaller: ARC_BRIDGE_CONTRACT, // MUST be ARC_BRIDGE_CONTRACT, not zero!
             sourceDomain: ARC_SOURCE_DOMAIN, // 26 (0x1a)
             maxFee: 1000n, // 0.001 USDC max fee
           };
