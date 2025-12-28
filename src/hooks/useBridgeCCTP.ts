@@ -443,7 +443,17 @@ export const useBridgeCCTP = () => {
 
           // Wait for attestation and relay
           setAttestationStatus('pending');
-          toast.success('Bridge initiated!', { description: 'Waiting for attestation (~30 sec)...' });
+          
+          // Show initial toast with counter
+          let toastId: string | number | undefined;
+          const updateToast = (seconds: number) => {
+            if (toastId) {
+              toast.loading(`Waiting for attestation... (${seconds}s)`, { id: toastId });
+            } else {
+              toastId = toast.loading(`Waiting for attestation... (${seconds}s)`, { duration: Infinity });
+            }
+          };
+          updateToast(0);
 
           // Poll Circle API for attestation (up to 5 minutes)
           let attempts = 0;
@@ -455,11 +465,8 @@ export const useBridgeCCTP = () => {
           while (attempts < MAX_ATTEMPTS) {
             await new Promise(r => setTimeout(r, 2000));
             attempts++;
-            
-            // Show progress every 30 seconds
-            if (attempts % 15 === 0) {
-              toast.info(`Waiting for attestation... (${attempts * 2}s)`, { duration: 3000 });
-            }
+            const seconds = attempts * 2;
+            updateToast(seconds);
             
             try {
               const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=0&transactionHash=${burnHash}`;
@@ -477,6 +484,10 @@ export const useBridgeCCTP = () => {
                 console.log('[useBridgeCCTP] Attestation received!');
                 messageBytes = data.messages[0].message as `0x${string}`;
                 attestationBytes = data.messages[0].attestation as `0x${string}`;
+                if (toastId) {
+                  toast.dismiss(toastId);
+                }
+                toast.success('Attestation received!', { description: 'Proceeding to mint...' });
                 break;
               }
             } catch (e) {
@@ -488,6 +499,9 @@ export const useBridgeCCTP = () => {
           if (!messageBytes || !attestationBytes) {
             // Timeout - save as pending burn so user can claim manually
             console.log('[useBridgeCCTP] Attestation timeout after', attempts * 2, 'seconds');
+            if (toastId) {
+              toast.dismiss(toastId);
+            }
             toast.warning('Attestation taking longer than expected', { 
               description: 'Your funds are safe. Click Claim when ready.',
               duration: 15000,
@@ -838,6 +852,13 @@ export const useBridgeCCTP = () => {
               pendingBurn: null,
             }));
           } else {
+            // Check if mint was already confirmed (shouldn't show this message)
+            // Only check mintConfirmedRef, not mintTxHashRef (tx might be pending)
+            if (mintConfirmedRef.current) {
+              console.log('[useBridgeCCTP] Mint already confirmed, skipping pending claim message');
+              return; // Don't show "Your funds are safe" if mint is confirmed
+            }
+            
             // Show pending claim UI
             setAttestationStatus('pending_mint');
             toast.warning('Your funds are safe!', {
@@ -1022,6 +1043,13 @@ export const useBridgeCCTP = () => {
 
         // Check if burn was actually confirmed (BURN_CONFIRMED event was received)
         if (burnConfirmedRef.current && burnTxHashRef.current) {
+          // Don't show "Your funds are safe" if mint was already confirmed
+          // Only check mintConfirmedRef, not mintTxHashRef (tx might be pending)
+          if (mintConfirmedRef.current) {
+            console.log('[useBridgeCCTP] Mint already confirmed, skipping pending claim message');
+            return;
+          }
+          
           console.log('[useBridgeCCTP] Burn was confirmed before error - funds are safe');
           const burnTxHash = burnTxHashRef.current;
           console.log('[useBridgeCCTP] Burn tx hash:', burnTxHash);
