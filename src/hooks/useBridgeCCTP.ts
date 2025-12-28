@@ -260,7 +260,7 @@ export const useBridgeCCTP = () => {
    */
   const bridge = useCallback(
     async ({ fromNetwork, toNetwork, amount }: BridgeParams) => {
-      if (!isConnected || !address || !connectorClient) {
+      if (!isConnected || !address || !connectorClient || !walletClient) {
         toast.error('Please connect your wallet first');
         return;
       }
@@ -921,7 +921,7 @@ export const useBridgeCCTP = () => {
         });
       }
     },
-    [isConnected, address, connectorClient, switchChainAsync, account.chainId, bridgeKit]
+    [isConnected, address, connectorClient, walletClient, sepoliaClient, switchChainAsync, account.chainId, bridgeKit]
   );
 
   /**
