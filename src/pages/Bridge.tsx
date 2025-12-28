@@ -215,6 +215,7 @@ const Bridge = () => {
 
   // Handle bridge based on networks
   const handleBridge = async () => {
+    alert('handleBridge called! Amount: ' + amount);
     console.log('[Bridge.tsx] handleBridge called!', { amount, fromNetwork, toNetwork, isEVMtoEVM });
     if (!amount || parseFloat(amount) <= 0) {
       console.log('[Bridge.tsx] Early return - invalid amount');
