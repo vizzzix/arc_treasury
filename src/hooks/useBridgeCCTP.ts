@@ -345,6 +345,116 @@ export const useBridgeCCTP = () => {
           address,
         });
 
+        // Special handling for Sepolia → Arc: use direct bridgeWithPreapproval call
+        // Bridge Kit SDK doesn't properly support Arc's custom bridge contract
+        const isSepoliaToArc = fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet';
+
+        if (isSepoliaToArc) {
+          console.log('[useBridgeCCTP] Sepolia → Arc: using direct bridgeWithPreapproval');
+          toast.info('Initiating bridge to Arc...');
+
+          if (!walletClient) {
+            throw new Error('Wallet not ready');
+          }
+
+          const usdcAddress = TOKEN_ADDRESSES.ethereumSepolia.USDC;
+          // USDC on Sepolia has 6 decimals
+          const amountWei = parseUnits(amount, 6);
+
+          // Step 1: Check and approve if needed
+          const allowance = await sepoliaClient!.readContract({
+            address: usdcAddress,
+            abi: [{ name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] }],
+            functionName: 'allowance',
+            args: [address, ARC_BRIDGE_CONTRACT],
+          });
+
+          if ((allowance as bigint) < amountWei) {
+            toast.info('Approving USDC...');
+            const approveHash = await walletClient.writeContract({
+              chain: sepolia,
+              address: usdcAddress,
+              abi: [{ name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
+              functionName: 'approve',
+              args: [ARC_BRIDGE_CONTRACT, amountWei * 10n], // Approve extra for future bridges
+            });
+            await sepoliaClient!.waitForTransactionReceipt({ hash: approveHash });
+            toast.success('USDC approved!');
+          }
+
+          // Step 2: Call bridgeWithPreapproval with raw calldata (selector 0xd0d4229a)
+          toast.info('Bridging to Arc...', { description: 'Please confirm in wallet' });
+
+          const BRIDGE_SELECTOR = '0xd0d4229a' as `0x${string}`;
+          const ARC_DESTINATION_DOMAIN = 550; // Arc domain
+          const ARC_SOURCE_DOMAIN = 26; // Sepolia's CCTP domain
+          const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
+
+          const encodedParams = encodeAbiParameters(
+            [
+              { type: 'uint256' }, { type: 'uint256' }, { type: 'uint256' },
+              { type: 'address' }, { type: 'bytes32' }, { type: 'address' },
+              { type: 'address' }, { type: 'uint256' }, { type: 'uint256' },
+            ],
+            [
+              amountWei, BigInt(ARC_DESTINATION_DOMAIN), 0n,
+              address, zeroBytes32, usdcAddress,
+              ARC_BRIDGE_CONTRACT, BigInt(ARC_SOURCE_DOMAIN), 1000n,
+            ]
+          );
+
+          const calldata = concat([BRIDGE_SELECTOR, encodedParams]);
+
+          const burnHash = await walletClient.sendTransaction({
+            chain: sepolia,
+            to: ARC_BRIDGE_CONTRACT,
+            data: calldata,
+            gas: 500_000n,
+          });
+
+          console.log('[useBridgeCCTP] Bridge tx sent:', burnHash);
+          burnTxHashRef.current = burnHash;
+          burnConfirmedRef.current = true;
+
+          toast.info('Waiting for confirmation...');
+          const receipt = await sepoliaClient!.waitForTransactionReceipt({ hash: burnHash });
+
+          if (receipt.status !== 'success') {
+            throw new Error('Bridge transaction failed');
+          }
+
+          trackSiteBridge(burnHash, address!, amount, 'to_arc');
+
+          // Wait for attestation and relay
+          setAttestationStatus('pending');
+          toast.success('Bridge initiated!', { description: 'Waiting for attestation (~30 sec)...' });
+
+          // Poll Circle API for attestation
+          let attempts = 0;
+          while (attempts < 60) {
+            await new Promise(r => setTimeout(r, 2000));
+            attempts++;
+            try {
+              const attestationUrl = `${CIRCLE_ATTESTATION_API}?domain=0&transactionHash=${burnHash}`;
+              const response = await fetch(attestationUrl);
+              const data = await response.json();
+              if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
+                console.log('[useBridgeCCTP] Attestation received!');
+                setAttestationStatus('complete');
+                toast.success('Bridge completed!', { description: 'Your USDC has arrived on Arc Testnet' });
+                setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
+                return;
+              }
+            } catch (e) { /* continue polling */ }
+          }
+
+          // Timeout - show pending
+          toast.warning('Bridge in progress', { description: 'USDC will arrive on Arc shortly.' });
+          setState(prev => ({ ...prev, isBridging: false }));
+          return;
+        }
+
+        // Arc → Sepolia: use Bridge Kit SDK
         toast.info('Initiating bridge via Circle Bridge Kit...');
 
         // Execute bridge using Bridge Kit
