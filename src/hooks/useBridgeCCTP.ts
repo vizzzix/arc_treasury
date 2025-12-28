@@ -439,7 +439,9 @@ export const useBridgeCCTP = () => {
             throw new Error('Bridge transaction failed');
           }
 
-          // Note: trackSiteBridge moved to after mint is confirmed
+          // Track bridge immediately after successful burn (for Live Activity)
+          // We'll track again after mint to ensure it's recorded even if user closes browser
+          trackSiteBridge(burnHash, address!, amount, 'to_arc');
 
           // Wait for attestation and relay
           setAttestationStatus('pending');
@@ -612,7 +614,7 @@ export const useBridgeCCTP = () => {
 
             if (mintReceipt.status === 'success') {
               console.log('[useBridgeCCTP] Mint confirmed!');
-              // Track bridge AFTER mint is confirmed (not before)
+              // Bridge already tracked after burn, but ensure it's recorded (upsert handles duplicates)
               trackSiteBridge(burnHash, address!, amount, 'to_arc');
               setAttestationStatus('complete');
               toast.success('Bridge completed!', { description: 'Your USDC has arrived on Arc Testnet' });
