@@ -152,6 +152,7 @@ export const useBridgeCCTP = () => {
 
   // Use refs to track progress - avoid async state timing issues
   const mintConfirmedRef = useRef(false);
+  const mintTxHashRef = useRef<string | null>(null); // Track if mint tx was sent
   const burnConfirmedRef = useRef(false);
   const burnTxHashRef = useRef<string | null>(null);
   const approvalConfirmedRef = useRef(false);
@@ -286,6 +287,7 @@ export const useBridgeCCTP = () => {
       setState({ isBridging: true, isClaiming: false, error: null, result: null, transactions: [], mintConfirmed: false, pendingBurn: null });
       setAttestationStatus(null);
       mintConfirmedRef.current = false;
+      mintTxHashRef.current = null; // Reset mint tx hash
       burnConfirmedRef.current = false;
       burnTxHashRef.current = null;
       approvalConfirmedRef.current = false;
@@ -517,6 +519,7 @@ export const useBridgeCCTP = () => {
             });
 
             console.log('[useBridgeCCTP] Mint tx sent:', mintHash);
+            mintTxHashRef.current = mintHash; // Mark that mint tx was sent
             toast.info('Waiting for mint confirmation...');
 
             const mintReceipt = await arcClient!.waitForTransactionReceipt({ hash: mintHash });
@@ -538,7 +541,20 @@ export const useBridgeCCTP = () => {
               setAttestationStatus('complete');
               toast.success('Bridge completed!', { description: 'USDC already minted on Arc' });
               setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
+            } else if (mintTxHashRef.current) {
+              // Mint tx was sent but confirmation failed - show waiting message, not error
+              console.log('[useBridgeCCTP] Mint tx was sent, waiting for confirmation...');
+              toast.info('Mint transaction sent!', { 
+                description: 'Waiting for confirmation. Your USDC will arrive shortly.',
+                duration: 10000,
+              });
+              setState(prev => ({
+                ...prev,
+                isBridging: false,
+                pendingBurn: { txHash: burnHash, fromNetwork, toNetwork, amount, timestamp: Date.now() }
+              }));
             } else {
+              // Mint tx was never sent - show error
               toast.error('Mint failed', { description: mintError.message || 'Please try claiming manually' });
               setState(prev => ({
                 ...prev,
