@@ -534,16 +534,47 @@ export const useBridgeCCTP = () => {
 
           try {
             // Switch to Arc Testnet
-            if (account.chainId !== SUPPORTED_NETWORKS.arcTestnet.chainId) {
-              await switchChainAsync({ chainId: SUPPORTED_NETWORKS.arcTestnet.chainId });
-              // Wait for network switch to complete
-              await new Promise(resolve => setTimeout(resolve, 2000));
+            const targetChainId = SUPPORTED_NETWORKS.arcTestnet.chainId;
+            if (account.chainId !== targetChainId) {
+              toast.info('Switching to Arc Testnet...');
+              await switchChainAsync({ chainId: targetChainId });
+              
+              // Wait and verify network switch actually happened
+              const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+              if (!provider) {
+                throw new Error('No wallet provider available');
+              }
+              
+              // Poll until network is actually switched
+              let attempts = 0;
+              while (attempts < 10) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const currentChainId = await provider.request({ method: 'eth_chainId' });
+                const currentChainIdNumber = parseInt(currentChainId, 16);
+                console.log('[useBridgeCCTP] Current chain after switch:', currentChainIdNumber, 'Expected:', targetChainId);
+                if (currentChainIdNumber === targetChainId) {
+                  console.log('[useBridgeCCTP] Network switch confirmed!');
+                  break;
+                }
+                attempts++;
+              }
+              
+              if (attempts >= 10) {
+                throw new Error('Network switch timeout - please switch to Arc Testnet manually');
+              }
             }
 
             // Get fresh provider after network switch and create new wallet client
             const provider = (connectorClient as any)?.transport || (window as any).ethereum;
             if (!provider) {
               throw new Error('No wallet provider available after network switch');
+            }
+
+            // Verify chain one more time before creating client
+            const currentChainId = await provider.request({ method: 'eth_chainId' });
+            const currentChainIdNumber = parseInt(currentChainId, 16);
+            if (currentChainIdNumber !== targetChainId) {
+              throw new Error(`Network not switched: current ${currentChainIdNumber}, expected ${targetChainId}`);
             }
 
             // Create new wallet client for Arc network
@@ -591,6 +622,21 @@ export const useBridgeCCTP = () => {
             }
           } catch (mintError: any) {
             console.error('[useBridgeCCTP] Mint error:', mintError);
+            
+            // Check if error is about network switch
+            if (mintError.message?.includes('chain') || mintError.message?.includes('network') || mintError.message?.includes('Chain ID')) {
+              toast.error('Network switch required', { 
+                description: 'Please switch to Arc Testnet manually and try claiming again.',
+                duration: 15000,
+              });
+              setState(prev => ({
+                ...prev,
+                isBridging: false,
+                pendingBurn: { txHash: burnHash, fromNetwork, toNetwork, amount, timestamp: Date.now() }
+              }));
+              return;
+            }
+            
             // Check if already minted (nonce already used)
             if (mintError.message?.includes('Nonce already used') || mintError.message?.includes('already')) {
               setAttestationStatus('complete');
@@ -1204,7 +1250,30 @@ export const useBridgeCCTP = () => {
         }
         try {
           await switchChainAsync({ chainId: destChainId });
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for chain switch to complete
+          
+          // Wait and verify network switch actually happened
+          const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+          if (!provider) {
+            throw new Error('No wallet provider available');
+          }
+          
+          // Poll until network is actually switched
+          let attempts = 0;
+          while (attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const currentChainId = await provider.request({ method: 'eth_chainId' });
+            const currentChainIdNumber = parseInt(currentChainId, 16);
+            console.log('[useBridgeCCTP] Current chain after switch:', currentChainIdNumber, 'Expected:', destChainId);
+            if (currentChainIdNumber === destChainId) {
+              console.log('[useBridgeCCTP] Network switch confirmed!');
+              break;
+            }
+            attempts++;
+          }
+          
+          if (attempts >= 10) {
+            throw new Error('Network switch timeout - please switch to destination network manually');
+          }
         } catch (switchError: any) {
           console.error('[useBridgeCCTP] Chain switch failed:', switchError);
           throw new Error(`Failed to switch network. Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually.`);
@@ -1218,6 +1287,13 @@ export const useBridgeCCTP = () => {
       const provider = (connectorClient as any)?.transport || (window as any).ethereum;
       if (!provider) {
         throw new Error('No wallet provider available after network switch');
+      }
+
+      // Verify chain one more time before creating client
+      const currentChainId = await provider.request({ method: 'eth_chainId' });
+      const currentChainIdNumber = parseInt(currentChainId, 16);
+      if (currentChainIdNumber !== destChainId) {
+        throw new Error(`Network not switched: current ${currentChainIdNumber}, expected ${destChainId}`);
       }
 
       // Get the correct chain object for the destination
