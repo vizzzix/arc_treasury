@@ -25,6 +25,10 @@ import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { supabase } from '@/lib/supabase';
 
+// Debug mode - set to false for production
+const DEBUG = false;
+const debug = (...args: any[]) => DEBUG && debug('', ...args);
+
 // Helper to safely stringify objects that may contain BigInt
 const safeStringify = (obj: any, space?: number): string => {
   return JSON.stringify(obj, (_, value) =>
@@ -43,7 +47,7 @@ const trackSiteBridge = async (txHash: string, walletAddress: string, amount: st
       direction,
       created_at: new Date().toISOString(),
     }, { onConflict: 'tx_hash' });
-    console.log('[useBridgeCCTP] Tracked site bridge:', txHash);
+    debug(' Tracked site bridge:', txHash);
   } catch (e) {
     console.error('[useBridgeCCTP] Failed to track site bridge:', e);
   }
@@ -207,7 +211,7 @@ export const useBridgeCCTP = () => {
   // Initialize Bridge Kit (memoized to avoid re-creating)
   const bridgeKit = useMemo(() => {
     const kit = new BridgeKit();
-    console.log('[useBridgeCCTP] Bridge Kit initialized');
+    debug(' Bridge Kit initialized');
     return kit;
   }, []);
 
@@ -215,12 +219,12 @@ export const useBridgeCCTP = () => {
   useEffect(() => {
     if (bridgeKit) {
       const chains = bridgeKit.getSupportedChains();
-      console.log('[useBridgeCCTP] Supported chains:', chains.map(c => `${c.name} (${c.chain})`));
+      debug(' Supported chains:', chains.map(c => `${c.name} (${c.chain})`));
 
       // Verify Arc Testnet is supported
       const arcChain = chains.find(c => c.chain === Blockchain.Arc_Testnet);
       if (arcChain) {
-        console.log('[useBridgeCCTP] Arc Testnet config:', arcChain);
+        debug(' Arc Testnet config:', arcChain);
       }
     }
   }, [bridgeKit]);
@@ -231,7 +235,7 @@ export const useBridgeCCTP = () => {
     if (address) {
       const savedPendingBurn = loadPendingBurn(address);
       if (savedPendingBurn) {
-        console.log('[useBridgeCCTP] Loaded pending burn from storage:', savedPendingBurn);
+        debug(' Loaded pending burn from storage:', savedPendingBurn);
 
         // Always verify with Circle API before showing Claim button
         const verifyAndLoad = async () => {
@@ -254,13 +258,13 @@ export const useBridgeCCTP = () => {
               if (!amount || amount === '0') {
                 if (decodedBody?.amount) {
                   amount = (parseFloat(decodedBody.amount) / 1e6).toString();
-                  console.log('[useBridgeCCTP] Fetched amount from Circle API:', amount);
+                  debug(' Fetched amount from Circle API:', amount);
                 }
               }
 
               // Check attestation status
               if (!messageData.attestation || messageData.attestation === 'PENDING') {
-                console.log('[useBridgeCCTP] Attestation still pending');
+                debug(' Attestation still pending');
                 setAttestationStatus('pending');
                 toast.info('Bridge in progress...', {
                   description: 'Waiting for Circle attestation.',
@@ -280,7 +284,7 @@ export const useBridgeCCTP = () => {
               setState(prev => ({ ...prev, pendingBurn: updatedPendingBurn }));
             } else {
               // No message found - transaction might have failed or wrong hash
-              console.log('[useBridgeCCTP] No CCTP message found for stored tx, clearing');
+              debug(' No CCTP message found for stored tx, clearing');
               savePendingBurn(address, null);
               setState(prev => ({ ...prev, pendingBurn: null }));
             }
@@ -322,7 +326,7 @@ export const useBridgeCCTP = () => {
         const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
         const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
 
-        console.log('[useBridgeCCTP] Estimating fees for:', { fromChain, toChain, amount });
+        debug(' Estimating fees for:', { fromChain, toChain, amount });
 
         const estimate = await bridgeKit.estimate({
           from: { adapter, chain: fromChain },
@@ -330,7 +334,7 @@ export const useBridgeCCTP = () => {
           amount,
         });
 
-        console.log('[useBridgeCCTP] Estimate result:', estimate);
+        debug(' Estimate result:', estimate);
 
         // Calculate total fees
         const totalFees = estimate.fees
@@ -430,14 +434,14 @@ export const useBridgeCCTP = () => {
           throw new Error('No wallet provider available');
         }
 
-        console.log('[useBridgeCCTP] Creating adapter from provider...');
+        debug(' Creating adapter from provider...');
 
         // Create adapter using Bridge Kit's factory
         const adapter = await createAdapterFromProvider({
           provider,
         });
 
-        console.log('[useBridgeCCTP] Adapter created successfully');
+        debug(' Adapter created successfully');
 
         // Bridge Kit expects human-readable amount (e.g., '20' = 20 USDC)
         // The SDK handles decimal conversion internally
@@ -446,7 +450,7 @@ export const useBridgeCCTP = () => {
         const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
         const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
 
-        console.log('[useBridgeCCTP] Bridge params:', {
+        debug(' Bridge params:', {
           from: fromChain,
           to: toChain,
           amount: bridgeAmount,
@@ -458,7 +462,7 @@ export const useBridgeCCTP = () => {
         const isSepoliaToArc = fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet';
 
         if (isSepoliaToArc) {
-          console.log('[useBridgeCCTP] Sepolia → Arc: using direct bridgeWithPreapproval');
+          debug(' Sepolia → Arc: using direct bridgeWithPreapproval');
           toast.info('Initiating bridge to Arc...');
 
           if (!walletClient) {
@@ -504,7 +508,7 @@ export const useBridgeCCTP = () => {
           const minFinalityThreshold = 1000n; // Fast Transfer threshold
           const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
 
-          console.log('[useBridgeCCTP] Calculated fee:', { amountWei: amountWei.toString(), maxFee: maxFee.toString() });
+          debug(' Calculated fee:', { amountWei: amountWei.toString(), maxFee: maxFee.toString() });
 
           const encodedParams = encodeAbiParameters(
             [
@@ -534,7 +538,7 @@ export const useBridgeCCTP = () => {
             gas: 500_000n,
           });
 
-          console.log('[useBridgeCCTP] Bridge tx sent:', burnHash);
+          debug(' Bridge tx sent:', burnHash);
           burnTxHashRef.current = burnHash;
           burnConfirmedRef.current = true;
 
@@ -569,7 +573,7 @@ export const useBridgeCCTP = () => {
           let attestationBytes: `0x${string}` | null = null;
           const MAX_ATTEMPTS = 150; // 150 * 2 sec = 5 minutes
 
-          console.log('[useBridgeCCTP] Starting attestation polling for tx:', burnHash);
+          debug(' Starting attestation polling for tx:', burnHash);
           while (attempts < MAX_ATTEMPTS) {
             await new Promise(r => setTimeout(r, 2000));
             attempts++;
@@ -589,7 +593,7 @@ export const useBridgeCCTP = () => {
               console.log(`[useBridgeCCTP] Attestation check ${attempts}:`, data.messages?.[0]?.status || 'no status');
               
               if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
-                console.log('[useBridgeCCTP] Attestation received!');
+                debug(' Attestation received!');
                 messageBytes = data.messages[0].message as `0x${string}`;
                 attestationBytes = data.messages[0].attestation as `0x${string}`;
                 if (toastId) {
@@ -606,7 +610,7 @@ export const useBridgeCCTP = () => {
 
           if (!messageBytes || !attestationBytes) {
             // Timeout - save as pending burn so user can claim manually
-            console.log('[useBridgeCCTP] Attestation timeout after', attempts * 2, 'seconds');
+            debug(' Attestation timeout after', attempts * 2, 'seconds');
             if (toastId) {
               toast.dismiss(toastId);
             }
@@ -659,9 +663,9 @@ export const useBridgeCCTP = () => {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 const currentChainId = await provider.request({ method: 'eth_chainId' });
                 const currentChainIdNumber = parseInt(currentChainId, 16);
-                console.log('[useBridgeCCTP] Current chain after switch:', currentChainIdNumber, 'Expected:', targetChainId);
+                debug(' Current chain after switch:', currentChainIdNumber, 'Expected:', targetChainId);
                 if (currentChainIdNumber === targetChainId) {
-                  console.log('[useBridgeCCTP] Network switch confirmed!');
+                  debug(' Network switch confirmed!');
                   break;
                 }
                 attempts++;
@@ -691,7 +695,7 @@ export const useBridgeCCTP = () => {
               transport: custom(provider),
             });
 
-            console.log('[useBridgeCCTP] Created Arc wallet client, calling receiveMessage...');
+            debug(' Created Arc wallet client, calling receiveMessage...');
 
             // Call receiveMessage on Arc's MessageTransmitter
             const mintHash = await arcWalletClient.writeContract({
@@ -712,14 +716,14 @@ export const useBridgeCCTP = () => {
               args: [messageBytes, attestationBytes],
             });
 
-            console.log('[useBridgeCCTP] Mint tx sent:', mintHash);
+            debug(' Mint tx sent:', mintHash);
             mintTxHashRef.current = mintHash; // Mark that mint tx was sent
             toast.info('Waiting for mint confirmation...');
 
             const mintReceipt = await arcClient!.waitForTransactionReceipt({ hash: mintHash });
 
             if (mintReceipt.status === 'success') {
-              console.log('[useBridgeCCTP] Mint confirmed!');
+              debug(' Mint confirmed!');
               // Bridge already tracked after burn, but ensure it's recorded (upsert handles duplicates)
               trackSiteBridge(burnHash, address!, amount, 'to_arc');
               setAttestationStatus('complete');
@@ -741,7 +745,7 @@ export const useBridgeCCTP = () => {
                                    errorMsg.includes('current') && errorMsg.includes('expected');
             
             if (isNetworkError) {
-              console.log('[useBridgeCCTP] Network switch error detected:', errorMsg);
+              debug(' Network switch error detected:', errorMsg);
               toast.error('Network switch required', { 
                 description: 'Please switch to Arc Testnet manually and try claiming again.',
                 duration: 15000,
@@ -761,7 +765,7 @@ export const useBridgeCCTP = () => {
               setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
             } else if (mintTxHashRef.current) {
               // Mint tx was sent but confirmation failed - show waiting message, not error
-              console.log('[useBridgeCCTP] Mint tx was sent, waiting for confirmation...');
+              debug(' Mint tx was sent, waiting for confirmation...');
               toast.info('Mint transaction sent!', { 
                 description: 'Waiting for confirmation. Your USDC will arrive shortly.',
                 duration: 10000,
@@ -800,12 +804,12 @@ export const useBridgeCCTP = () => {
           amount: bridgeAmount,
           token: 'USDC',
           onProgress: (progress: any) => {
-            console.log('[useBridgeCCTP] Progress event:', safeStringify(progress));
-            console.log('[useBridgeCCTP] Progress keys:', Object.keys(progress));
+            debug(' Progress event:', safeStringify(progress));
+            debug(' Progress keys:', Object.keys(progress));
 
             // Handle different progress stages
             const eventType = progress.type || progress.event || progress.status || progress.stage;
-            console.log('[useBridgeCCTP] Event type detected:', eventType);
+            debug(' Event type detected:', eventType);
 
             switch (eventType) {
               case 'approval':
@@ -815,7 +819,7 @@ export const useBridgeCCTP = () => {
                 // Capture tx hash if available
                 if (progress.txHash || progress.transactionHash) {
                   approvalTxHashRef.current = progress.txHash || progress.transactionHash;
-                  console.log('[useBridgeCCTP] Approval tx hash:', approvalTxHashRef.current);
+                  debug(' Approval tx hash:', approvalTxHashRef.current);
                 }
                 break;
 
@@ -907,24 +911,24 @@ export const useBridgeCCTP = () => {
                 break;
 
               default:
-                console.log('[useBridgeCCTP] Unknown progress event:', eventType);
+                debug(' Unknown progress event:', eventType);
             }
           },
         });
 
-        console.log('[useBridgeCCTP] Bridge result:', result);
-        console.log('[useBridgeCCTP] Result state:', result?.state);
-        console.log('[useBridgeCCTP] Result steps:', result?.steps);
+        debug(' Bridge result:', result);
+        debug(' Result state:', result?.state);
+        debug(' Result steps:', result?.steps);
 
         // Analyze result.steps to determine what happened
         const steps = result?.steps || [];
-        console.log('[useBridgeCCTP] All steps:', safeStringify(steps, 2));
+        debug(' All steps:', safeStringify(steps, 2));
         const burnStep = steps.find((s: any) =>
           s.name?.toLowerCase().includes('burn') ||
           s.name?.toLowerCase().includes('deposit') ||
           s.type?.toLowerCase().includes('burn')
         );
-        console.log('[useBridgeCCTP] Burn step details:', safeStringify(burnStep, 2));
+        debug(' Burn step details:', safeStringify(burnStep, 2));
         const mintStep = steps.find((s: any) =>
           s.name?.toLowerCase().includes('mint') ||
           s.type?.toLowerCase().includes('mint')
@@ -934,7 +938,7 @@ export const useBridgeCCTP = () => {
         const burnSucceeded = burnStep?.state === 'success' || burnConfirmedRef.current;
         const mintSucceeded = mintStep?.state === 'success' || mintConfirmedRef.current;
 
-        console.log('[useBridgeCCTP] burnSucceeded:', burnSucceeded, 'mintSucceeded:', mintSucceeded, 'burnConfirmedRef:', burnConfirmedRef.current);
+        debug(' burnSucceeded:', burnSucceeded, 'mintSucceeded:', mintSucceeded, 'burnConfirmedRef:', burnConfirmedRef.current);
 
         // Check overall result state
         if (result?.state === 'success') {
@@ -964,9 +968,9 @@ export const useBridgeCCTP = () => {
         } else if (burnSucceeded && !mintSucceeded) {
           // Burn succeeded but SDK didn't confirm mint
           // Check Circle API - relay may have already completed the mint automatically
-          console.log('[useBridgeCCTP] Burn succeeded, checking if mint was auto-relayed...');
+          debug(' Burn succeeded, checking if mint was auto-relayed...');
           let burnTxHash = burnTxHashRef.current || burnStep?.txHash || burnStep?.transactionHash;
-          console.log('[useBridgeCCTP] Burn tx hash:', burnTxHash);
+          debug(' Burn tx hash:', burnTxHash);
 
           // Track the bridge
           if (burnTxHash) {
@@ -989,19 +993,19 @@ export const useBridgeCCTP = () => {
                 // Note: We check for attestation presence and assume success after ~30 sec
                 if (msg.attestation && msg.attestation !== 'PENDING') {
                   // Wait a bit for relay to complete, then assume success
-                  console.log('[useBridgeCCTP] Attestation received, waiting for relay...');
+                  debug(' Attestation received, waiting for relay...');
                   await new Promise(resolve => setTimeout(resolve, 5000));
                   relayCompleted = true;
                 }
               }
             } catch (e) {
-              console.log('[useBridgeCCTP] Could not check relay status:', e);
+              debug(' Could not check relay status:', e);
             }
           }
 
           if (relayCompleted) {
             // Relay likely completed - show success
-            console.log('[useBridgeCCTP] Relay appears complete, showing success');
+            debug(' Relay appears complete, showing success');
             setAttestationStatus('complete');
             toast.success('Bridge completed!', {
               description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
@@ -1018,7 +1022,7 @@ export const useBridgeCCTP = () => {
             // Check if mint was already confirmed (shouldn't show this message)
             // Only check mintConfirmedRef, not mintTxHashRef (tx might be pending)
             if (mintConfirmedRef.current) {
-              console.log('[useBridgeCCTP] Mint already confirmed, skipping pending claim message');
+              debug(' Mint already confirmed, skipping pending claim message');
               return; // Don't show "Your funds are safe" if mint is confirmed
             }
             
@@ -1054,7 +1058,7 @@ export const useBridgeCCTP = () => {
           // Only save pending burn if burn was actually confirmed
           // This prevents false positives from approval tx hashes
           if (burnConfirmedRef.current && burnTxHashRef.current) {
-            console.log('[useBridgeCCTP] Burn confirmed but result unclear, treating as pending claim:', burnTxHashRef.current);
+            debug(' Burn confirmed but result unclear, treating as pending claim:', burnTxHashRef.current);
 
             const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
             trackSiteBridge(burnTxHashRef.current, address!, amount, direction);
@@ -1087,7 +1091,7 @@ export const useBridgeCCTP = () => {
             }));
           } else {
             // No confirmed burn - check approval status
-            console.log('[useBridgeCCTP] Bridge returned but no confirmed burn - approvalStarted:', approvalStartedRef.current, 'approvalConfirmed:', approvalConfirmedRef.current, 'approvalTxHash:', approvalTxHashRef.current);
+            debug(' Bridge returned but no confirmed burn - approvalStarted:', approvalStartedRef.current, 'approvalConfirmed:', approvalConfirmedRef.current, 'approvalTxHash:', approvalTxHashRef.current);
             setAttestationStatus(null);
 
             if (approvalConfirmedRef.current) {
@@ -1124,7 +1128,7 @@ export const useBridgeCCTP = () => {
             } else {
               // Nothing happened according to refs - but Bridge Kit 1.2.0 may not fire events properly
               // Check if bridge actually completed by looking at the result object
-              console.log('[useBridgeCCTP] Checking result object for success:', safeStringify(result, 2));
+              debug(' Checking result object for success:', safeStringify(result, 2));
 
               // Try to find any transaction hash in the result
               const anyTxHash = result?.steps?.find((s: any) => s.txHash || s.transactionHash)?.txHash ||
@@ -1133,7 +1137,7 @@ export const useBridgeCCTP = () => {
 
               if (anyTxHash) {
                 // Found a transaction - check Circle API
-                console.log('[useBridgeCCTP] Found tx hash in result, checking Circle API:', anyTxHash);
+                debug(' Found tx hash in result, checking Circle API:', anyTxHash);
                 try {
                   const sourceDomain = CCTP_DOMAINS[fromNetwork];
                   const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${anyTxHash}`;
@@ -1144,7 +1148,7 @@ export const useBridgeCCTP = () => {
                     const msg = data.messages[0];
                     if (msg.attestation && msg.attestation !== 'PENDING') {
                       // Bridge completed! Show success
-                      console.log('[useBridgeCCTP] Bridge actually completed! Attestation found.');
+                      debug(' Bridge actually completed! Attestation found.');
                       trackSiteBridge(anyTxHash, address!, amount, toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia');
                       setAttestationStatus('complete');
                       toast.success('Bridge completed!', {
@@ -1162,7 +1166,7 @@ export const useBridgeCCTP = () => {
                     }
                   }
                 } catch (e) {
-                  console.log('[useBridgeCCTP] Could not verify via Circle API:', e);
+                  debug(' Could not verify via Circle API:', e);
                 }
               }
 
@@ -1185,9 +1189,9 @@ export const useBridgeCCTP = () => {
 
       } catch (error: any) {
         console.error('[useBridgeCCTP] Bridge error:', error);
-        console.log('[useBridgeCCTP] Error object:', safeStringify(error, 2));
-        console.log('[useBridgeCCTP] Error steps:', error?.steps);
-        console.log('[useBridgeCCTP] On error - burnConfirmed ref:', burnConfirmedRef.current);
+        debug(' Error object:', safeStringify(error, 2));
+        debug(' Error steps:', error?.steps);
+        debug(' On error - burnConfirmed ref:', burnConfirmedRef.current);
 
         let errorMsg = error?.message || 'An unexpected error occurred';
 
@@ -1202,7 +1206,7 @@ export const useBridgeCCTP = () => {
 
         // Only trust burnConfirmedRef - it's set when BURN_CONFIRMED event is received
         // Don't trust error.steps as it may incorrectly report approval as burn
-        console.log('[useBridgeCCTP] On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
+        debug(' On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
 
         // Check if error is about network switch - don't show "Your funds are safe" for network errors
         const isNetworkError = errorMsg.includes('chain') || 
@@ -1213,7 +1217,7 @@ export const useBridgeCCTP = () => {
                                (errorMsg.includes('current') && errorMsg.includes('expected'));
         
         if (isNetworkError && burnConfirmedRef.current) {
-          console.log('[useBridgeCCTP] Network switch error after burn - show network error, not "Your funds are safe"');
+          debug(' Network switch error after burn - show network error, not "Your funds are safe"');
           toast.error('Network switch required', { 
             description: 'Please switch to Arc Testnet manually and try claiming again.',
             duration: 15000,
@@ -1232,13 +1236,13 @@ export const useBridgeCCTP = () => {
           // Don't show "Your funds are safe" if mint was already confirmed
           // Only check mintConfirmedRef, not mintTxHashRef (tx might be pending)
           if (mintConfirmedRef.current) {
-            console.log('[useBridgeCCTP] Mint already confirmed, skipping pending claim message');
+            debug(' Mint already confirmed, skipping pending claim message');
             return;
           }
           
-          console.log('[useBridgeCCTP] Burn was confirmed before error - funds are safe');
+          debug(' Burn was confirmed before error - funds are safe');
           const burnTxHash = burnTxHashRef.current;
-          console.log('[useBridgeCCTP] Burn tx hash:', burnTxHash);
+          debug(' Burn tx hash:', burnTxHash);
 
           setAttestationStatus('pending_mint');
           toast.warning('Your funds are safe!', {
@@ -1318,7 +1322,7 @@ export const useBridgeCCTP = () => {
     }
 
     const { txHash, fromNetwork, toNetwork } = pendingBurn;
-    console.log('[useBridgeCCTP] Claiming pending bridge:', pendingBurn);
+    debug(' Claiming pending bridge:', pendingBurn);
 
     setState(prev => ({ ...prev, isClaiming: true, error: null }));
 
@@ -1339,21 +1343,21 @@ export const useBridgeCCTP = () => {
 
       for (const { domain, to } of domains) {
         const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${domain}&transactionHash=${txHash}`;
-        console.log('[useBridgeCCTP] Trying domain', domain, 'URL:', attestationUrl);
+        debug(' Trying domain', domain, 'URL:', attestationUrl);
 
         try {
           const attestationResponse = await fetch(attestationUrl);
           const attestationData = await attestationResponse.json();
-          console.log('[useBridgeCCTP] Attestation response for domain', domain, ':', attestationData);
+          debug(' Attestation response for domain', domain, ':', attestationData);
 
           if (attestationData.messages && attestationData.messages.length > 0) {
             messageData = attestationData.messages[0];
             detectedDestNetwork = to;
-            console.log('[useBridgeCCTP] Found message on domain', domain, '- dest:', to);
+            debug(' Found message on domain', domain, '- dest:', to);
             break;
           }
         } catch (e) {
-          console.log('[useBridgeCCTP] Domain', domain, 'failed, trying next...');
+          debug(' Domain', domain, 'failed, trying next...');
         }
       }
 
@@ -1364,7 +1368,7 @@ export const useBridgeCCTP = () => {
       const destNetwork = detectedDestNetwork;
       const destContracts = CCTP_CONTRACTS[destNetwork];
 
-      console.log('[useBridgeCCTP] Dest network:', destNetwork);
+      debug(' Dest network:', destNetwork);
 
       const attestation = messageData.attestation;
       const messageBytes = messageData.message; // Circle API returns the message bytes!
@@ -1377,12 +1381,12 @@ export const useBridgeCCTP = () => {
         throw new Error('Message bytes not found in attestation response');
       }
 
-      console.log('[useBridgeCCTP] Got message:', messageBytes);
-      console.log('[useBridgeCCTP] Got attestation:', attestation);
+      debug(' Got message:', messageBytes);
+      debug(' Got attestation:', attestation);
 
       // Step 3: Switch to destination network if needed
       const destChainId = SUPPORTED_NETWORKS[destNetwork].chainId;
-      console.log('[useBridgeCCTP] Current chain:', account.chainId, 'Destination chain:', destChainId);
+      debug(' Current chain:', account.chainId, 'Destination chain:', destChainId);
       if (account.chainId !== destChainId) {
         toast.info(`Switching to ${SUPPORTED_NETWORKS[destNetwork].name}...`);
         if (!switchChainAsync) {
@@ -1403,9 +1407,9 @@ export const useBridgeCCTP = () => {
             await new Promise(resolve => setTimeout(resolve, 500));
             const currentChainId = await provider.request({ method: 'eth_chainId' });
             const currentChainIdNumber = parseInt(currentChainId, 16);
-            console.log('[useBridgeCCTP] Current chain after switch:', currentChainIdNumber, 'Expected:', destChainId);
+            debug(' Current chain after switch:', currentChainIdNumber, 'Expected:', destChainId);
             if (currentChainIdNumber === destChainId) {
-              console.log('[useBridgeCCTP] Network switch confirmed!');
+              debug(' Network switch confirmed!');
               break;
             }
             attempts++;
@@ -1445,7 +1449,7 @@ export const useBridgeCCTP = () => {
         transport: custom(provider),
       });
 
-      console.log('[useBridgeCCTP] Created destination wallet client, calling receiveMessage...');
+      debug(' Created destination wallet client, calling receiveMessage...');
 
       // MessageTransmitter ABI for receiveMessage
       const messageTransmitterABI = [
@@ -1470,7 +1474,7 @@ export const useBridgeCCTP = () => {
         args: [messageBytes as `0x${string}`, attestation as `0x${string}`],
       });
 
-      console.log('[useBridgeCCTP] Claim tx hash:', hash);
+      debug(' Claim tx hash:', hash);
       toast.info('Waiting for confirmation...');
 
       // Wait for confirmation
@@ -1559,7 +1563,7 @@ export const useBridgeCCTP = () => {
 
       const adapter = await createAdapterFromProvider({ provider });
 
-      console.log('[useBridgeCCTP] Retrying failed bridge...');
+      debug(' Retrying failed bridge...');
       toast.info('Retrying bridge...');
 
       const retryResult = await bridgeKit.retry(lastResult as any, {
@@ -1567,7 +1571,7 @@ export const useBridgeCCTP = () => {
         to: adapter,
       });
 
-      console.log('[useBridgeCCTP] Retry result:', retryResult);
+      debug(' Retry result:', retryResult);
 
       if (retryResult.state === 'success') {
         toast.success('Bridge completed successfully!');
@@ -1629,7 +1633,7 @@ export const useBridgeCCTP = () => {
 
       for (const { domain, from, to } of domains) {
         const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${domain}&transactionHash=${burnTxHash}`;
-        console.log('[useBridgeCCTP] Trying domain', domain, 'for:', burnTxHash);
+        debug(' Trying domain', domain, 'for:', burnTxHash);
 
         try {
           const response = await fetch(attestationUrl);
@@ -1639,11 +1643,11 @@ export const useBridgeCCTP = () => {
             messageData = data.messages[0];
             detectedFrom = from;
             detectedTo = to;
-            console.log('[useBridgeCCTP] Found message on domain', domain, '- direction:', from, '→', to);
+            debug(' Found message on domain', domain, '- direction:', from, '→', to);
             break;
           }
         } catch (e) {
-          console.log('[useBridgeCCTP] Domain', domain, 'failed, trying next...');
+          debug(' Domain', domain, 'failed, trying next...');
         }
       }
 
@@ -1651,7 +1655,7 @@ export const useBridgeCCTP = () => {
         return { success: false, message: 'No CCTP burn found for this transaction. Make sure this is a valid burn tx hash.', type: 'error' };
       }
 
-      console.log('[useBridgeCCTP] Attestation check response:', messageData);
+      debug(' Attestation check response:', messageData);
 
       const decodedBody = messageData.decodedMessage?.decodedMessageBody;
 
@@ -1659,7 +1663,7 @@ export const useBridgeCCTP = () => {
       let detectedAmount = '0';
       if (decodedBody?.amount) {
         detectedAmount = (parseFloat(decodedBody.amount) / 1e6).toFixed(2);
-        console.log('[useBridgeCCTP] Detected amount from API:', detectedAmount, 'USDC');
+        debug(' Detected amount from API:', detectedAmount, 'USDC');
       }
 
       // NOTE: We cannot reliably tell from Circle API if mint was already done
