@@ -2,8 +2,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowRight, ArrowLeftRight, Info, Loader2, ExternalLink, CheckCircle2, XCircle, Clock, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, ArrowLeftRight, Info, Loader2, ExternalLink, CheckCircle2, XCircle, Clock, RefreshCw, DollarSign } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { useBridgeCCTP } from "@/hooks/useBridgeCCTP";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useAccount } from "wagmi";
@@ -31,7 +31,33 @@ export const BridgeModal = ({ open, onOpenChange }: BridgeModalProps) => {
   const { balance: toBalance, isLoading: isLoadingToBalance } = useUSDCBalance(toNetwork);
 
   const [amount, setAmount] = useState<string>("");
-  const { bridge, completeBridge, isBridging, error, transactions, attestationStatus, canCompleteBridge } = useBridgeCCTP();
+  const {
+    bridge,
+    completeBridge,
+    isBridging,
+    error,
+    transactions,
+    attestationStatus,
+    canCompleteBridge,
+    // Bridge Kit 1.3.0 new features
+    estimateBridge,
+    retryBridge,
+    canRetry,
+    isEstimating,
+    estimate,
+    steps,
+  } = useBridgeCCTP();
+
+  // Debounced estimate when amount changes
+  useEffect(() => {
+    if (!amount || parseFloat(amount) <= 0) return;
+
+    const timer = setTimeout(() => {
+      estimateBridge({ fromNetwork, toNetwork, amount });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [amount, fromNetwork, toNetwork, estimateBridge]);
 
   const handleDirectionChange = (newDirection: boolean) => {
     setBridgeDirection(newDirection);
@@ -195,10 +221,86 @@ export const BridgeModal = ({ open, onOpenChange }: BridgeModalProps) => {
             </p>
           </div>
 
-          {/* Error Message */}
+          {/* Fee Estimate (Bridge Kit 1.3.0) */}
+          {(isEstimating || estimate) && (
+            <div className="p-3 rounded-lg bg-background/50 border border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs font-medium">Estimated Fees</span>
+                {isEstimating && <Loader2 className="w-3 h-3 animate-spin ml-auto" />}
+              </div>
+              {estimate && (
+                <div className="space-y-1">
+                  {estimate.fees.map((fee, idx) => (
+                    <div key={idx} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground capitalize">{fee.type} fee</span>
+                      <span>{fee.amount} {fee.token}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-xs font-medium pt-1 border-t border-border">
+                    <span>Total fees</span>
+                    <span>{estimate.totalFees} USDC</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-green-600">
+                    <span>You receive</span>
+                    <span>~{(parseFloat(amount || '0') - parseFloat(estimate.totalFees)).toFixed(2)} USDC</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bridge Steps Progress (Bridge Kit 1.3.0) */}
+          {steps.length > 0 && (
+            <div className="p-3 rounded-lg bg-background/50 border border-border">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-medium">Bridge Progress</span>
+              </div>
+              <div className="flex items-center justify-between">
+                {['approve', 'burn', 'fetchAttestation', 'mint'].map((stepName, idx) => {
+                  const step = steps.find(s => s.name === stepName);
+                  const isActive = step?.state === 'pending';
+                  const isComplete = step?.state === 'success';
+                  const isError = step?.state === 'error';
+                  const stepLabels = { approve: 'Approve', burn: 'Burn', fetchAttestation: 'Attest', mint: 'Mint' };
+
+                  return (
+                    <div key={stepName} className="flex flex-col items-center gap-1">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all ${
+                        isComplete ? 'bg-green-500 text-white' :
+                        isError ? 'bg-red-500 text-white' :
+                        isActive ? 'bg-primary text-white animate-pulse' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {isComplete ? <CheckCircle2 className="w-4 h-4" /> :
+                         isError ? <XCircle className="w-4 h-4" /> :
+                         isActive ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                         idx + 1}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">{stepLabels[stepName as keyof typeof stepLabels]}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Error Message with Retry */}
           {error && (
             <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
               <p className="text-sm text-destructive">{error}</p>
+              {canRetry && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 w-full"
+                  onClick={retryBridge}
+                  disabled={isBridging}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry Bridge
+                </Button>
+              )}
             </div>
           )}
 

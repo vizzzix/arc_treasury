@@ -74,14 +74,50 @@ interface PendingBurn {
   timestamp: number;
 }
 
+// Fee estimate from Bridge Kit 1.3.0
+interface BridgeFee {
+  type: 'gas' | 'provider' | 'relayer';
+  amount: string;
+  token: string;
+}
+
+interface BridgeEstimate {
+  amount: string;
+  token: string;
+  source: { chain: string };
+  destination: { chain: string };
+  fees: BridgeFee[];
+  totalFees: string;
+}
+
+// Step status from Bridge Kit 1.3.0
+interface BridgeStep {
+  name: 'approve' | 'burn' | 'fetchAttestation' | 'mint';
+  state: 'pending' | 'success' | 'error';
+  txHash?: string;
+  error?: string;
+}
+
+// Last bridge result for retry
+interface LastBridgeResult {
+  state: 'pending' | 'success' | 'error';
+  steps: BridgeStep[];
+  source: { address: string; chain: string };
+  destination: { address: string; chain: string };
+}
+
 interface BridgeState {
   isBridging: boolean;
   isClaiming: boolean;
+  isEstimating: boolean;
   error: string | null;
   result: any | null;
   transactions: BridgeTransaction[];
   mintConfirmed: boolean;
   pendingBurn: PendingBurn | null;
+  estimate: BridgeEstimate | null;
+  steps: BridgeStep[];
+  lastResult: LastBridgeResult | null;
 }
 
 // Map our network names to Bridge Kit Blockchain enum
@@ -141,11 +177,15 @@ export const useBridgeCCTP = () => {
   const [state, setState] = useState<BridgeState>({
     isBridging: false,
     isClaiming: false,
+    isEstimating: false,
     error: null,
     result: null,
     transactions: [],
     mintConfirmed: false,
     pendingBurn: null,
+    estimate: null,
+    steps: [],
+    lastResult: null,
   });
 
   const [attestationStatus, setAttestationStatus] = useState<string | null>(null);
@@ -257,6 +297,72 @@ export const useBridgeCCTP = () => {
   }, [address]);
 
   /**
+   * Estimate bridge fees before transfer (Bridge Kit 1.3.0)
+   * Returns estimated gas fees and provider fees
+   */
+  const estimateBridge = useCallback(
+    async ({ fromNetwork, toNetwork, amount }: BridgeParams): Promise<BridgeEstimate | null> => {
+      if (!isConnected || !address || !connectorClient) {
+        return null;
+      }
+
+      if (!amount || parseFloat(amount) <= 0) {
+        return null;
+      }
+
+      setState(prev => ({ ...prev, isEstimating: true, estimate: null }));
+
+      try {
+        const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+        if (!provider) {
+          throw new Error('No wallet provider available');
+        }
+
+        const adapter = await createAdapterFromProvider({ provider });
+        const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
+        const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
+
+        console.log('[useBridgeCCTP] Estimating fees for:', { fromChain, toChain, amount });
+
+        const estimate = await bridgeKit.estimate({
+          from: { adapter, chain: fromChain },
+          to: { adapter, chain: toChain },
+          amount,
+        });
+
+        console.log('[useBridgeCCTP] Estimate result:', estimate);
+
+        // Calculate total fees
+        const totalFees = estimate.fees
+          .reduce((sum: number, fee: any) => sum + parseFloat(fee.amount || '0'), 0)
+          .toFixed(6);
+
+        const bridgeEstimate: BridgeEstimate = {
+          amount: estimate.amount,
+          token: estimate.token,
+          source: { chain: estimate.source.chain },
+          destination: { chain: estimate.destination.chain },
+          fees: estimate.fees.map((f: any) => ({
+            type: f.type,
+            amount: f.amount,
+            token: f.token || 'USDC',
+          })),
+          totalFees,
+        };
+
+        setState(prev => ({ ...prev, isEstimating: false, estimate: bridgeEstimate }));
+        return bridgeEstimate;
+
+      } catch (error: any) {
+        console.error('[useBridgeCCTP] Estimate error:', error);
+        setState(prev => ({ ...prev, isEstimating: false, estimate: null }));
+        return null;
+      }
+    },
+    [isConnected, address, connectorClient, bridgeKit]
+  );
+
+  /**
    * Main bridge function using Circle Bridge Kit
    */
   const bridge = useCallback(
@@ -284,7 +390,7 @@ export const useBridgeCCTP = () => {
       if (address) {
         savePendingBurn(address, null);
       }
-      setState({ isBridging: true, isClaiming: false, error: null, result: null, transactions: [], mintConfirmed: false, pendingBurn: null });
+      setState({ isBridging: true, isClaiming: false, isEstimating: false, error: null, result: null, transactions: [], mintConfirmed: false, pendingBurn: null, estimate: null, steps: [], lastResult: null });
       setAttestationStatus(null);
       mintConfirmedRef.current = false;
       mintTxHashRef.current = null; // Reset mint tx hash
@@ -1428,6 +1534,72 @@ export const useBridgeCCTP = () => {
   }, [state.pendingBurn, walletClient, address, sepoliaClient, arcClient, account.chainId, switchChainAsync]);
 
   /**
+   * Retry a failed bridge using Bridge Kit 1.3.0 retry method
+   * Only works if we have a lastResult with error state
+   */
+  const retryBridge = useCallback(async () => {
+    const lastResult = state.lastResult;
+    if (!lastResult || lastResult.state !== 'error') {
+      toast.error('No failed bridge to retry');
+      return;
+    }
+
+    if (!isConnected || !address || !connectorClient) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    setState(prev => ({ ...prev, isBridging: true, error: null }));
+
+    try {
+      const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+      if (!provider) {
+        throw new Error('No wallet provider available');
+      }
+
+      const adapter = await createAdapterFromProvider({ provider });
+
+      console.log('[useBridgeCCTP] Retrying failed bridge...');
+      toast.info('Retrying bridge...');
+
+      const retryResult = await bridgeKit.retry(lastResult as any, {
+        from: adapter,
+        to: adapter,
+      });
+
+      console.log('[useBridgeCCTP] Retry result:', retryResult);
+
+      if (retryResult.state === 'success') {
+        toast.success('Bridge completed successfully!');
+        setState(prev => ({
+          ...prev,
+          isBridging: false,
+          mintConfirmed: true,
+          lastResult: null,
+          steps: retryResult.steps || [],
+        }));
+      } else {
+        // Still failed - save for another retry
+        const errorStep = retryResult.steps?.find((s: any) => s.state === 'error');
+        const errorMsg = errorStep?.error || 'Retry failed';
+        toast.error('Retry failed', { description: errorMsg });
+        setState(prev => ({
+          ...prev,
+          isBridging: false,
+          error: errorMsg,
+          lastResult: retryResult as LastBridgeResult,
+          steps: retryResult.steps || [],
+        }));
+      }
+
+    } catch (error: any) {
+      console.error('[useBridgeCCTP] Retry error:', error);
+      toast.error('Retry failed', { description: error.message });
+      setState(prev => ({ ...prev, isBridging: false, error: error.message }));
+    }
+  }, [state.lastResult, isConnected, address, connectorClient, bridgeKit]);
+
+  /**
    * Manually restore a pending burn for claiming
    * Validates the transaction by checking Circle Attestation API
    * Auto-detects direction by trying both domains
@@ -1541,11 +1713,15 @@ export const useBridgeCCTP = () => {
     setState({
       isBridging: false,
       isClaiming: false,
+      isEstimating: false,
       error: null,
       result: null,
       transactions: [],
       mintConfirmed: false,
       pendingBurn: null,
+      estimate: null,
+      steps: [],
+      lastResult: null,
     });
     setAttestationStatus(null);
     mintConfirmedRef.current = false;
@@ -1565,6 +1741,10 @@ export const useBridgeCCTP = () => {
     clearPendingBurn,
     reset,
     attestationStatus,
+    // Bridge Kit 1.3.0 new features
+    estimateBridge,
+    retryBridge,
+    canRetry: state.lastResult?.state === 'error',
     // Bridge Kit handles mint automatically, so no manual completion needed
     canCompleteBridge: false,
   };
