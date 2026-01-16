@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       address: BADGE_ADDRESS,
       abi: badgeAbi,
       functionName: 'owner',
-    });
+    } as const) as string;
 
     if (owner.toLowerCase() !== account.address.toLowerCase()) {
       return res.status(403).json({ error: 'Not contract owner' });
@@ -115,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           abi: badgeAbi,
           functionName: 'whitelist',
           args: [addr as `0x${string}`],
-        });
+        } as const) as boolean;
 
         if (!isWhitelisted) {
           newAddresses.push(addr as `0x${string}`);
@@ -150,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         abi: badgeAbi,
         functionName: 'addToWhitelist',
         args: [batch],
+        chain: arcTestnet,
       });
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
