@@ -16,7 +16,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     // Handle fees endpoint: /v2/burn/USDC/fees/{destDomain}/{srcDomain}
     const feesMatch = path.match(/\/v2\/burn\/USDC\/fees\/(\d+)\/(\d+)/);
     if (feesMatch) {
-      url = `/api/circle/fees?destDomain=${feesMatch[1]}&srcDomain=${feesMatch[2]}`;
+      url = `/api/circle?action=fees&destDomain=${feesMatch[1]}&srcDomain=${feesMatch[2]}`;
       console.log('[Fetch Interceptor] Redirecting fees call to:', url);
     }
 
@@ -24,7 +24,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const messagesMatch = path.match(/\/v2\/messages\/(\d+)/);
     if (messagesMatch) {
       const transactionHash = urlObj.searchParams.get('transactionHash');
-      url = `/api/circle/messages?domain=${messagesMatch[1]}&transactionHash=${transactionHash}`;
+      url = `/api/circle?action=messages&domain=${messagesMatch[1]}&transactionHash=${transactionHash}`;
       console.log('[Fetch Interceptor] Redirecting messages call to:', url);
     }
 

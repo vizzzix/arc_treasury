@@ -78,17 +78,17 @@ export const useReferral = () => {
         let codePromise: Promise<Response>;
 
         if (!cached) {
-          codePromise = fetch(`/api/referral/generate-code?address=${address}`);
+          codePromise = fetch(`/api/referral?action=generate-code&address=${address}`);
         } else {
           // Still fetch in background to validate/update cache
-          codePromise = fetch(`/api/referral/generate-code?address=${address}`);
+          codePromise = fetch(`/api/referral?action=generate-code&address=${address}`);
         }
 
         // Fetch stats and list in parallel
         const [codeRes, statsRes, listRes] = await Promise.all([
           codePromise,
-          fetch(`/api/referral/stats?address=${address}`),
-          fetch(`/api/referral/list?address=${address}&limit=10`),
+          fetch(`/api/referral?action=stats&address=${address}`),
+          fetch(`/api/referral?action=list&address=${address}&limit=10`),
         ]);
 
         if (!codeRes.ok || !statsRes.ok || !listRes.ok) {
@@ -119,7 +119,7 @@ export const useReferral = () => {
   // Register a referral
   const registerReferral = async (referrerAddress: string, refereeAddress: string) => {
     try {
-      const response = await fetch('/api/referral/register', {
+      const response = await fetch('/api/referral?action=register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -55,7 +55,7 @@ const TwitterConnect = () => {
     if (!address) return;
 
     try {
-      const res = await fetch(`/api/twitter/status?walletAddress=${address}`);
+      const res = await fetch(`/api/twitter?action=status&walletAddress=${address}`);
       const data = await res.json();
       setStatus(data);
     } catch (err) {
@@ -70,7 +70,7 @@ const TwitterConnect = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/twitter/auth', {
+      const res = await fetch('/api/twitter?action=auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),
@@ -97,7 +97,7 @@ const TwitterConnect = () => {
     setError(null);
 
     try {
-      const res = await fetch('/api/twitter/verify-repost', {
+      const res = await fetch('/api/twitter?action=verify-repost', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address }),

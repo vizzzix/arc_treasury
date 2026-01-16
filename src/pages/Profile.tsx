@@ -142,7 +142,7 @@ const Profile = () => {
 
     setIsVerifying(true);
     try {
-      const response = await fetch('/api/email/send-code', {
+      const response = await fetch('/api/email?action=send-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, walletAddress: address }),
@@ -180,7 +180,7 @@ const Profile = () => {
 
     setIsVerifying(true);
     try {
-      const response = await fetch('/api/email/verify-code', {
+      const response = await fetch('/api/email?action=verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

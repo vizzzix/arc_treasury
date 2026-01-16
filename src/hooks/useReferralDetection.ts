@@ -23,7 +23,7 @@ export const useReferralDetection = () => {
 
       if (codeRegex.test(refParam)) {
         // It's a referral code - resolve it to an address
-        fetch(`/api/referral/resolve-code?code=${refParam}`)
+        fetch(`/api/referral?action=resolve-code&code=${refParam}`)
           .then(response => response.json())
           .then(data => {
             if (data.success && data.address) {
@@ -80,7 +80,7 @@ export const useReferralDetection = () => {
       try {
         console.log('Registering referral:', { referrerAddress, refereeAddress: address });
 
-        const response = await fetch('/api/referral/register', {
+        const response = await fetch('/api/referral?action=register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -8,7 +8,23 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || '***REDACTED_SUPABASE_ANON_KEY*
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+
 export default async function handler(request: any, response: any) {
+  const { action } = request.query;
+
+  switch (action) {
+    case 'send-code':
+      return handleSendCode(request, response);
+    case 'verify-code':
+      return handleVerifyCode(request, response);
+    default:
+      return response.status(400).json({ error: 'Invalid action. Use: send-code, verify-code' });
+  }
+}
+
+async function handleSendCode(request: any, response: any) {
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method not allowed' });
   }
@@ -20,29 +36,22 @@ export default async function handler(request: any, response: any) {
       return response.status(400).json({ error: 'Email and wallet address required' });
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return response.status(400).json({ error: 'Invalid email format' });
     }
 
-    // Validate wallet address
-    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
     if (!addressRegex.test(walletAddress)) {
       return response.status(400).json({ error: 'Invalid wallet address' });
     }
 
-    // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    // Delete any existing codes for this wallet/email
     await supabase
       .from('email_verification_codes')
       .delete()
       .eq('wallet_address', walletAddress.toLowerCase());
 
-    // Store code in Supabase
     const { error: dbError } = await supabase
       .from('email_verification_codes')
       .insert({
@@ -57,7 +66,6 @@ export default async function handler(request: any, response: any) {
       return response.status(500).json({ error: 'Failed to store verification code' });
     }
 
-    // Send email via Resend
     await resend.emails.send({
       from: 'Arc Treasury <noreply@arctreasury.biz>',
       to: email,
@@ -81,5 +89,56 @@ export default async function handler(request: any, response: any) {
   } catch (error) {
     console.error('Error sending verification email:', error);
     return response.status(500).json({ error: 'Failed to send verification email' });
+  }
+}
+
+async function handleVerifyCode(request: any, response: any) {
+  if (request.method !== 'POST') {
+    return response.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    const { email, walletAddress, code } = request.body;
+
+    if (!email || !walletAddress || !code) {
+      return response.status(400).json({ error: 'Email, wallet address, and code required' });
+    }
+
+    const { data, error: dbError } = await supabase
+      .from('email_verification_codes')
+      .select('*')
+      .eq('wallet_address', walletAddress.toLowerCase())
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (dbError || !data) {
+      return response.status(400).json({ error: 'No verification code found. Please request a new one.' });
+    }
+
+    if (new Date(data.expires_at) < new Date()) {
+      await supabase
+        .from('email_verification_codes')
+        .delete()
+        .eq('wallet_address', walletAddress.toLowerCase());
+      return response.status(400).json({ error: 'Verification code expired. Please request a new one.' });
+    }
+
+    if (data.code !== code) {
+      return response.status(400).json({ error: 'Invalid verification code' });
+    }
+
+    await supabase
+      .from('email_verification_codes')
+      .delete()
+      .eq('wallet_address', walletAddress.toLowerCase());
+
+    return response.status(200).json({
+      success: true,
+      message: 'Email verified successfully',
+      verified: true
+    });
+  } catch (error) {
+    console.error('Error verifying code:', error);
+    return response.status(500).json({ error: 'Failed to verify code' });
   }
 }

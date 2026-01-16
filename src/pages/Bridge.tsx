@@ -239,7 +239,7 @@ const Bridge = () => {
   useEffect(() => {
     if (!account?.address || !showTwitterBoost) return;
 
-    fetch(`/api/twitter/status?walletAddress=${account.address}`)
+    fetch(`/api/twitter?action=status&walletAddress=${account.address}`)
       .then(res => res.json())
       .then(data => setTwitterStatus(data))
       .catch(() => {});
