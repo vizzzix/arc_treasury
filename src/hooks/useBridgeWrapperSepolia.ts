@@ -196,7 +196,7 @@ export const useBridgeWrapperSepolia = () => {
   // Poll for attestation and return message data when ready
   const pollForAttestation = useCallback(async (burnTxHash: string): Promise<{ message: string; attestation: string } | null> => {
     const sourceDomain = CCTP_DOMAINS.ethereumSepolia;
-    const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
+    const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${burnTxHash}`;
 
     for (let attempt = 0; attempt < ATTESTATION_MAX_ATTEMPTS; attempt++) {
       try {
@@ -481,7 +481,7 @@ export const useBridgeWrapperSepolia = () => {
     try {
       // Fetch attestation from Circle API
       const sourceDomain = CCTP_DOMAINS.ethereumSepolia;
-      const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
+      const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${burnTxHash}`;
 
       toast.info('Fetching attestation...');
 

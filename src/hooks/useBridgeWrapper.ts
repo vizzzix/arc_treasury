@@ -291,7 +291,7 @@ export const useBridgeWrapper = () => {
     try {
       // Fetch attestation from Circle API
       const sourceDomain = CCTP_DOMAINS.arcTestnet;
-      const attestationUrl = `${CIRCLE_ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
+      const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${burnTxHash}`;
 
       toast.info('Fetching attestation...');
 
