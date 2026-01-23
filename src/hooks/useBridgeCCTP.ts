@@ -202,6 +202,7 @@ export const useBridgeCCTP = () => {
   const approvalConfirmedRef = useRef(false);
   const approvalStartedRef = useRef(false);
   const approvalTxHashRef = useRef<string | null>(null);
+  const claimPendingBridgeRef = useRef<(() => void) | null>(null);
 
   // Get public client for reading chain data
   const sepoliaClient = usePublicClient({ chainId: SUPPORTED_NETWORKS.ethereumSepolia.chainId });
@@ -271,12 +272,24 @@ export const useBridgeCCTP = () => {
                   duration: 5000,
                 });
               } else {
-                // Has attestation, ready to claim
+                // Has attestation, ready to claim - try auto-claim
                 setAttestationStatus('pending_mint');
-                toast.info('You have unclaimed USDC!', {
-                  description: 'Click Claim to receive your bridged funds.',
-                  duration: 10000,
-                });
+
+                // Auto-claim: try to mint automatically instead of showing Claim button
+                const targetChainId = SUPPORTED_NETWORKS.arcTestnet.chainId;
+                if (account?.chainId === targetChainId) {
+                  debug(' Auto-claiming pending bridge...');
+                  toast.info('Auto-claiming bridged USDC...', { duration: 5000 });
+                  // Trigger claim after state is set
+                  setTimeout(() => {
+                    claimPendingBridgeRef.current?.();
+                  }, 1000);
+                } else {
+                  toast.info('You have unclaimed USDC!', {
+                    description: 'Switch to Arc Testnet to auto-claim, or click Claim.',
+                    duration: 10000,
+                  });
+                }
               }
 
               const updatedPendingBurn = { ...savedPendingBurn, amount };
@@ -727,8 +740,9 @@ export const useBridgeCCTP = () => {
               // Bridge already tracked after burn, but ensure it's recorded (upsert handles duplicates)
               trackSiteBridge(burnHash, address!, amount, 'to_arc');
               setAttestationStatus('complete');
+              savePendingBurn(address!, null); // Clear pending burn from localStorage
               toast.success('Bridge completed!', { description: 'Your USDC has arrived on Arc Testnet' });
-              setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
+              setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true, pendingBurn: null }));
             } else {
               throw new Error('Mint transaction failed');
             }
@@ -761,8 +775,9 @@ export const useBridgeCCTP = () => {
             // Check if already minted (nonce already used)
             if (mintError.message?.includes('Nonce already used') || mintError.message?.includes('already')) {
               setAttestationStatus('complete');
+              savePendingBurn(address!, null); // Clear pending burn
               toast.success('Bridge completed!', { description: 'USDC already minted on Arc' });
-              setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true }));
+              setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true, pendingBurn: null }));
             } else if (mintTxHashRef.current) {
               // Mint tx was sent but confirmation failed - show waiting message, not error
               debug(' Mint tx was sent, waiting for confirmation...');
@@ -1536,6 +1551,11 @@ export const useBridgeCCTP = () => {
       });
     }
   }, [state.pendingBurn, walletClient, address, sepoliaClient, arcClient, account.chainId, switchChainAsync]);
+
+  // Keep ref updated for auto-claim from useEffect
+  useEffect(() => {
+    claimPendingBridgeRef.current = claimPendingBridge;
+  }, [claimPendingBridge]);
 
   /**
    * Retry a failed bridge using Bridge Kit 1.3.0 retry method
