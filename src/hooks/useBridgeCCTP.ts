@@ -423,9 +423,7 @@ export const useBridgeCCTP = () => {
 
       if (currentChainId !== requiredChainId) {
         try {
-          toast.info(`Switching to ${SUPPORTED_NETWORKS[fromNetwork].name}...`);
           await switchChainAsync?.({ chainId: requiredChainId });
-          toast.success('Network switched successfully!');
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error: any) {
           console.error('[useBridgeCCTP] Network switch error:', error);
@@ -476,8 +474,6 @@ export const useBridgeCCTP = () => {
 
         if (isSepoliaToArc) {
           debug(' Sepolia → Arc: using direct bridgeWithPreapproval');
-          toast.info('Initiating bridge to Arc...');
-
           if (!walletClient) {
             throw new Error('Wallet not ready');
           }
@@ -504,7 +500,6 @@ export const useBridgeCCTP = () => {
               args: [ARC_BRIDGE_CONTRACT, amountWei * 10n], // Approve extra for future bridges
             });
             await sepoliaClient!.waitForTransactionReceipt({ hash: approveHash });
-            toast.success('USDC approved!');
           }
 
           // Step 2: Call bridgeWithPreapproval with raw calldata (selector 0xd0d4229a)
@@ -555,7 +550,6 @@ export const useBridgeCCTP = () => {
           burnTxHashRef.current = burnHash;
           burnConfirmedRef.current = true;
 
-          toast.info('Waiting for confirmation...');
           const receipt = await sepoliaClient!.waitForTransactionReceipt({ hash: burnHash });
 
           if (receipt.status !== 'success') {
@@ -612,7 +606,6 @@ export const useBridgeCCTP = () => {
                 if (toastId) {
                   toast.dismiss(toastId);
                 }
-                toast.success('Attestation received!', { description: 'Proceeding to mint...' });
                 break;
               }
             } catch (e) {
@@ -661,7 +654,6 @@ export const useBridgeCCTP = () => {
             // Switch to Arc Testnet
             const targetChainId = SUPPORTED_NETWORKS.arcTestnet.chainId;
             if (account.chainId !== targetChainId) {
-              toast.info('Switching to Arc Testnet...');
               await switchChainAsync({ chainId: targetChainId });
               
               // Wait and verify network switch actually happened
@@ -731,7 +723,6 @@ export const useBridgeCCTP = () => {
 
             debug(' Mint tx sent:', mintHash);
             mintTxHashRef.current = mintHash; // Mark that mint tx was sent
-            toast.info('Waiting for mint confirmation...');
 
             const mintReceipt = await arcClient!.waitForTransactionReceipt({ hash: mintHash });
 
@@ -804,8 +795,6 @@ export const useBridgeCCTP = () => {
         }
 
         // Arc → Sepolia: use Bridge Kit SDK
-        toast.info('Initiating bridge via Circle Bridge Kit...');
-
         // Execute bridge using Bridge Kit
         const result = await bridgeKit.bridge({
           from: {
@@ -839,7 +828,6 @@ export const useBridgeCCTP = () => {
                 break;
 
               case 'APPROVAL_CONFIRMED':
-                toast.success('USDC approved!');
                 approvalConfirmedRef.current = true;
                 break;
 
@@ -866,7 +854,6 @@ export const useBridgeCCTP = () => {
                 break;
 
               case 'BURN_CONFIRMED':
-                toast.success('Burn confirmed!');
                 burnConfirmedRef.current = true;
                 // Backup tracking - in case BURN_STARTED didn't have txHash
                 if (progress.txHash || progress.transactionHash) {
@@ -890,11 +877,8 @@ export const useBridgeCCTP = () => {
                 break;
 
               case 'ATTESTATION_COMPLETE':
-                // Don't set 'complete' here - attestation is ready but mint hasn't happened yet
-                // Burn definitely happened if attestation is complete
                 burnConfirmedRef.current = true;
                 setAttestationStatus('attested');
-                toast.success('Attestation received! Starting mint...');
                 break;
 
               case 'mint':
@@ -920,7 +904,6 @@ export const useBridgeCCTP = () => {
 
               case 'MINT_CONFIRMED':
               case 'complete':
-                toast.success('Mint confirmed!');
                 mintConfirmedRef.current = true;
                 setState(prev => ({ ...prev, mintConfirmed: true }));
                 break;
@@ -964,12 +947,8 @@ export const useBridgeCCTP = () => {
             trackSiteBridge(burnTxHash, address!, amount, direction);
           }
 
-          setAttestationStatus('confirming');
-          toast.info('Transaction sent, waiting for confirmation...');
-          await new Promise(resolve => setTimeout(resolve, 6000));
-
           setAttestationStatus('complete');
-          toast.success('Bridge completed successfully!', {
+          toast.success('Bridge completed!', {
             description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
             duration: 10000,
           });
@@ -1316,8 +1295,6 @@ export const useBridgeCCTP = () => {
    */
   const completeBridge = useCallback(async () => {
     // Bridge Kit handles the full flow (burn → attestation → mint) automatically
-    // This function is kept for UI compatibility but doesn't need to do anything
-    toast.info('Bridge Kit handles the complete flow automatically');
   }, []);
 
   /**
