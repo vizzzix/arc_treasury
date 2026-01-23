@@ -107,6 +107,13 @@ const TREASURY_VAULT_ABI = [
     type: 'function',
   },
   {
+    inputs: [],
+    name: 'eurc',
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [{ name: 'amount', type: 'uint256' }],
     name: 'depositEURC',
     outputs: [{ name: 'shares', type: 'uint256' }],
@@ -481,15 +488,32 @@ export const useTreasuryVault = () => {
 
     if (currency === "EURC") {
       // Handle EURC deposit
-      const eurcAddress = TOKEN_ADDRESSES.arcTestnet.EURC;
+      // Read the vault's actual EURC address (may differ from TOKEN_ADDRESSES)
+      let eurcAddress: `0x${string}`;
+      try {
+        const vaultEurc = await client.readContract({
+          address: TREASURY_CONTRACTS.TreasuryVault,
+          abi: TREASURY_VAULT_ABI,
+          functionName: 'eurc',
+        }) as `0x${string}`;
+        eurcAddress = vaultEurc;
+        console.log('[deposit] Vault EURC address:', eurcAddress);
+      } catch {
+        eurcAddress = TOKEN_ADDRESSES.arcTestnet.EURC;
+        console.log('[deposit] Fallback to constants EURC:', eurcAddress);
+      }
       const amountWei = parseUnits(amount, 6); // EURC uses 6 decimals
 
-      // Check EURC allowance
-      const currentEURCAllowance = eurcAllowance || 0n;
+      // Check EURC allowance on the vault's actual EURC token
+      const currentEURCAllowance = await client.readContract({
+        address: eurcAddress,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [address, TREASURY_CONTRACTS.TreasuryVault],
+      }) as bigint;
 
       if (currentEURCAllowance < amountWei) {
         // Approve first using writeContractAsync
-        // Use exact amount instead of maxUint256 for better token compatibility
         if (!writeContractAsync) {
           throw new Error('Approve function not available');
         }
@@ -498,7 +522,7 @@ export const useTreasuryVault = () => {
           address: eurcAddress,
           abi: ERC20_ABI,
           functionName: 'approve',
-          args: [TREASURY_CONTRACTS.TreasuryVault, amountWei],
+          args: [TREASURY_CONTRACTS.TreasuryVault, amountWei * 10n],
           chainId: arcTestnet.id,
         });
 

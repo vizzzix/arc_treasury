@@ -55,7 +55,7 @@ const Swap = () => {
   };
 
   // Get native USDC balance on Arc Testnet
-  const { balance: usdcBalance, isLoading: isLoadingBalance } = useUSDCBalance('arcTestnet');
+  const { balance: usdcBalance, isLoading: isLoadingBalance, refetch: refetchUsdcBalance } = useUSDCBalance('arcTestnet');
 
   // Get live EUR/USD exchange rate
   const { eurToUsd: liveRate, refreshRate, isLoading: isLoadingRate } = useExchangeRate();
@@ -131,6 +131,7 @@ const Swap = () => {
       setAmount('');
       setOutputAmount('0');
       setFeeAmount('0');
+      refetchUsdcBalance(true);
     }
   };
 
@@ -140,6 +141,7 @@ const Swap = () => {
     if (success) {
       setAddUsdcAmount('');
       setAddEurcAmount('');
+      refetchUsdcBalance(true);
     }
   };
 
@@ -148,6 +150,7 @@ const Swap = () => {
     const success = await removeLiquidity(lpAmount);
     if (success) {
       setLpAmount('');
+      refetchUsdcBalance(true);
     }
   };
 

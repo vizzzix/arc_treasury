@@ -381,20 +381,27 @@ const Bridge = () => {
   const currentAttestationStatus = isSolanaInvolved ? solanaState.attestationStatus : attestationStatus;
   const isComplete = currentAttestationStatus === 'complete';
 
-  // Auto-refresh balances and clear amount when bridge completes
+  // Auto-refresh balances and auto-reset when bridge completes
   useEffect(() => {
     if (isComplete) {
-      // Clear the amount field
       setAmount("");
-      // Delay slightly to allow blockchain state to update
-      const timer = setTimeout(() => {
-        refetchSepolia(true); // silent refetch
-        refetchArc(true); // silent refetch
-        refetchSolanaBalance(); // refetch Solana balance
+      // Refetch balances after a short delay
+      const refetchTimer = setTimeout(() => {
+        refetchSepolia(true);
+        refetchArc(true);
+        refetchSolanaBalance();
       }, 2000);
-      return () => clearTimeout(timer);
+      // Auto-reset bridge state after 4 seconds so user can bridge again
+      const resetTimer = setTimeout(() => {
+        handleReset();
+      }, 4000);
+      return () => {
+        clearTimeout(refetchTimer);
+        clearTimeout(resetTimer);
+      };
     }
-  }, [isComplete, refetchSepolia, refetchArc, refetchSolanaBalance]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isComplete]);
 
   // Also refresh balances when mint is confirmed (after claim)
   useEffect(() => {
@@ -845,8 +852,8 @@ const Bridge = () => {
                 </div>
               )}
 
-              {/* Pending mint recovery */}
-              {attestationStatus === 'pending_mint' && (
+              {/* Pending mint recovery - only show when not actively bridging */}
+              {attestationStatus === 'pending_mint' && !currentIsBridging && (
                 <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 relative">
                   <button
                     onClick={clearPendingBurn}

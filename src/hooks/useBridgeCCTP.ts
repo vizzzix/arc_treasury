@@ -19,7 +19,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useConnectorClient, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
-import { parseUnits, encodeAbiParameters, concat, createWalletClient, custom } from 'viem';
+import { parseUnits, encodeAbiParameters, concat, createWalletClient, custom, pad } from 'viem';
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
@@ -651,47 +651,30 @@ export const useBridgeCCTP = () => {
           setAttestationStatus('pending_mint');
 
           try {
-            // Switch to Arc Testnet
+            // Switch to Arc Testnet - always attempt switch (provider may be stale after attestation wait)
             const targetChainId = SUPPORTED_NETWORKS.arcTestnet.chainId;
-            if (account.chainId !== targetChainId) {
-              await switchChainAsync({ chainId: targetChainId });
-              
-              // Wait and verify network switch actually happened
-              const provider = (connectorClient as any)?.transport || (window as any).ethereum;
-              if (!provider) {
-                throw new Error('No wallet provider available');
-              }
-              
-              // Poll until network is actually switched
-              let attempts = 0;
-              while (attempts < 10) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-                const currentChainId = await provider.request({ method: 'eth_chainId' });
-                const currentChainIdNumber = parseInt(currentChainId, 16);
-                debug(' Current chain after switch:', currentChainIdNumber, 'Expected:', targetChainId);
-                if (currentChainIdNumber === targetChainId) {
-                  debug(' Network switch confirmed!');
-                  break;
-                }
-                attempts++;
-              }
-              
-              if (attempts >= 10) {
-                throw new Error('Network switch timeout - please switch to Arc Testnet manually');
-              }
-            }
+            await switchChainAsync({ chainId: targetChainId });
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for wallet to settle
 
-            // Get fresh provider after network switch and create new wallet client
-            const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+            // Use window.ethereum directly for fresh provider reference
+            const provider = (window as any).ethereum || (connectorClient as any)?.transport;
             if (!provider) {
-              throw new Error('No wallet provider available after network switch');
+              throw new Error('No wallet provider available');
             }
 
-            // Verify chain one more time before creating client
-            const currentChainId = await provider.request({ method: 'eth_chainId' });
-            const currentChainIdNumber = parseInt(currentChainId, 16);
-            if (currentChainIdNumber !== targetChainId) {
-              throw new Error(`Network not switched: current ${currentChainIdNumber}, expected ${targetChainId}`);
+            // Verify chain switch succeeded
+            let switchAttempts = 0;
+            while (switchAttempts < 15) {
+              const currentId = await provider.request({ method: 'eth_chainId' });
+              if (parseInt(currentId, 16) === targetChainId) {
+                debug(' Chain switch to Arc Testnet confirmed');
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 500));
+              switchAttempts++;
+            }
+            if (switchAttempts >= 15) {
+              throw new Error('Network switch timeout - please switch to Arc Testnet manually');
             }
 
             // Create new wallet client for Arc network
@@ -794,392 +777,236 @@ export const useBridgeCCTP = () => {
           return;
         }
 
-        // Arc → Sepolia: use Bridge Kit SDK
-        // Execute bridge using Bridge Kit
-        const result = await bridgeKit.bridge({
-          from: {
-            adapter,
-            chain: fromChain,
-          },
-          to: {
-            adapter,
-            chain: toChain,
-          },
-          amount: bridgeAmount,
-          token: 'USDC',
-          onProgress: (progress: any) => {
-            debug(' Progress event:', safeStringify(progress));
-            debug(' Progress keys:', Object.keys(progress));
+        // Arc → Sepolia: use CCTP V2 depositForBurn with 7 parameters
+        // Arc's NativeFiatTokenV2_2 precompile uses 6-decimal ERC20 interface (even though native balance is 18 dec)
+        // Standard 4-param depositForBurn reverts - must use full V2 signature with fee params
+        debug(' Arc → Sepolia: using CCTP V2 depositForBurn');
+        if (!walletClient) {
+          throw new Error('Wallet not ready');
+        }
 
-            // Handle different progress stages
-            const eventType = progress.type || progress.event || progress.status || progress.stage;
-            debug(' Event type detected:', eventType);
+        const usdcAddress = TOKEN_ADDRESSES.arcTestnet.USDC;
+        // ERC20 precompile uses 6 decimals (converts internally from 18-dec native)
+        const amountWei = parseUnits(amount, 6);
+        const tokenMessenger = CCTP_CONTRACTS.arcTestnet.TokenMessenger;
 
-            switch (eventType) {
-              case 'approval':
-              case 'APPROVAL_STARTED':
-                toast.info('Approving USDC...');
-                approvalStartedRef.current = true;
-                // Capture tx hash if available
-                if (progress.txHash || progress.transactionHash) {
-                  approvalTxHashRef.current = progress.txHash || progress.transactionHash;
-                  debug(' Approval tx hash:', approvalTxHashRef.current);
-                }
-                break;
-
-              case 'APPROVAL_CONFIRMED':
-                approvalConfirmedRef.current = true;
-                break;
-
-              case 'burn':
-              case 'BURN_STARTED':
-                toast.info('Burning USDC on source chain...');
-                if (progress.txHash || progress.transactionHash) {
-                  const hash = progress.txHash || progress.transactionHash;
-                  burnTxHashRef.current = hash; // Store in ref for reliable access later
-                  setState(prev => ({
-                    ...prev,
-                    transactions: [{
-                      hash,
-                      network: SUPPORTED_NETWORKS[fromNetwork].name,
-                      explorerUrl: `${SUPPORTED_NETWORKS[fromNetwork].explorerUrl}/tx/${hash}`,
-                      status: 'pending',
-                      step: 'Burn',
-                    }],
-                  }));
-                  // Track this bridge as initiated from our site
-                  const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-                  trackSiteBridge(hash, address!, amount, direction);
-                }
-                break;
-
-              case 'BURN_CONFIRMED':
-                burnConfirmedRef.current = true;
-                // Backup tracking - in case BURN_STARTED didn't have txHash
-                if (progress.txHash || progress.transactionHash) {
-                  const hash = progress.txHash || progress.transactionHash;
-                  if (!burnTxHashRef.current) burnTxHashRef.current = hash; // Backup store
-                  const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-                  trackSiteBridge(hash, address!, amount, direction);
-                }
-                setState(prev => ({
-                  ...prev,
-                  transactions: prev.transactions.map(tx => ({ ...tx, status: 'success' as const })),
-                }));
-                break;
-
-              case 'attestation':
-              case 'ATTESTATION_PENDING':
-                // If we're waiting for attestation, burn must have been confirmed
-                burnConfirmedRef.current = true;
-                setAttestationStatus('pending');
-                toast.info('Waiting for Circle attestation (~30 sec)...');
-                break;
-
-              case 'ATTESTATION_COMPLETE':
-                burnConfirmedRef.current = true;
-                setAttestationStatus('attested');
-                break;
-
-              case 'mint':
-              case 'MINT_STARTED':
-                toast.info('Minting USDC on destination chain...');
-                if (progress.txHash || progress.transactionHash) {
-                  const hash = progress.txHash || progress.transactionHash;
-                  setState(prev => ({
-                    ...prev,
-                    transactions: [
-                      ...prev.transactions,
-                      {
-                        hash,
-                        network: SUPPORTED_NETWORKS[toNetwork].name,
-                        explorerUrl: `${SUPPORTED_NETWORKS[toNetwork].explorerUrl}/tx/${hash}`,
-                        status: 'pending',
-                        step: 'Mint',
-                      },
-                    ],
-                  }));
-                }
-                break;
-
-              case 'MINT_CONFIRMED':
-              case 'complete':
-                mintConfirmedRef.current = true;
-                setState(prev => ({ ...prev, mintConfirmed: true }));
-                break;
-
-              default:
-                debug(' Unknown progress event:', eventType);
-            }
-          },
+        // Step 1: Approve USDC to TokenMessenger (6-decimal amounts)
+        const currentAllowance = await arcClient!.readContract({
+          address: usdcAddress,
+          abi: [{ name: 'allowance', type: 'function', stateMutability: 'view', inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] }],
+          functionName: 'allowance',
+          args: [address, tokenMessenger],
         });
 
-        debug(' Bridge result:', result);
-        debug(' Result state:', result?.state);
-        debug(' Result steps:', result?.steps);
-
-        // Analyze result.steps to determine what happened
-        const steps = result?.steps || [];
-        debug(' All steps:', safeStringify(steps, 2));
-        const burnStep = steps.find((s: any) =>
-          s.name?.toLowerCase().includes('burn') ||
-          s.name?.toLowerCase().includes('deposit') ||
-          s.type?.toLowerCase().includes('burn')
-        );
-        debug(' Burn step details:', safeStringify(burnStep, 2));
-        const mintStep = steps.find((s: any) =>
-          s.name?.toLowerCase().includes('mint') ||
-          s.type?.toLowerCase().includes('mint')
-        );
-
-        // Check burn success - also use burnConfirmedRef as fallback (set during progress events)
-        const burnSucceeded = burnStep?.state === 'success' || burnConfirmedRef.current;
-        const mintSucceeded = mintStep?.state === 'success' || mintConfirmedRef.current;
-
-        debug(' burnSucceeded:', burnSucceeded, 'mintSucceeded:', mintSucceeded, 'burnConfirmedRef:', burnConfirmedRef.current);
-
-        // Check overall result state
-        if (result?.state === 'success') {
-          // Full success - track the bridge in site_bridges
-          const burnTxHash = burnStep?.txHash || burnStep?.transactionHash;
-          if (burnTxHash) {
-            const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-            trackSiteBridge(burnTxHash, address!, amount, direction);
-          }
-
-          setAttestationStatus('complete');
-          toast.success('Bridge completed!', {
-            description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
-            duration: 10000,
+        if ((currentAllowance as bigint) < amountWei) {
+          toast.info('Approving USDC...');
+          const approveHash = await walletClient.writeContract({
+            chain: arcTestnetChain,
+            address: usdcAddress,
+            abi: [{ name: 'approve', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }],
+            functionName: 'approve',
+            args: [tokenMessenger, amountWei * 10n],
           });
-          setState(prev => ({
-            ...prev,
-            isBridging: false,
-            result,
-            mintConfirmed: true,
-            transactions: prev.transactions.map(tx => ({ ...tx, status: 'success' as const })),
-          }));
-        } else if (burnSucceeded && !mintSucceeded) {
-          // Burn succeeded but SDK didn't confirm mint
-          // Check Circle API - relay may have already completed the mint automatically
-          debug(' Burn succeeded, checking if mint was auto-relayed...');
-          let burnTxHash = burnTxHashRef.current || burnStep?.txHash || burnStep?.transactionHash;
-          debug(' Burn tx hash:', burnTxHash);
+          await arcClient!.waitForTransactionReceipt({ hash: approveHash });
+        }
 
-          // Track the bridge
-          if (burnTxHash) {
-            const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-            trackSiteBridge(burnTxHash, address!, amount, direction);
-          }
+        // Step 2: Call CCTP V2 depositForBurn (7 params) on Arc's TokenMessengerV2
+        toast.info('Bridging to Sepolia...', { description: 'Please confirm in wallet' });
 
-          // Check Circle API to see if relay already completed
-          let relayCompleted = false;
-          if (burnTxHash) {
-            try {
-              const sourceDomain = CCTP_DOMAINS[fromNetwork];
-              const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${burnTxHash}`;
-              const response = await fetch(attestationUrl);
-              const data = await response.json();
+        const mintRecipient = pad(address as `0x${string}`, { size: 32 });
+        const SEPOLIA_DESTINATION_DOMAIN = 0;
+        const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
+        // Fee: 1 bps (0.01%) of amount, minimum 1000 (0.001 USDC in 6 dec)
+        const feeBps = 1n;
+        const calculatedFee = (amountWei * feeBps) / 10000n;
+        const MIN_FEE = 1000n;
+        const maxFee = calculatedFee > MIN_FEE ? calculatedFee : MIN_FEE;
+        const minFinalityThreshold = 2000; // Standard finality threshold
 
-              if (data.messages && data.messages.length > 0) {
-                const msg = data.messages[0];
-                // If feeExecuted > 0 or status indicates completion, relay was done
-                // Note: We check for attestation presence and assume success after ~30 sec
-                if (msg.attestation && msg.attestation !== 'PENDING') {
-                  // Wait a bit for relay to complete, then assume success
-                  debug(' Attestation received, waiting for relay...');
-                  await new Promise(resolve => setTimeout(resolve, 5000));
-                  relayCompleted = true;
-                }
-              }
-            } catch (e) {
-              debug(' Could not check relay status:', e);
-            }
-          }
+        debug(' depositForBurn params:', { amount: amountWei.toString(), maxFee: maxFee.toString(), minFinalityThreshold });
 
-          if (relayCompleted) {
-            // Relay likely completed - show success
-            debug(' Relay appears complete, showing success');
-            setAttestationStatus('complete');
-            toast.success('Bridge completed!', {
-              description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
-              duration: 10000,
-            });
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              result: null,
-              mintConfirmed: true,
-              pendingBurn: null,
-            }));
+        const burnHash = await walletClient.writeContract({
+          chain: arcTestnetChain,
+          address: tokenMessenger,
+          abi: [{
+            name: 'depositForBurn',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [
+              { name: 'amount', type: 'uint256' },
+              { name: 'destinationDomain', type: 'uint32' },
+              { name: 'mintRecipient', type: 'bytes32' },
+              { name: 'burnToken', type: 'address' },
+              { name: 'destinationCaller', type: 'bytes32' },
+              { name: 'maxFee', type: 'uint256' },
+              { name: 'minFinalityThreshold', type: 'uint32' },
+            ],
+            outputs: [{ name: 'nonce', type: 'uint64' }],
+          }],
+          functionName: 'depositForBurn',
+          args: [amountWei, SEPOLIA_DESTINATION_DOMAIN, mintRecipient, usdcAddress, zeroBytes32, maxFee, minFinalityThreshold],
+        });
+
+        debug(' Burn tx sent:', burnHash);
+        burnTxHashRef.current = burnHash;
+        burnConfirmedRef.current = true;
+
+        const receipt = await arcClient!.waitForTransactionReceipt({ hash: burnHash });
+
+        if (receipt.status !== 'success') {
+          throw new Error('Bridge transaction failed on Arc');
+        }
+
+        trackSiteBridge(burnHash, address!, amount, 'to_sepolia');
+
+        // Step 3: Wait for attestation
+        setAttestationStatus('pending');
+
+        let toastId: string | number | undefined;
+        const updateToast = (seconds: number) => {
+          if (toastId) {
+            toast.loading(`Waiting for attestation... (${seconds}s)`, { id: toastId });
           } else {
-            // Check if mint was already confirmed (shouldn't show this message)
-            // Only check mintConfirmedRef, not mintTxHashRef (tx might be pending)
-            if (mintConfirmedRef.current) {
-              debug(' Mint already confirmed, skipping pending claim message');
-              return; // Don't show "Your funds are safe" if mint is confirmed
-            }
-            
-            // Show pending claim UI
-            setAttestationStatus('pending_mint');
-            toast.warning('Your funds are safe!', {
-              description: 'Burn completed. Click Claim to receive your USDC.',
-              duration: 15000,
-            });
-
-            const newPendingBurn = burnTxHash ? {
-              txHash: burnTxHash,
-              fromNetwork,
-              toNetwork,
-              amount,
-              timestamp: Date.now(),
-            } : null;
-
-            if (newPendingBurn && address) {
-              savePendingBurn(address, newPendingBurn);
-            }
-
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              error: 'Mint was not completed. Your funds are safe - click Claim USDC.',
-              result: null,
-              mintConfirmed: false,
-              pendingBurn: newPendingBurn,
-            }));
+            toastId = toast.loading(`Waiting for attestation... (${seconds}s)`, { duration: Infinity });
           }
-        } else {
-          // Only save pending burn if burn was actually confirmed
-          // This prevents false positives from approval tx hashes
-          if (burnConfirmedRef.current && burnTxHashRef.current) {
-            debug(' Burn confirmed but result unclear, treating as pending claim:', burnTxHashRef.current);
+        };
+        updateToast(0);
 
-            const direction = toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia';
-            trackSiteBridge(burnTxHashRef.current, address!, amount, direction);
+        let attempts = 0;
+        let messageBytes: `0x${string}` | null = null;
+        let attestationBytes: `0x${string}` | null = null;
+        const MAX_ATTEMPTS = 150; // 5 minutes
 
-            setAttestationStatus('pending_mint');
-            toast.warning('Your funds are safe!', {
-              description: 'Transaction sent. Waiting for attestation - this takes 5-10 minutes.',
-              duration: 15000,
-            });
+        debug(' Starting attestation polling for tx:', burnHash);
+        while (attempts < MAX_ATTEMPTS) {
+          await new Promise(r => setTimeout(r, 2000));
+          attempts++;
+          const seconds = attempts * 2;
+          updateToast(seconds);
 
-            const newPendingBurn = {
-              txHash: burnTxHashRef.current,
-              fromNetwork,
-              toNetwork,
-              amount,
-              timestamp: Date.now(),
-            };
+          try {
+            const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${CCTP_DOMAINS.arcTestnet}&transactionHash=${burnHash}`;
+            const response = await fetch(attestationUrl);
 
-            if (address) {
-              savePendingBurn(address, newPendingBurn);
+            if (!response.ok) continue;
+
+            const data = await response.json();
+
+            if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
+              debug(' Attestation received!');
+              messageBytes = data.messages[0].message as `0x${string}`;
+              attestationBytes = data.messages[0].attestation as `0x${string}`;
+              if (toastId) toast.dismiss(toastId);
+              break;
             }
-
-            setState(prev => ({
-              ...prev,
-              isBridging: false,
-              error: null,
-              result: null,
-              mintConfirmed: false,
-              pendingBurn: newPendingBurn,
-            }));
-          } else {
-            // No confirmed burn - check approval status
-            debug(' Bridge returned but no confirmed burn - approvalStarted:', approvalStartedRef.current, 'approvalConfirmed:', approvalConfirmedRef.current, 'approvalTxHash:', approvalTxHashRef.current);
-            setAttestationStatus(null);
-
-            if (approvalConfirmedRef.current) {
-              // Approval succeeded but burn didn't start - likely user rejected burn tx or timeout
-              toast.warning('Approval successful', {
-                description: 'USDC approved. Please try bridging again to complete the transfer.',
-                duration: 10000,
-              });
-              setState(prev => ({
-                ...prev,
-                isBridging: false,
-                error: 'Approval completed. Please try again to bridge.',
-                result: null,
-                transactions: [],
-                mintConfirmed: false,
-              }));
-            } else if (approvalStartedRef.current) {
-              // Approval was started but not confirmed yet - tx might still be pending
-              const txLink = approvalTxHashRef.current
-                ? `Check tx: ${SUPPORTED_NETWORKS[fromNetwork].explorerUrl}/tx/${approvalTxHashRef.current}`
-                : '';
-              toast.warning('Approval pending', {
-                description: `Transaction may still be processing. Wait a moment and try again. ${txLink}`,
-                duration: 15000,
-              });
-              setState(prev => ({
-                ...prev,
-                isBridging: false,
-                error: 'Approval transaction pending. Please wait and try again.',
-                result: null,
-                transactions: [],
-                mintConfirmed: false,
-              }));
-            } else {
-              // Nothing happened according to refs - but Bridge Kit 1.2.0 may not fire events properly
-              // Check if bridge actually completed by looking at the result object
-              debug(' Checking result object for success:', safeStringify(result, 2));
-
-              // Try to find any transaction hash in the result
-              const anyTxHash = result?.steps?.find((s: any) => s.txHash || s.transactionHash)?.txHash ||
-                               result?.steps?.find((s: any) => s.txHash || s.transactionHash)?.transactionHash ||
-                               result?.txHash || result?.transactionHash;
-
-              if (anyTxHash) {
-                // Found a transaction - check Circle API
-                debug(' Found tx hash in result, checking Circle API:', anyTxHash);
-                try {
-                  const sourceDomain = CCTP_DOMAINS[fromNetwork];
-                  const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${anyTxHash}`;
-                  const response = await fetch(attestationUrl);
-                  const data = await response.json();
-
-                  if (data.messages && data.messages.length > 0) {
-                    const msg = data.messages[0];
-                    if (msg.attestation && msg.attestation !== 'PENDING') {
-                      // Bridge completed! Show success
-                      debug(' Bridge actually completed! Attestation found.');
-                      trackSiteBridge(anyTxHash, address!, amount, toNetwork === 'arcTestnet' ? 'to_arc' : 'to_sepolia');
-                      setAttestationStatus('complete');
-                      toast.success('Bridge completed!', {
-                        description: `Your USDC has been transferred to ${SUPPORTED_NETWORKS[toNetwork].name}`,
-                        duration: 10000,
-                      });
-                      setState(prev => ({
-                        ...prev,
-                        isBridging: false,
-                        result: null,
-                        mintConfirmed: true,
-                        pendingBurn: null,
-                      }));
-                      return; // Exit early - bridge was successful
-                    }
-                  }
-                } catch (e) {
-                  debug(' Could not verify via Circle API:', e);
-                }
-              }
-
-              // Truly nothing happened
-              toast.error('Bridge cancelled', {
-                description: 'Transaction was not completed.',
-                duration: 5000,
-              });
-              setState(prev => ({
-                ...prev,
-                isBridging: false,
-                error: 'Transaction was cancelled',
-                result: null,
-                transactions: [],
-                mintConfirmed: false,
-              }));
-            }
+          } catch (e) {
+            // Continue polling on error
           }
         }
+
+        if (!messageBytes || !attestationBytes) {
+          if (toastId) toast.dismiss(toastId);
+          toast.warning('Attestation taking longer than expected', {
+            description: 'Your funds are safe. Click Claim when ready.',
+            duration: 15000,
+          });
+
+          const newPendingBurn = {
+            txHash: burnHash,
+            fromNetwork,
+            toNetwork,
+            amount,
+            timestamp: Date.now(),
+          };
+          if (address) savePendingBurn(address, newPendingBurn);
+
+          setAttestationStatus('pending_mint');
+          setState(prev => ({ ...prev, isBridging: false, pendingBurn: newPendingBurn }));
+          return;
+        }
+
+        // Step 4: Switch to Sepolia and call receiveMessage
+        toast.info('Minting on Sepolia...', { description: 'Please confirm to receive your USDC' });
+        setAttestationStatus('pending_mint');
+
+        try {
+          const targetChainId = SUPPORTED_NETWORKS.ethereumSepolia.chainId;
+
+          // Always attempt chain switch for Arc → Sepolia (provider may be stale after attestation wait)
+          await switchChainAsync({ chainId: targetChainId });
+          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for wallet to settle
+
+          // Get fresh provider reference after switch
+          const providerAfterSwitch = (window as any).ethereum || (connectorClient as any)?.transport;
+          if (!providerAfterSwitch) throw new Error('No wallet provider available');
+
+          // Verify chain switch succeeded
+          let switchAttempts = 0;
+          while (switchAttempts < 15) {
+            const currentId = await providerAfterSwitch.request({ method: 'eth_chainId' });
+            if (parseInt(currentId, 16) === targetChainId) {
+              debug(' Chain switch to Sepolia confirmed');
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 500));
+            switchAttempts++;
+          }
+          if (switchAttempts >= 15) throw new Error('Network switch timeout - please switch to Sepolia manually');
+
+          const sepoliaWalletClient = createWalletClient({
+            chain: sepolia,
+            transport: custom(providerAfterSwitch),
+          });
+
+          const mintHash = await sepoliaWalletClient.writeContract({
+            chain: sepolia,
+            account: address as `0x${string}`,
+            address: CCTP_CONTRACTS.ethereumSepolia.MessageTransmitter,
+            abi: [{
+              name: 'receiveMessage',
+              type: 'function',
+              stateMutability: 'nonpayable',
+              inputs: [
+                { name: 'message', type: 'bytes' },
+                { name: 'attestation', type: 'bytes' },
+              ],
+              outputs: [{ name: 'success', type: 'bool' }],
+            }],
+            functionName: 'receiveMessage',
+            args: [messageBytes, attestationBytes],
+          });
+
+          debug(' Mint tx sent:', mintHash);
+          mintTxHashRef.current = mintHash;
+
+          const mintReceipt = await sepoliaClient!.waitForTransactionReceipt({ hash: mintHash });
+
+          if (mintReceipt.status === 'success') {
+            debug(' Mint confirmed!');
+            trackSiteBridge(burnHash, address!, amount, 'to_sepolia');
+            setAttestationStatus('complete');
+            savePendingBurn(address!, null);
+            toast.success('Bridge completed!', { description: 'Your USDC has arrived on Sepolia' });
+            setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true, pendingBurn: null }));
+          } else {
+            throw new Error('Mint transaction failed');
+          }
+        } catch (mintError: any) {
+          console.error('[useBridgeCCTP] Mint error (Arc→Sepolia):', mintError);
+
+          if (mintError.message?.includes('Nonce already used') || mintError.message?.includes('already')) {
+            setAttestationStatus('complete');
+            savePendingBurn(address!, null);
+            toast.success('Bridge completed!', { description: 'USDC already minted on Sepolia' });
+            setState(prev => ({ ...prev, isBridging: false, mintConfirmed: true, pendingBurn: null }));
+          } else {
+            toast.error('Mint failed', { description: mintError.message || 'Please try claiming manually' });
+            const newPendingBurn = { txHash: burnHash, fromNetwork, toNetwork, amount, timestamp: Date.now() };
+            if (address) savePendingBurn(address, newPendingBurn);
+            setState(prev => ({ ...prev, isBridging: false, pendingBurn: newPendingBurn }));
+          }
+        }
+        return;
 
       } catch (error: any) {
         console.error('[useBridgeCCTP] Bridge error:', error);
@@ -1376,60 +1203,36 @@ export const useBridgeCCTP = () => {
       debug(' Got message:', messageBytes);
       debug(' Got attestation:', attestation);
 
-      // Step 3: Switch to destination network if needed
+      // Step 3: Switch to destination network
       const destChainId = SUPPORTED_NETWORKS[destNetwork].chainId;
       debug(' Current chain:', account.chainId, 'Destination chain:', destChainId);
-      if (account.chainId !== destChainId) {
-        toast.info(`Switching to ${SUPPORTED_NETWORKS[destNetwork].name}...`);
-        if (!switchChainAsync) {
-          throw new Error(`Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually in MetaMask`);
-        }
-        try {
-          await switchChainAsync({ chainId: destChainId });
-          
-          // Wait and verify network switch actually happened
-          const provider = (connectorClient as any)?.transport || (window as any).ethereum;
-          if (!provider) {
-            throw new Error('No wallet provider available');
-          }
-          
-          // Poll until network is actually switched
-          let attempts = 0;
-          while (attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const currentChainId = await provider.request({ method: 'eth_chainId' });
-            const currentChainIdNumber = parseInt(currentChainId, 16);
-            debug(' Current chain after switch:', currentChainIdNumber, 'Expected:', destChainId);
-            if (currentChainIdNumber === destChainId) {
-              debug(' Network switch confirmed!');
-              break;
-            }
-            attempts++;
-          }
-          
-          if (attempts >= 10) {
-            throw new Error('Network switch timeout - please switch to destination network manually');
-          }
-        } catch (switchError: any) {
-          console.error('[useBridgeCCTP] Chain switch failed:', switchError);
-          throw new Error(`Failed to switch network. Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually.`);
-        }
-      }
+
+      // Always attempt switch (provider state may be stale)
+      await switchChainAsync({ chainId: destChainId });
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Step 4: Call receiveMessage on MessageTransmitter
       toast.info('Claiming your USDC...');
 
-      // Get fresh provider after network switch and create new wallet client
-      const provider = (connectorClient as any)?.transport || (window as any).ethereum;
+      // Use window.ethereum directly for fresh provider reference
+      const provider = (window as any).ethereum || (connectorClient as any)?.transport;
       if (!provider) {
-        throw new Error('No wallet provider available after network switch');
+        throw new Error('No wallet provider available');
       }
 
-      // Verify chain one more time before creating client
-      const currentChainId = await provider.request({ method: 'eth_chainId' });
-      const currentChainIdNumber = parseInt(currentChainId, 16);
-      if (currentChainIdNumber !== destChainId) {
-        throw new Error(`Network not switched: current ${currentChainIdNumber}, expected ${destChainId}`);
+      // Verify chain switch succeeded
+      let verifyAttempts = 0;
+      while (verifyAttempts < 15) {
+        const currentChainId = await provider.request({ method: 'eth_chainId' });
+        if (parseInt(currentChainId, 16) === destChainId) {
+          debug(' Chain switch confirmed for claim');
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
+        verifyAttempts++;
+      }
+      if (verifyAttempts >= 15) {
+        throw new Error(`Please switch to ${SUPPORTED_NETWORKS[destNetwork].name} manually`);
       }
 
       // Get the correct chain object for the destination
