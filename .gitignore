@@ -152,7 +152,8 @@ pnpm-lock.yaml
 *.map
 
 # Scripts with sensitive data (API keys, emails, contacts)
-scripts/
+scripts/*
+!scripts/usdc-agent.ts
 
 # Private investor documents
 docs/investor-*
