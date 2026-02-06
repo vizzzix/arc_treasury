@@ -167,3 +167,4 @@ docs/PitchWeb.pdf
 docs/*.pptx
 public/docs/pitch-deck-dcvc-*
 public/docs/pitch-deck-hivemind-*
+.env*.local
