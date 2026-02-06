@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js';
 interface CircleWalletState {
   user: User | null;
   walletId: string | null;
+  arcWalletId: string | null;
   address: string | null;
   isConnected: boolean;
   isLoading: boolean;
@@ -25,6 +26,7 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CircleWalletState>({
     user: null,
     walletId: null,
+    arcWalletId: null,
     address: null,
     isConnected: false,
     isLoading: true,
@@ -57,6 +59,7 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
         setState({
           user: null,
           walletId: null,
+          arcWalletId: null,
           address: null,
           isConnected: false,
           isLoading: false,
@@ -94,6 +97,7 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
       const newState: CircleWalletState = {
         user,
         walletId: data.walletId,
+        arcWalletId: data.arcWalletId || null,
         address: data.address,
         isConnected: true,
         isLoading: false,
@@ -108,6 +112,7 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
       const pendingState: CircleWalletState = {
         user,
         walletId: null,
+        arcWalletId: null,
         address: null,
         isConnected: false,
         isLoading: false,
@@ -148,6 +153,7 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
     setState({
       user: null,
       walletId: null,
+      arcWalletId: null,
       address: null,
       isConnected: false,
       isLoading: false,

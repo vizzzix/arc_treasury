@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 
 type BridgePhase = 'idle' | 'approving' | 'waiting-approve' | 'burning' | 'waiting-burn' | 'attestation' | 'claiming' | 'complete' | 'error';
+type BridgeDirection = 'sepolia-to-arc' | 'arc-to-sepolia';
 
 interface ServerBridgeState {
   phase: BridgePhase;
@@ -25,7 +26,7 @@ export const useServerBridge = () => {
   // Poll Circle transaction status until COMPLETE or FAILED
   const waitForTx = async (txId: string, label: string): Promise<{ txHash: string }> => {
     let attempts = 0;
-    const MAX_ATTEMPTS = 60; // 60 * 2s = 2 minutes
+    const MAX_ATTEMPTS = 60;
 
     while (attempts < MAX_ATTEMPTS) {
       await new Promise(r => setTimeout(r, 2000));
@@ -52,10 +53,11 @@ export const useServerBridge = () => {
   };
 
   // Poll attestation until ready
-  const waitForAttestation = async (burnTxHash: string): Promise<void> => {
+  const waitForAttestation = async (burnTxHash: string, direction: BridgeDirection): Promise<void> => {
     let attempts = 0;
-    const MAX_ATTEMPTS = 150; // 5 minutes
+    const MAX_ATTEMPTS = 150;
     let toastId: string | number | undefined;
+    const domain = direction === 'arc-to-sepolia' ? 26 : 0;
 
     while (attempts < MAX_ATTEMPTS) {
       await new Promise(r => setTimeout(r, 2000));
@@ -69,7 +71,7 @@ export const useServerBridge = () => {
       }
 
       try {
-        const res = await fetch(`/api/circle?action=messages&domain=0&transactionHash=${burnTxHash}`);
+        const res = await fetch(`/api/circle?action=messages&domain=${domain}&transactionHash=${burnTxHash}`);
         if (!res.ok) continue;
         const data = await res.json();
         const msg = data.messages?.[0];
@@ -87,9 +89,11 @@ export const useServerBridge = () => {
     throw new Error('Attestation timeout');
   };
 
-  // Main bridge function
-  const bridge = useCallback(async (walletId: string, amount: string, recipientAddress: string) => {
+  // Main bridge function — supports both directions
+  const bridge = useCallback(async (walletId: string, amount: string, recipientAddress: string, direction: BridgeDirection = 'sepolia-to-arc') => {
     setState({ phase: 'approving', error: null, burnTxHash: null, claimTxHash: null });
+    const isArcToSepolia = direction === 'arc-to-sepolia';
+    const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
 
     try {
       // Step 1: Approve
@@ -97,14 +101,13 @@ export const useServerBridge = () => {
       const approveRes = await fetch('/api/bridge?action=approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletId, amount }),
+        body: JSON.stringify({ walletId, amount, direction }),
       });
       const approveData = await approveRes.json();
       if (!approveRes.ok) throw new Error(approveData.error || 'Approve failed');
 
       console.log('[ServerBridge] Approve submitted:', approveData.transactionId);
 
-      // Wait for approve tx to confirm
       setState(s => ({ ...s, phase: 'waiting-approve' }));
       toast.info('Waiting for approval confirmation...');
       await waitForTx(approveData.transactionId, 'Approve');
@@ -112,18 +115,17 @@ export const useServerBridge = () => {
 
       // Step 2: Burn (bridge)
       setState(s => ({ ...s, phase: 'burning' }));
-      toast.info('Bridging USDC to Arc...');
+      toast.info(`Bridging USDC to ${destName}...`);
       const burnRes = await fetch('/api/bridge?action=burn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletId, amount, recipientAddress }),
+        body: JSON.stringify({ walletId, amount, recipientAddress, direction }),
       });
       const burnData = await burnRes.json();
       if (!burnRes.ok) throw new Error(burnData.error || 'Bridge failed');
 
       console.log('[ServerBridge] Burn submitted:', burnData.transactionId);
 
-      // Wait for burn tx to confirm
       setState(s => ({ ...s, phase: 'waiting-burn' }));
       toast.info('Waiting for bridge transaction...');
       const { txHash: burnTxHash } = await waitForTx(burnData.transactionId, 'Bridge');
@@ -132,26 +134,25 @@ export const useServerBridge = () => {
       setState(s => ({ ...s, burnTxHash, phase: 'attestation' }));
 
       // Step 3: Wait for attestation
-      await waitForAttestation(burnTxHash);
+      await waitForAttestation(burnTxHash, direction);
       console.log('[ServerBridge] Attestation received');
 
-      // Step 4: Claim on Arc (backend relayer)
+      // Step 4: Claim on destination chain (backend relayer)
       setState(s => ({ ...s, phase: 'claiming' }));
-      toast.info('Claiming USDC on Arc Testnet...');
+      toast.info(`Claiming USDC on ${destName}...`);
       const claimRes = await fetch('/api/bridge?action=claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ burnTxHash }),
+        body: JSON.stringify({ burnTxHash, direction }),
       });
       const claimData = await claimRes.json();
 
       if (claimData.status === 'pending') {
-        // Attestation not ready yet on backend side - retry once after delay
         await new Promise(r => setTimeout(r, 3000));
         const retryRes = await fetch('/api/bridge?action=claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ burnTxHash }),
+          body: JSON.stringify({ burnTxHash, direction }),
         });
         const retryData = await retryRes.json();
         if (retryData.status !== 'complete') {
@@ -164,7 +165,7 @@ export const useServerBridge = () => {
         setState(s => ({ ...s, phase: 'complete', claimTxHash: claimData.claimTxHash }));
       }
 
-      toast.success('Bridge complete!', { description: 'USDC arrived on Arc Testnet' });
+      toast.success('Bridge complete!', { description: `USDC arrived on ${destName}` });
 
     } catch (error: any) {
       console.error('[ServerBridge] Error:', error);

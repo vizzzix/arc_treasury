@@ -3,20 +3,33 @@ import crypto from 'crypto';
 
 const CIRCLE_API_BASE = 'https://api.circle.com/v1/w3s';
 
-// CCTP / Bridge constants
+// CCTP / Bridge constants — Sepolia
 const ARC_BRIDGE_CONTRACT = '0xC5567a5E3370d4DBfB0540025078e283e36A363d';
 const USDC_SEPOLIA = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
+const SEPOLIA_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275';
+const SEPOLIA_DOMAIN = 0;
+
+// CCTP / Bridge constants — Arc Testnet
+const USDC_ARC = '0x3600000000000000000000000000000000000000';
+const ARC_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
 const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275';
 const ARC_DESTINATION_DOMAIN = 26;
-const BRIDGE_SELECTOR = '0xd0d4229a';
+
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages';
 
-// Arc Testnet chain config for viem
+// Chain configs for viem (claim step)
 const arcTestnet = {
   id: 5042002,
   name: 'Arc Testnet',
   nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } },
+} as const;
+
+const sepoliaChain = {
+  id: 11155111,
+  name: 'Sepolia',
+  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
+  rpcUrls: { default: { http: ['https://rpc.sepolia.org'] } },
 } as const;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -52,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// --- Circle API helpers (same as wallet.ts) ---
+// --- Circle API helpers ---
 
 async function getCirclePublicKey(apiKey: string): Promise<string> {
   const r = await fetch(`${CIRCLE_API_BASE}/config/entity/publicKey`, {
@@ -112,26 +125,34 @@ async function circleGet(path: string) {
   return data.data;
 }
 
-// --- Step 1: Approve USDC to ARC_BRIDGE_CONTRACT ---
+// Pad address to bytes32 (for CCTP mintRecipient)
+function padAddress(addr: string): string {
+  const clean = addr.toLowerCase().replace('0x', '');
+  return '0x' + clean.padStart(64, '0');
+}
+
+// --- Step 1: Approve USDC on source chain ---
 
 async function handleApprove(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount } = req.body;
+  const { walletId, amount, direction } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
-  // USDC has 6 decimals on Sepolia
+  const isArcToSepolia = direction === 'arc-to-sepolia';
   const amountMicro = BigInt(Math.round(parseFloat(amount) * 1_000_000));
-  // Approve 10x for future bridges
   const approveAmount = (amountMicro * 10n).toString();
 
-  console.log(`[Bridge] Approve: wallet=${walletId}, amount=${amount} USDC, approveAmount=${approveAmount}`);
+  const contractAddress = isArcToSepolia ? USDC_ARC : USDC_SEPOLIA;
+  const spender = isArcToSepolia ? ARC_TOKEN_MESSENGER : ARC_BRIDGE_CONTRACT;
+
+  console.log(`[Bridge] Approve: wallet=${walletId}, amount=${amount}, direction=${direction || 'sepolia-to-arc'}, spender=${spender}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
-    contractAddress: USDC_SEPOLIA,
+    contractAddress,
     abiFunctionSignature: 'approve(address,uint256)',
-    abiParameters: [ARC_BRIDGE_CONTRACT, approveAmount],
+    abiParameters: [spender, approveAmount],
     feeLevel: 'HIGH',
   });
 
@@ -143,52 +164,77 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
   });
 }
 
-// --- Step 2: Execute bridge (burn via bridgeWithPreapproval) ---
+// --- Step 2: Burn/bridge on source chain ---
 
 async function handleBurn(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, recipientAddress } = req.body;
+  const { walletId, amount, recipientAddress, direction } = req.body;
   if (!walletId || !amount || !recipientAddress) {
     return res.status(400).json({ error: 'walletId, amount, and recipientAddress required' });
   }
 
-  // USDC has 6 decimals on Sepolia
+  const isArcToSepolia = direction === 'arc-to-sepolia';
   const amountMicro = BigInt(Math.round(parseFloat(amount) * 1_000_000));
-
-  // Calculate fee: 1 bps (0.01%)
   const calculatedFee = amountMicro / 10000n;
   const maxFee = calculatedFee > 1000n ? calculatedFee : 1000n;
-  const minFinalityThreshold = 1000;
   const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-  console.log(`[Bridge] Burn: wallet=${walletId}, amount=${amount}, recipient=${recipientAddress}`);
+  console.log(`[Bridge] Burn: wallet=${walletId}, amount=${amount}, recipient=${recipientAddress}, direction=${direction || 'sepolia-to-arc'}`);
 
-  // Use Circle's contractExecution API with the full ABI signature
-  const result = await circlePost('/developer/transactions/contractExecution', {
-    walletId,
-    contractAddress: ARC_BRIDGE_CONTRACT,
-    abiFunctionSignature: 'bridgeWithPreapproval(uint256,uint256,uint256,address,bytes32,address,address,uint256,uint256)',
-    abiParameters: [
-      amountMicro.toString(),
-      maxFee.toString(),
-      '0',
-      recipientAddress,
-      zeroBytes32,
-      USDC_SEPOLIA,
-      ARC_BRIDGE_CONTRACT,
-      ARC_DESTINATION_DOMAIN.toString(),
-      minFinalityThreshold.toString(),
-    ],
-    feeLevel: 'HIGH',
-  });
+  if (isArcToSepolia) {
+    // Arc → Sepolia: CCTP V2 depositForBurn on TokenMessenger
+    const mintRecipient = padAddress(recipientAddress);
 
-  console.log('[Bridge] Burn result:', JSON.stringify(result));
+    const result = await circlePost('/developer/transactions/contractExecution', {
+      walletId,
+      contractAddress: ARC_TOKEN_MESSENGER,
+      abiFunctionSignature: 'depositForBurn(uint256,uint32,bytes32,address,bytes32,uint256,uint32)',
+      abiParameters: [
+        amountMicro.toString(),
+        SEPOLIA_DOMAIN.toString(),
+        mintRecipient,
+        USDC_ARC,
+        zeroBytes32,
+        maxFee.toString(),
+        '2000',
+      ],
+      feeLevel: 'HIGH',
+    });
 
-  return res.status(200).json({
-    transactionId: result?.id || result?.transactionId,
-    state: result?.state,
-  });
+    console.log('[Bridge] Burn (Arc→Sepolia) result:', JSON.stringify(result));
+
+    return res.status(200).json({
+      transactionId: result?.id || result?.transactionId,
+      state: result?.state,
+    });
+  } else {
+    // Sepolia → Arc: bridgeWithPreapproval on ARC_BRIDGE_CONTRACT
+    const result = await circlePost('/developer/transactions/contractExecution', {
+      walletId,
+      contractAddress: ARC_BRIDGE_CONTRACT,
+      abiFunctionSignature: 'bridgeWithPreapproval(uint256,uint256,uint256,address,bytes32,address,address,uint256,uint256)',
+      abiParameters: [
+        amountMicro.toString(),
+        maxFee.toString(),
+        '0',
+        recipientAddress,
+        zeroBytes32,
+        USDC_SEPOLIA,
+        ARC_BRIDGE_CONTRACT,
+        ARC_DESTINATION_DOMAIN.toString(),
+        '1000',
+      ],
+      feeLevel: 'HIGH',
+    });
+
+    console.log('[Bridge] Burn (Sepolia→Arc) result:', JSON.stringify(result));
+
+    return res.status(200).json({
+      transactionId: result?.id || result?.transactionId,
+      state: result?.state,
+    });
+  }
 }
 
 // --- Check Circle transaction status ---
@@ -212,12 +258,12 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   });
 }
 
-// --- Step 4: Claim on Arc Testnet (backend relayer) ---
+// --- Step 4: Claim on destination chain (backend relayer) ---
 
 async function handleClaim(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { burnTxHash } = req.body;
+  const { burnTxHash, direction } = req.body;
   if (!burnTxHash) return res.status(400).json({ error: 'burnTxHash required' });
 
   const relayerKey = process.env.BRIDGE_RELAYER_KEY;
@@ -225,10 +271,12 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Bridge relayer not configured' });
   }
 
-  // 1. Get attestation from Circle
-  console.log(`[Bridge] Claim: fetching attestation for ${burnTxHash}`);
+  const isArcToSepolia = direction === 'arc-to-sepolia';
+  const sourceDomain = isArcToSepolia ? ARC_DESTINATION_DOMAIN : SEPOLIA_DOMAIN;
 
-  const attestationUrl = `${ATTESTATION_API}/0?transactionHash=${burnTxHash}`;
+  console.log(`[Bridge] Claim: fetching attestation for ${burnTxHash}, direction=${direction || 'sepolia-to-arc'}`);
+
+  const attestationUrl = `${ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
   const attestResponse = await fetch(attestationUrl, {
     headers: { 'Accept': 'application/json' },
   });
@@ -250,22 +298,25 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
   const messageBytes = msg.message as `0x${string}`;
   const attestationBytes = msg.attestation as `0x${string}`;
 
-  console.log('[Bridge] Attestation received, calling receiveMessage on Arc...');
+  console.log('[Bridge] Attestation received, calling receiveMessage...');
 
-  // 2. Call receiveMessage on Arc Testnet using relayer
   const { privateKeyToAccount } = await import('viem/accounts');
   const { createPublicClient, createWalletClient, http } = await import('viem');
   const account = privateKeyToAccount(relayerKey as `0x${string}`);
 
+  const destChain = isArcToSepolia ? sepoliaChain : arcTestnet;
+  const destRpc = isArcToSepolia ? 'https://rpc.sepolia.org' : 'https://rpc.testnet.arc.network';
+  const destTransmitter = isArcToSepolia ? SEPOLIA_MESSAGE_TRANSMITTER : ARC_MESSAGE_TRANSMITTER;
+
   const publicClient = createPublicClient({
-    chain: arcTestnet as any,
-    transport: http('https://rpc.testnet.arc.network'),
+    chain: destChain as any,
+    transport: http(destRpc),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: arcTestnet as any,
-    transport: http('https://rpc.testnet.arc.network'),
+    chain: destChain as any,
+    transport: http(destRpc),
   });
 
   const MESSAGE_TRANSMITTER_ABI = [
@@ -282,7 +333,7 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
   ];
 
   const claimHash = await walletClient.writeContract({
-    address: ARC_MESSAGE_TRANSMITTER as `0x${string}`,
+    address: destTransmitter as `0x${string}`,
     abi: MESSAGE_TRANSMITTER_ABI,
     functionName: 'receiveMessage',
     args: [messageBytes, attestationBytes],
@@ -290,7 +341,6 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Bridge] Claim tx sent:', claimHash);
 
-  // Wait for confirmation
   const receipt = await publicClient.waitForTransactionReceipt({ hash: claimHash });
 
   if (receipt.status !== 'success') {
@@ -299,9 +349,10 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Bridge] Claim confirmed!');
 
+  const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
   return res.status(200).json({
     status: 'complete',
     claimTxHash: claimHash,
-    message: 'Bridge complete! USDC minted on Arc Testnet',
+    message: `Bridge complete! USDC minted on ${destName}`,
   });
 }

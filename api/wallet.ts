@@ -109,35 +109,60 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   if (userSet) {
     // 2. Found existing set — get its wallets
     const existingWallets = await circleGet(`/wallets?walletSetId=${userSet.id}`);
-    const wallet = existingWallets?.wallets?.[0];
-    if (wallet) {
+    const wallets = existingWallets?.wallets || [];
+    const sepoliaWallet = wallets.find((w: any) => w.blockchain === 'ETH-SEPOLIA');
+    const arcWallet = wallets.find((w: any) => w.blockchain === 'ARC-TESTNET');
+
+    // If missing ARC-TESTNET wallet, create it in the existing set
+    if (sepoliaWallet && !arcWallet) {
+      const arcData = await circlePost('/developer/wallets', {
+        walletSetId: userSet.id,
+        blockchains: ['ARC-TESTNET'],
+        count: 1,
+        accountType: 'EOA',
+      });
+      const newArcWallet = arcData?.wallets?.[0];
       return res.status(200).json({
-        walletId: wallet.id,
-        address: wallet.address,
-        blockchain: wallet.blockchain,
+        walletId: sepoliaWallet.id,
+        arcWalletId: newArcWallet?.id || null,
+        address: sepoliaWallet.address,
+        blockchain: sepoliaWallet.blockchain,
+        existing: true,
+      });
+    }
+
+    if (sepoliaWallet) {
+      return res.status(200).json({
+        walletId: sepoliaWallet.id,
+        arcWalletId: arcWallet?.id || null,
+        address: sepoliaWallet.address,
+        blockchain: sepoliaWallet.blockchain,
         existing: true,
       });
     }
   }
 
-  // 3. No existing wallet — create new wallet set + wallet
+  // 3. No existing wallet — create new wallet set + wallets on both chains
   const wsData = await circlePost('/developer/walletSets', { name: walletSetName });
   const walletSetId = wsData?.walletSet?.id;
   if (!walletSetId) throw new Error('Failed to create wallet set');
 
   const wData = await circlePost('/developer/wallets', {
     walletSetId,
-    blockchains: ['ETH-SEPOLIA'],
+    blockchains: ['ETH-SEPOLIA', 'ARC-TESTNET'],
     count: 1,
     accountType: 'EOA',
   });
-  const wallet = wData?.wallets?.[0];
-  if (!wallet) throw new Error('Failed to create wallet');
+  const wallets = wData?.wallets || [];
+  const sepoliaWallet = wallets.find((w: any) => w.blockchain === 'ETH-SEPOLIA');
+  const arcWallet = wallets.find((w: any) => w.blockchain === 'ARC-TESTNET');
+  if (!sepoliaWallet) throw new Error('Failed to create wallet');
 
   return res.status(200).json({
-    walletId: wallet.id,
-    address: wallet.address,
-    blockchain: wallet.blockchain,
+    walletId: sepoliaWallet.id,
+    arcWalletId: arcWallet?.id || null,
+    address: sepoliaWallet.address,
+    blockchain: sepoliaWallet.blockchain,
     existing: false,
   });
 }

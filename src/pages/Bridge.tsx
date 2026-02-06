@@ -263,16 +263,18 @@ const Bridge = () => {
     }
     setSavedBridgeParams({ amount, toNetwork });
 
-    // Circle wallet: use server-side bridge (Sepolia → Arc only)
-    if (isCircleWallet && fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet') {
-      console.log('[Bridge.tsx] Using server bridge for Circle wallet');
-      const walletId = circleWallet.walletId;
+    // Circle wallet: use server-side bridge (Sepolia ↔ Arc)
+    if (isCircleWallet && isEVMtoEVM) {
+      const isArcToSepolia = fromNetwork === 'arcTestnet' && toNetwork === 'ethereumSepolia';
+      const walletId = isArcToSepolia ? circleWallet.arcWalletId : circleWallet.walletId;
       const address = unifiedWallet.address;
+      const direction = isArcToSepolia ? 'arc-to-sepolia' : 'sepolia-to-arc';
+      console.log('[Bridge.tsx] Using server bridge for Circle wallet, direction:', direction);
       if (!walletId || !address) {
         console.error('[Bridge.tsx] Missing walletId or address for server bridge');
         return;
       }
-      await serverBridge.bridge(walletId, amount, address);
+      await serverBridge.bridge(walletId, amount, address, direction as any);
       return;
     }
 
@@ -499,10 +501,9 @@ const Bridge = () => {
     const epsilon = 0.000001; // 1 micro-unit tolerance
     if (amountNum > exactSourceBalance + epsilon) return false;
 
-    // Circle wallet: only Sepolia → Arc supported
+    // Circle wallet: Sepolia ↔ Arc supported
     if (isCircleWallet) {
-      if (fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet') return true;
-      return false;
+      return isEVMtoEVM;
     }
 
     // Need external EVM wallet for signing bridge transactions
@@ -517,8 +518,8 @@ const Bridge = () => {
   const getButtonText = () => {
     if (currentIsBridging || serverBridge.isBridging) return 'Bridging...';
     if (isCircleWallet) {
-      if (fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet') return `Bridge to ${getNetworkName(toNetwork)}`;
-      return 'Only Sepolia → Arc supported';
+      if (isEVMtoEVM) return `Bridge to ${getNetworkName(toNetwork)}`;
+      return 'Only Sepolia ↔ Arc supported';
     }
     if (!isExternalWallet && fromNetwork !== 'solanaDevnet') return 'Connect Browser Wallet to Bridge';
     if (isSolanaInvolved && !solanaConnected) return 'Connect Solana Wallet';
@@ -855,11 +856,11 @@ const Bridge = () => {
                     {serverBridge.phase === 'approving' || serverBridge.phase === 'waiting-approve'
                       ? 'Approving USDC...'
                       : serverBridge.phase === 'burning' || serverBridge.phase === 'waiting-burn'
-                      ? 'Burning USDC on Sepolia...'
+                      ? `Burning USDC on ${getNetworkName(fromNetwork)}...`
                       : serverBridge.phase === 'attestation'
                       ? 'Waiting for Circle attestation...'
                       : serverBridge.phase === 'claiming'
-                      ? 'Minting USDC on Arc Testnet...'
+                      ? `Minting USDC on ${getNetworkName(toNetwork)}...`
                       : 'Processing...'}
                   </p>
                   <p className="text-xs text-muted-foreground">
