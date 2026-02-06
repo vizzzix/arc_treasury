@@ -11,6 +11,8 @@ import { WalletHeader } from "@/components/WalletHeader";
 import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useBridgeCCTP } from "@/hooks/useBridgeCCTP";
 import { useBridgeSolana, EVMNetwork } from "@/hooks/useBridgeSolana";
+import { useServerBridge } from "@/hooks/useServerBridge";
+import { useCircleWallet } from "@/providers/CircleWalletProvider";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { SUPPORTED_NETWORKS } from "@/lib/constants";
 import { LiveBridgeFeed } from "@/components/LiveBridgeFeed";
@@ -76,7 +78,10 @@ const Bridge = () => {
   const navigate = useNavigate();
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverBridge = useServerBridge();
   const isExternalWallet = account?.isConnected ?? false;
+  const isCircleWallet = !isExternalWallet && unifiedWallet.isConnected && unifiedWallet.walletType === 'circle';
   const isConnected = isExternalWallet || unifiedWallet.isConnected;
 
   // Unified network selection
@@ -251,12 +256,25 @@ const Bridge = () => {
 
   // Handle bridge based on networks
   const handleBridge = async () => {
-    console.log('[Bridge.tsx] handleBridge called!', { amount, fromNetwork, toNetwork, isEVMtoEVM });
+    console.log('[Bridge.tsx] handleBridge called!', { amount, fromNetwork, toNetwork, isEVMtoEVM, isCircleWallet });
     if (!amount || parseFloat(amount) <= 0) {
       console.log('[Bridge.tsx] Early return - invalid amount');
       return;
     }
     setSavedBridgeParams({ amount, toNetwork });
+
+    // Circle wallet: use server-side bridge (Sepolia → Arc only)
+    if (isCircleWallet && fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet') {
+      console.log('[Bridge.tsx] Using server bridge for Circle wallet');
+      const walletId = circleWallet.walletId;
+      const address = unifiedWallet.address;
+      if (!walletId || !address) {
+        console.error('[Bridge.tsx] Missing walletId or address for server bridge');
+        return;
+      }
+      await serverBridge.bridge(walletId, amount, address);
+      return;
+    }
 
     if (isEVMtoEVM) {
       console.log('[Bridge.tsx] Calling EVM bridge...');
@@ -380,10 +398,10 @@ const Bridge = () => {
   };
 
   // Determine current bridging state
-  const currentIsBridging = isSolanaInvolved ? solanaState.isBridging : isBridging;
-  const currentError = isSolanaInvolved ? solanaState.error : error;
-  const currentAttestationStatus = isSolanaInvolved ? solanaState.attestationStatus : attestationStatus;
-  const isComplete = currentAttestationStatus === 'complete';
+  const currentIsBridging = serverBridge.isBridging || (isSolanaInvolved ? solanaState.isBridging : isBridging);
+  const currentError = serverBridge.error || (isSolanaInvolved ? solanaState.error : error);
+  const currentAttestationStatus = serverBridge.isComplete ? 'complete' : (isSolanaInvolved ? solanaState.attestationStatus : attestationStatus);
+  const isComplete = currentAttestationStatus === 'complete' || serverBridge.isComplete;
 
   // Auto-refresh balances and auto-reset when bridge completes
   useEffect(() => {
@@ -481,6 +499,12 @@ const Bridge = () => {
     const epsilon = 0.000001; // 1 micro-unit tolerance
     if (amountNum > exactSourceBalance + epsilon) return false;
 
+    // Circle wallet: only Sepolia → Arc supported
+    if (isCircleWallet) {
+      if (fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet') return true;
+      return false;
+    }
+
     // Need external EVM wallet for signing bridge transactions
     if (fromNetwork !== 'solanaDevnet' && !isExternalWallet) return false;
 
@@ -491,7 +515,11 @@ const Bridge = () => {
   };
 
   const getButtonText = () => {
-    if (currentIsBridging) return 'Bridging...';
+    if (currentIsBridging || serverBridge.isBridging) return 'Bridging...';
+    if (isCircleWallet) {
+      if (fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet') return `Bridge to ${getNetworkName(toNetwork)}`;
+      return 'Only Sepolia → Arc supported';
+    }
     if (!isExternalWallet && fromNetwork !== 'solanaDevnet') return 'Connect Browser Wallet to Bridge';
     if (isSolanaInvolved && !solanaConnected) return 'Connect Solana Wallet';
     return `Bridge to ${getNetworkName(toNetwork)}`;
@@ -503,6 +531,7 @@ const Bridge = () => {
     }
     // Reset EVM bridge state
     resetCCTP();
+    serverBridge.reset();
     setSavedBridgeParams(null);
     setAmount("");
   };
@@ -816,8 +845,33 @@ const Bridge = () => {
             </div>
           )}
 
+          {/* Server Bridge Status (Circle wallet) */}
+          {serverBridge.isBridging && (
+            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <div className="flex items-start gap-3">
+                <Loader2 className="w-5 h-5 text-blue-400 animate-spin flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-400 mb-1">
+                    {serverBridge.phase === 'approving' || serverBridge.phase === 'waiting-approve'
+                      ? 'Approving USDC...'
+                      : serverBridge.phase === 'burning' || serverBridge.phase === 'waiting-burn'
+                      ? 'Burning USDC on Sepolia...'
+                      : serverBridge.phase === 'attestation'
+                      ? 'Waiting for Circle attestation...'
+                      : serverBridge.phase === 'claiming'
+                      ? 'Minting USDC on Arc Testnet...'
+                      : 'Processing...'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Server-side bridge — no wallet signature needed
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* EVM Bridge Status Messages */}
-          {isEVMtoEVM && (
+          {isEVMtoEVM && !serverBridge.isBridging && (
             <>
               {/* Attestation Status - Pending */}
               {attestationStatus === 'pending' && <AttestationCounter />}
