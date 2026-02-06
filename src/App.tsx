@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes";
 import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
 import { SolanaWalletProvider } from './providers/SolanaWalletProvider';
+import { CircleWalletProvider } from './providers/CircleWalletProvider';
 
 // Eagerly load landing page for fast initial render
 import Landing from "./pages/Landing";
@@ -63,13 +64,15 @@ const App = () => (
   <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>
       <SolanaWalletProvider>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <AppRoutes />
-          </TooltipProvider>
-        </ThemeProvider>
+        <CircleWalletProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <AppRoutes />
+            </TooltipProvider>
+          </ThemeProvider>
+        </CircleWalletProvider>
       </SolanaWalletProvider>
     </QueryClientProvider>
   </WagmiProvider>
