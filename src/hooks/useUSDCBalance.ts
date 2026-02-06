@@ -4,6 +4,7 @@ import { formatUnits, createPublicClient, http } from 'viem';
 import { SUPPORTED_NETWORKS } from '@/lib/constants';
 import { sepolia } from 'viem/chains';
 import { defineChain } from 'viem';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 // USDC contract addresses for different networks
 const USDC_ADDRESSES: Record<string, `0x${string}`> = {
@@ -46,8 +47,9 @@ const arcTestnet = defineChain({
 
 export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
   const account = useAccount();
-  const address = account?.address;
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
   const network = SUPPORTED_NETWORKS[networkKey];
   const usdcAddress = USDC_ADDRESSES[networkKey];
   const [balance, setBalance] = useState<bigint | null>(null);
@@ -273,8 +275,9 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
 // Hook to get balances for all testnet networks
 export const useAllUSDCBalances = () => {
   const account = useAccount();
-  const address = account?.address;
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
   
   const testnetNetworks = useMemo(() => {
     return Object.entries(SUPPORTED_NETWORKS)

@@ -4,6 +4,7 @@ import { formatUnits, createPublicClient, http } from 'viem';
 import { defineChain } from 'viem';
 import { rpcRateLimiter } from '@/lib/rpcRateLimiter';
 import { ERC20_ABI } from '@/lib/abis/erc20';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 // Arc Testnet chain definition
 const arcTestnet = defineChain({
@@ -39,8 +40,9 @@ export const useTokenBalance = ({
   refreshTrigger
 }: UseTokenBalanceParams) => {
   const account = useAccount();
-  const address = account?.address;
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
   const [balance, setBalance] = useState<bigint | null>(null);
   const [decimals, setDecimals] = useState<number | null>(providedDecimals || null);
   const [isLoading, setIsLoading] = useState(false);
