@@ -17,21 +17,6 @@ const ARC_DESTINATION_DOMAIN = 26;
 
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages';
 
-// Chain configs for viem (claim step)
-const arcTestnet = {
-  id: 5042002,
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } },
-} as const;
-
-const sepoliaChain = {
-  id: 11155111,
-  name: 'Sepolia',
-  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc.sepolia.org'] } },
-} as const;
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -53,7 +38,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'health':
         return res.status(200).json({
           ok: true,
-          hasRelayerKey: !!process.env.BRIDGE_RELAYER_KEY,
           hasCircleApi: !!process.env.CircleAPI,
         });
       default:
