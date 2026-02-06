@@ -144,6 +144,7 @@ const VAULT_ABI = [
   { inputs: [], name: "totalLockedUSDC", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "totalEURC", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "totalLockedEURC", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "_newAPYBps", type: "uint256" }], name: "setBaseAPY", outputs: [], stateMutability: "nonpayable", type: "function" },
 ];
 
 const ORACLE_ABI = [
@@ -622,27 +623,43 @@ async function handleSync(chatId: number) {
   const isOverpaying = data.contractAPY > targetContractAPY;
   const status = drift <= USYC_DRIFT_THRESHOLD ? "✅" : (isOverpaying ? "⚠️" : "📉");
 
-  const message = `
-🔄 *APY Sync Check*
+  if (drift > USYC_DRIFT_THRESHOLD && operatorWalletClient) {
+    // Auto-sync APY
+    try {
+      await sendMessage(chatId, `⏳ Syncing APY to ${suggestedBps} bps...`);
+      const gasPrice = await publicClient.getGasPrice();
+      const hash = await operatorWalletClient.writeContract({
+        address: PROXY_ADDRESS,
+        abi: VAULT_ABI,
+        functionName: "setBaseAPY",
+        args: [BigInt(suggestedBps)],
+        gas: 100_000n,
+        gasPrice,
+      });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
 
-📊 *Current State:*
-• Contract APY: *${data.contractAPY.toFixed(2)}%*
-• Net User APY: *${data.netAPY.toFixed(2)}%*
-• Real USYC APY: *${usycRealAPY.toFixed(2)}%*
+      const message = `✅ *APY Synced!*
 
-📐 *Analysis:*
-• Target Contract APY: ${targetContractAPY.toFixed(2)}%
-• Drift: ${drift.toFixed(2)}%
+• Old: ${data.contractAPY.toFixed(2)}% → New: ${targetContractAPY.toFixed(2)}% (${suggestedBps} bps)
+• Net User APY: ~${usycRealAPY.toFixed(2)}%
+• Drift was: ${drift.toFixed(2)}%
+
+[View Tx](https://testnet.arcscan.app/tx/${hash}) | Block: ${receipt.blockNumber}`;
+
+      await sendMessage(chatId, message, mainKeyboard());
+    } catch (e: any) {
+      await sendMessage(chatId, `❌ Auto-sync failed: ${e.message?.slice(0, 200)}\n\nManual: \`cd contracts && npx tsx scripts/setBaseAPY.ts ${suggestedBps}\``, mainKeyboard());
+    }
+  } else {
+    const message = `🔄 *APY Sync Check*
+
+• Contract APY: *${data.contractAPY.toFixed(2)}%* | Real USYC: *${usycRealAPY.toFixed(2)}%*
+• Target: ${targetContractAPY.toFixed(2)}% | Drift: ${drift.toFixed(2)}%
 • Status: ${status} ${drift <= USYC_DRIFT_THRESHOLD ? "In sync" : (isOverpaying ? "OVERPAYING" : "Underpaying")}
+${drift > USYC_DRIFT_THRESHOLD ? `\n\`cd contracts && npx tsx scripts/setBaseAPY.ts ${suggestedBps}\`` : "\n_No action needed_"}`;
 
-${drift > USYC_DRIFT_THRESHOLD ? `*To sync:*
-\`\`\`
-cd contracts
-npx tsx scripts/setBaseAPY.ts ${suggestedBps}
-\`\`\`` : "_No action needed_"}
-  `;
-
-  await sendMessage(chatId, message, mainKeyboard());
+    await sendMessage(chatId, message, mainKeyboard());
+  }
 }
 
 async function handleHelp(chatId: number) {
@@ -656,10 +673,10 @@ async function handleHelp(chatId: number) {
 /sync - Check APY vs real USYC
 /help - Show this help
 
-*Auto-Alerts (every 6h):*
+*Auto-Sync (every 6h):*
 • Compare with real USYC APY
-• Alert if drift > ${USYC_DRIFT_THRESHOLD}%
-• Provide exact command to sync
+• Auto-adjust if drift > ${USYC_DRIFT_THRESHOLD}%
+• Notify only on actual changes
 
 _Monitoring real Hashnote USYC data_
   `;
@@ -1459,38 +1476,60 @@ async function checkAlerts() {
       const suggestedBps = Math.round(targetContractAPY * 100);
       const isOverpaying = data.contractAPY > targetContractAPY;
 
-      const message = `🔔 *APY Sync Required*
+      // Auto-set APY if operator wallet is available
+      if (operatorWalletClient) {
+        try {
+          const gasPrice = await publicClient.getGasPrice();
+          const hash = await operatorWalletClient.writeContract({
+            address: PROXY_ADDRESS,
+            abi: VAULT_ABI,
+            functionName: "setBaseAPY",
+            args: [BigInt(suggestedBps)],
+            gas: 100_000n,
+            gasPrice,
+          });
 
-📊 *Current State:*
-• Contract APY: *${data.contractAPY.toFixed(2)}%*
-• Net User APY: *${data.netAPY.toFixed(2)}%*
-• Real USYC APY: *${usycRealAPY.toFixed(2)}%*
+          const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
 
-${isOverpaying ? "⚠️ *We are OVERPAYING!*" : "📉 *We are underpaying*"}
-Drift: ${drift.toFixed(2)}%
+          const message = `✅ *APY Auto-Synced*
 
-*Recommended Action:*
-\`\`\`
-cd contracts
-npx tsx scripts/setBaseAPY.ts ${suggestedBps}
-\`\`\`
-
-_This sets APY to ${targetContractAPY.toFixed(2)}% (${suggestedBps} bps)_
-_Net user APY will be ~${usycRealAPY.toFixed(2)}%_`;
-
-      await sendMessage(TELEGRAM_CHAT_ID, message);
-    } else {
-      // APY is in sync - send status report
-      const message = `✅ *APY Check - All Good*
-
-• Contract APY: ${data.contractAPY.toFixed(2)}%
-• Net User APY: ~${data.netAPY.toFixed(2)}%
+📊 *${isOverpaying ? "Was overpaying" : "Was underpaying"}* (drift: ${drift.toFixed(2)}%)
+• Old APY: ${data.contractAPY.toFixed(2)}%
+• New APY: ${targetContractAPY.toFixed(2)}% (${suggestedBps} bps)
+• Net User APY: ~${usycRealAPY.toFixed(2)}%
 • Real USYC APY: ${usycRealAPY.toFixed(2)}%
-• Drift: ${drift.toFixed(2)}% (threshold: ${USYC_DRIFT_THRESHOLD}%)
 
-_Next check in 6 hours_`;
+[View Tx](https://testnet.arcscan.app/tx/${hash})
+_Block: ${receipt.blockNumber}_`;
 
-      await sendMessage(TELEGRAM_CHAT_ID, message);
+          await sendMessage(TELEGRAM_CHAT_ID, message);
+          console.log(`[APY Auto-Sync] Set to ${suggestedBps} bps, tx: ${hash}`);
+        } catch (e: any) {
+          const message = `⚠️ *APY Auto-Sync Failed*
+
+Drift: ${drift.toFixed(2)}% | Target: ${suggestedBps} bps
+Error: ${e.message?.slice(0, 200)}
+
+*Manual fallback:*
+\`cd contracts && npx tsx scripts/setBaseAPY.ts ${suggestedBps}\``;
+
+          await sendMessage(TELEGRAM_CHAT_ID, message);
+          console.error("[APY Auto-Sync] Error:", e.message?.slice(0, 150));
+        }
+      } else {
+        // No operator wallet — fallback to manual notification
+        const message = `🔔 *APY Sync Required* (no operator key)
+
+• Contract APY: *${data.contractAPY.toFixed(2)}%* | Real USYC: *${usycRealAPY.toFixed(2)}%*
+• Drift: ${drift.toFixed(2)}% | Target: ${suggestedBps} bps
+
+\`cd contracts && npx tsx scripts/setBaseAPY.ts ${suggestedBps}\``;
+
+        await sendMessage(TELEGRAM_CHAT_ID, message);
+      }
+    } else {
+      // APY is in sync — silent, just log
+      console.log(`[APY Check] In sync. Contract: ${data.contractAPY.toFixed(2)}%, USYC: ${usycRealAPY.toFixed(2)}%, drift: ${drift.toFixed(2)}%`);
     }
   }
 
