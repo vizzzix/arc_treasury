@@ -258,9 +258,9 @@ const TreasuryVaultCardComponent = ({
 export const TreasuryVaultCard = React.memo(TreasuryVaultCardComponent, (prevProps, nextProps) => {
   // Only re-render if balance, APY, or interactive state changes
   return (
-    prevProps.balance.usdc === nextProps.balance.usdc &&
-    prevProps.balance.eurc === nextProps.balance.eurc &&
-    prevProps.balance.usyc === nextProps.balance.usyc &&
+    prevProps.balance?.usdc === nextProps.balance?.usdc &&
+    prevProps.balance?.eurc === nextProps.balance?.eurc &&
+    prevProps.balance?.usyc === nextProps.balance?.usyc &&
     prevProps.apy === nextProps.apy &&
     prevProps.interactive === nextProps.interactive &&
     prevProps.isAllowlisted === nextProps.isAllowlisted &&

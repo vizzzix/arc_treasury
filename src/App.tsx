@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,19 +9,23 @@ import { ThemeProvider } from "next-themes";
 import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
 import { SolanaWalletProvider } from './providers/SolanaWalletProvider';
+
+// Eagerly load landing page for fast initial render
 import Landing from "./pages/Landing";
-import DashboardSimplified from "./pages/DashboardSimplified";
-import FAQ from "./pages/FAQ";
-import Bridge from "./pages/Bridge";
-import Profile from "./pages/Profile";
-import Rewards from "./pages/Rewards";
-import Support from "./pages/Support";
-import Litepaper from "./pages/Litepaper";
-import LockDesignPreview from "./pages/LockDesignPreview";
-import Swap from "./pages/Swap";
-import PitchDeck from "./pages/PitchDeck";
-import BridgeSolana from "./pages/BridgeSolana";
-import NotFound from "./pages/NotFound";
+
+// Lazy load all other pages for code splitting
+const DashboardSimplified = lazy(() => import("./pages/DashboardSimplified"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const Bridge = lazy(() => import("./pages/Bridge"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Rewards = lazy(() => import("./pages/Rewards"));
+const Support = lazy(() => import("./pages/Support"));
+const Litepaper = lazy(() => import("./pages/Litepaper"));
+const LockDesignPreview = lazy(() => import("./pages/LockDesignPreview"));
+const Swap = lazy(() => import("./pages/Swap"));
+const PitchDeck = lazy(() => import("./pages/PitchDeck"));
+const BridgeSolana = lazy(() => import("./pages/BridgeSolana"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -31,23 +36,25 @@ const AppRoutes = () => {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/app" element={<DashboardSimplified />} />
-        <Route path="/dashboard" element={<DashboardSimplified />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/rewards" element={<Rewards />} />
-        <Route path="/faq" element={<FAQ />} />
-        <Route path="/bridge" element={<Bridge />} />
-        <Route path="/support" element={<Support />} />
-        <Route path="/litepaper" element={<Litepaper />} />
-        <Route path="/lock-preview" element={<LockDesignPreview />} />
-        <Route path="/swap" element={<Swap />} />
-        <Route path="/bridge-solana" element={<BridgeSolana />} />
-        <Route path="/pitch/:token" element={<PitchDeck />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/app" element={<DashboardSimplified />} />
+          <Route path="/dashboard" element={<DashboardSimplified />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/rewards" element={<Rewards />} />
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/bridge" element={<Bridge />} />
+          <Route path="/support" element={<Support />} />
+          <Route path="/litepaper" element={<Litepaper />} />
+          <Route path="/lock-preview" element={<LockDesignPreview />} />
+          <Route path="/swap" element={<Swap />} />
+          <Route path="/bridge-solana" element={<BridgeSolana />} />
+          <Route path="/pitch/:token" element={<PitchDeck />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };

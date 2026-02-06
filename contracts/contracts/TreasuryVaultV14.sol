@@ -130,6 +130,9 @@ contract TreasuryVaultV14 is
     uint256 public lastYieldAccrual;
     uint256 public yieldAPYBps;  // APY in basis points (e.g., 420 = 4.2%)
 
+    // V15: Slippage protection for USYC redemption (in BPS, default 300 = 3%)
+    uint256 public maxSlippageBps;
+
     // ============ Events ============
 
     event Deposit(address indexed user, uint256 amount, uint256 shares);
@@ -270,12 +273,14 @@ contract TreasuryVaultV14 is
 
     /**
      * @notice Calculate pending time-based points for active deposits
+     * @dev Limited to 100 deposits to prevent unbounded gas consumption
      */
     function _calculatePendingTimePoints(address user) internal view returns (uint256) {
         uint256 totalPending = 0;
         ActiveDeposit[] memory deposits = userActiveDeposits[user];
+        uint256 maxIter = deposits.length > 100 ? 100 : deposits.length;
 
-        for (uint256 i = 0; i < deposits.length; i++) {
+        for (uint256 i = 0; i < maxIter; i++) {
             if (deposits[i].amount == 0) continue;
 
             // Skip if below minimum
@@ -844,8 +849,9 @@ contract TreasuryVaultV14 is
             } catch {}
         }
 
-        // Calculate USYC amount needed (with small buffer for rounding)
-        uint256 usycToRedeem = (needed6Dec * 1e6 * 101) / (usycPrice * 100); // +1% buffer
+        // V15: Calculate USYC amount needed with configurable slippage buffer
+        uint256 slippage = maxSlippageBps > 0 ? maxSlippageBps : 300; // default 3%
+        uint256 usycToRedeem = (needed6Dec * 1e6 * (10000 + slippage)) / (usycPrice * 10000);
         if (usycToRedeem > totalUSYC) {
             usycToRedeem = totalUSYC;
         }
@@ -958,6 +964,12 @@ contract TreasuryVaultV14 is
     function setAutoConvertEnabled(bool _enabled) external onlyOwner {
         autoConvertEnabled = _enabled;
         emit AutoConvertToggled(_enabled);
+    }
+
+    /// @notice V15: Set max slippage for USYC redemption (in basis points)
+    function setMaxSlippage(uint256 _slippageBps) external onlyOwner {
+        require(_slippageBps <= 1000, "Slippage too high"); // Max 10%
+        maxSlippageBps = _slippageBps;
     }
 
     // ============ V13: Yield Simulation ============

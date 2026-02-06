@@ -3,30 +3,7 @@ import { useMemo, useRef, useEffect } from 'react';
 import { formatUnits, parseUnits, maxUint256, createPublicClient, http } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
-
-// ERC20 ABI for approve
-const ERC20_ABI = [
-  {
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    name: 'approve',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    name: 'allowance',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
+import { ERC20_ABI } from '@/lib/abis/erc20';
 
 // TreasuryVault ABI (simplified for main functions)
 const TREASURY_VAULT_ABI = [
@@ -176,20 +153,18 @@ export const useTreasuryVault = () => {
   // Common query options to handle 429 errors
   // Auto-refresh with longer interval to avoid 429 errors
   const commonQueryOptions = {
-    refetchInterval: 60000, // Auto-refresh every 60 seconds to avoid 429 errors
-    staleTime: 0, // Always consider data stale - refetch on mount
-    gcTime: 0, // Don't cache data - always fetch fresh (formerly cacheTime)
-    refetchOnMount: true, // Always refetch on component mount
-    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
+    staleTime: 30000, // Data considered fresh for 30s (avoids redundant refetches)
+    gcTime: 300000, // Keep cache for 5 minutes (instant back-navigation)
+    refetchOnMount: true,
+    refetchOnWindowFocus: false, // Avoid burst refetches on tab switch
     retry: (failureCount: number, error: any) => {
-      // Don't retry on 429 errors
       if (error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('Too Many Requests')) {
         return false;
       }
-      // Only retry once for other errors
       return failureCount < 1;
     },
-    retryDelay: 10000, // Wait 10 seconds before retry
+    retryDelay: 10000,
   };
 
   const { data: totalPoolValue, refetch: refetchTotalValue } = useReadContract({
@@ -265,20 +240,6 @@ export const useTreasuryVault = () => {
     },
   });
 
-  // DEBUG: Log query results
-  useEffect(() => {
-    console.log('[useTreasuryVault] QUERY RESULTS:', {
-      contract: TREASURY_CONTRACTS.TreasuryVault,
-      chainId: arcTestnet.id,
-      isArcTestnet,
-      totalUSDC: totalUSDC?.toString(),
-      totalUSDCError: totalUSDCError?.message,
-      userShares: userShares?.toString(),
-      userSharesError: userSharesError?.message,
-      address,
-      isConnected,
-    });
-  }, [totalUSDC, totalUSDCError, userShares, userSharesError, address, isConnected, isArcTestnet]);
 
   // Read total USYC
   const { data: totalUSYC, refetch: refetchTotalUSYC } = useReadContract({
@@ -418,28 +379,6 @@ export const useTreasuryVault = () => {
     return yield_ > 0 ? yield_ : 0;
   }, [userInfoData, userShareValue]);
 
-  // DEBUG: Log queries after mount
-  useEffect(() => {
-    console.log('[useTreasuryVault] Connection state:', {
-      isConnected,
-      chainId,
-      isArcTestnet,
-      address: address || 'not connected',
-    });
-    console.log('[useTreasuryVault] Query results:', {
-      totalUSDC: totalUSDC?.toString() || 'undefined',
-      totalEURC: totalEURC?.toString() || 'undefined',
-      userShares: userShares?.toString() || 'undefined',
-      userShareValue: userShareValue?.toString() || 'undefined',
-      pricePerShare: pricePerShare?.toString() || 'undefined',
-      formattedUserShareValue: formattedUserShareValue,
-      formattedUserShares: formattedUserShares,
-      formattedPricePerShare: formattedPricePerShare,
-      totalUSDCError: totalUSDCError?.message || 'none',
-      totalEURCError: totalEURCError?.message || 'none',
-      userSharesError: userSharesError?.message || 'none',
-    });
-  }, [isConnected, chainId, isArcTestnet, address, totalUSDC, totalEURC, userShares, userShareValue, pricePerShare, formattedUserShareValue, formattedUserShares, formattedPricePerShare, totalUSDCError, totalEURCError, userSharesError]);
 
   // Check USDC allowance
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
@@ -497,11 +436,9 @@ export const useTreasuryVault = () => {
           functionName: 'eurc',
         }) as `0x${string}`;
         eurcAddress = vaultEurc;
-        console.log('[deposit] Vault EURC address:', eurcAddress);
-      } catch {
+        } catch {
         eurcAddress = TOKEN_ADDRESSES.arcTestnet.EURC;
-        console.log('[deposit] Fallback to constants EURC:', eurcAddress);
-      }
+        }
       const amountWei = parseUnits(amount, 6); // EURC uses 6 decimals
 
       // Check EURC allowance on the vault's actual EURC token
@@ -553,20 +490,16 @@ export const useTreasuryVault = () => {
         chainId: arcTestnet.id,
       });
 
-      // Wait for transaction receipt and check status
-      console.log('[deposit] Waiting for transaction receipt...');
       const receipt = await client.waitForTransactionReceipt({
         hash: depositHash,
         timeout: 120000,
       });
-      console.log('[deposit] Receipt received:', receipt.status);
 
       if (receipt.status === 'reverted') {
         throw new Error('Transaction failed on blockchain');
       }
 
       // Trigger immediate refetch of balances after confirmed transaction
-      console.log('[deposit] Transaction confirmed, triggering refetch...');
 
       return depositHash;
     }
@@ -659,9 +592,7 @@ export const useTreasuryVault = () => {
     // If string is passed, convert to bigint with 18 decimals
     const sharesBigInt = typeof shares === 'bigint' ? shares : parseUnits(shares, 18);
 
-    console.log('[withdraw] Input shares:', typeof shares === 'bigint' ? 'bigint' : shares);
-    console.log('[withdraw] Currency:', currency);
-    console.log('[withdraw] Shares bigint:', sharesBigInt.toString());
+
 
     // Validate shares > 0
     if (sharesBigInt === 0n) {
@@ -714,7 +645,6 @@ export const useTreasuryVault = () => {
 
     // Start refetch immediately, stagger subsequent calls to avoid rate limiting
     refetchTimeoutRef.current = setTimeout(() => {
-      console.log('[refetchAll] Starting data refresh...');
       // Stagger the refetch calls to avoid overwhelming the RPC
       refetchTotalValue();
       refetchTotalUSDC();
@@ -758,7 +688,6 @@ export const useTreasuryVault = () => {
         functionName: currency === "USDC" ? 'userShares' : 'userEURCShares',
         args: [address],
       });
-      console.log('[getFreshUserShares] Fresh shares from contract:', shares?.toString());
       return shares as bigint || 0n;
     } catch (error) {
       console.error('[getFreshUserShares] Error reading shares:', error);

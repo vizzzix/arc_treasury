@@ -5,30 +5,7 @@ import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import TreasuryVaultABI from '@/lib/abis/TreasuryVault.json';
 import { useUSYCPrice } from './useUSYCPrice';
 import { arcTestnet } from '@/lib/wagmi';
-
-// ERC20 ABI for approve and allowance
-const ERC20_ABI = [
-  {
-    inputs: [
-      { name: 'spender', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    name: 'approve',
-    outputs: [{ name: '', type: 'bool' }],
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
-  {
-    inputs: [
-      { name: 'owner', type: 'address' },
-      { name: 'spender', type: 'address' },
-    ],
-    name: 'allowance',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
+import { ERC20_ABI } from '@/lib/abis/erc20';
 
 // Create public client for waiting on receipts
 const client = createPublicClient({

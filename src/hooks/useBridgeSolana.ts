@@ -158,7 +158,7 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       }
 
       console.log('[BridgeSolana] Creating EVM adapter...');
-      const evmAdapter = await createEVMAdapter({ provider: evmProvider });
+      const evmAdapter = await createEVMAdapter({ provider: evmProvider as any });
 
       console.log('[BridgeSolana] Creating Solana adapter...');
       const solanaAdapter = await createSolanaAdapter({
@@ -171,7 +171,7 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
 
       console.log(`[BridgeSolana] Bridging ${amount} USDC from ${fromChain} to ${toChain}`);
 
-      const result = await bridgeKit.bridge({
+      const result = await (bridgeKit as any).bridge({
         from: { adapter: evmAdapter, chain: fromChain },
         to: { adapter: solanaAdapter, chain: toChain },
         amount: amount,
@@ -253,8 +253,8 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       console.log('[BridgeSolana] Bridge result (EVM→Sol):', JSON.stringify(result, null, 2));
 
       // Try to track from result.steps if we didn't catch it from progress events
-      const burnStep = result?.steps?.find((s: any) => s.type === 'burn' || s.step === 'burn' || s.name === 'burn');
-      const resultTxHash = burnStep?.values?.txHash || burnStep?.txHash || burnStep?.transactionHash || burnStep?.hash || result?.txHash;
+      const burnStep = (result as any)?.steps?.find((s: any) => s.type === 'burn' || s.step === 'burn' || s.name === 'burn');
+      const resultTxHash = burnStep?.values?.txHash || burnStep?.txHash || burnStep?.transactionHash || burnStep?.hash || (result as any)?.txHash;
       if (resultTxHash && evmAddress) {
         const direction: SolanaDirection = fromNetwork === 'ethereumSepolia' ? 'sep_to_sol' : 'arc_to_sol';
         console.log('[BridgeSolana] Tracking from result:', resultTxHash);
@@ -402,14 +402,14 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       });
 
       console.log('[BridgeSolana] Creating EVM adapter...');
-      const evmAdapter = await createEVMAdapter({ provider: evmProvider });
+      const evmAdapter = await createEVMAdapter({ provider: evmProvider as any });
 
       const fromChain = SUPPORTED_NETWORKS.solanaDevnet.bridgeKitChain;
       const toChain = SUPPORTED_NETWORKS[toNetwork].bridgeKitChain;
 
       console.log(`[BridgeSolana] Bridging ${amount} USDC from ${fromChain} to ${toChain}`);
 
-      const result = await bridgeKit.bridge({
+      const result = await (bridgeKit as any).bridge({
         from: { adapter: solanaAdapter, chain: fromChain },
         to: { adapter: evmAdapter, chain: toChain },
         amount: amount,
@@ -487,8 +487,8 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       console.log('[BridgeSolana] Bridge result (Sol→EVM):', JSON.stringify(result, null, 2));
 
       // Try to track from result.steps if we didn't catch it from progress events
-      const burnStep = result?.steps?.find((s: any) => s.type === 'burn' || s.step === 'burn' || s.name === 'burn');
-      const resultTxHash = burnStep?.values?.txHash || burnStep?.txHash || burnStep?.transactionHash || burnStep?.hash || result?.txHash;
+      const burnStep = (result as any)?.steps?.find((s: any) => s.type === 'burn' || s.step === 'burn' || s.name === 'burn');
+      const resultTxHash = burnStep?.values?.txHash || burnStep?.txHash || burnStep?.transactionHash || burnStep?.hash || (result as any)?.txHash;
       if (resultTxHash && publicKey) {
         const direction: SolanaDirection = toNetwork === 'ethereumSepolia' ? 'sol_to_sep' : 'sol_to_arc';
         console.log('[BridgeSolana] Tracking from result (Sol→EVM):', resultTxHash);

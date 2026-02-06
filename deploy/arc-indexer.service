@@ -1,0 +1,16 @@
+[Unit]
+Description=Arc Treasury Ponder Indexer (blockchain events)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/arc-treasury/indexer
+ExecStart=/usr/bin/npx ponder start
+Restart=on-failure
+RestartSec=30
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/arc-treasury/.env
+
+[Install]
+WantedBy=multi-user.target

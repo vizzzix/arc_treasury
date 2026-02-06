@@ -1,0 +1,16 @@
+[Unit]
+Description=Arc Treasury Rebalance Bot (pool rebalancing)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/arc-treasury/railway-bot
+ExecStart=/usr/bin/node rebalance-bot.cjs --daemon --interval=300
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/arc-treasury/.env
+
+[Install]
+WantedBy=multi-user.target

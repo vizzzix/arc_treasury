@@ -1,0 +1,16 @@
+[Unit]
+Description=Arc Treasury Bots (Telegram + Points + Rebalance)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/arc-treasury/railway-bot
+ExecStart=/usr/bin/node --import tsx telegramBot.ts
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/arc-treasury/.env
+
+[Install]
+WantedBy=multi-user.target

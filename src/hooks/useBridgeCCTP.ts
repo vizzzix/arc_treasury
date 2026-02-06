@@ -23,152 +23,18 @@ import { parseUnits, encodeAbiParameters, concat, createWalletClient, custom, pa
 import { toast } from 'sonner';
 import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
-import { supabase } from '@/lib/supabase';
+import { MESSAGE_TRANSMITTER_ABI } from '@/lib/abis/cctp';
+import { debug, safeStringify, trackSiteBridge } from './bridge/utils';
+import { savePendingBurn, loadPendingBurn } from './bridge/storage';
+import type { BridgeNetwork, BridgeParams, BridgeEstimate, BridgeStep, BridgeState, LastBridgeResult, PendingBurn } from './bridge/types';
 
-// Debug mode - set to false for production
-const DEBUG = false;
-const debug = (...args: any[]) => DEBUG && debug('', ...args);
+// Re-export types for consumers
+export type { BridgeNetwork, BridgeParams, BridgeEstimate, BridgeStep, BridgeState, LastBridgeResult, PendingBurn };
 
-// Helper to safely stringify objects that may contain BigInt
-const safeStringify = (obj: any, space?: number): string => {
-  return JSON.stringify(obj, (_, value) =>
-    typeof value === 'bigint' ? value.toString() : value
-  , space);
-};
-
-// Track bridge initiated from our site
-const trackSiteBridge = async (txHash: string, walletAddress: string, amount: string, direction: 'to_arc' | 'to_sepolia') => {
-  if (!supabase) return;
-  try {
-    await supabase.from('site_bridges').upsert({
-      tx_hash: txHash.toLowerCase(),
-      wallet_address: walletAddress.toLowerCase(),
-      amount_usd: parseFloat(amount),
-      direction,
-      created_at: new Date().toISOString(),
-    }, { onConflict: 'tx_hash' });
-    debug(' Tracked site bridge:', txHash);
-  } catch (e) {
-    console.error('[useBridgeCCTP] Failed to track site bridge:', e);
-  }
-};
-// viem imports removed - using Circle API for message bytes
-
-type BridgeNetwork = keyof typeof SUPPORTED_NETWORKS;
-
-interface BridgeParams {
-  fromNetwork: BridgeNetwork;
-  toNetwork: BridgeNetwork;
-  amount: string;
-}
-
-interface BridgeTransaction {
-  hash: string;
-  network: string;
-  explorerUrl: string;
-  status: 'pending' | 'success' | 'failed';
-  step: string;
-}
-
-interface PendingBurn {
-  txHash: string;
-  fromNetwork: BridgeNetwork;
-  toNetwork: BridgeNetwork;
-  amount: string;
-  timestamp: number;
-}
-
-// Fee estimate from Bridge Kit 1.3.0
-interface BridgeFee {
-  type: 'gas' | 'provider' | 'relayer';
-  amount: string;
-  token: string;
-}
-
-interface BridgeEstimate {
-  amount: string;
-  token: string;
-  source: { chain: string };
-  destination: { chain: string };
-  fees: BridgeFee[];
-  totalFees: string;
-}
-
-// Step status from Bridge Kit 1.3.0
-interface BridgeStep {
-  name: 'approve' | 'burn' | 'fetchAttestation' | 'mint';
-  state: 'pending' | 'success' | 'error';
-  txHash?: string;
-  error?: string;
-}
-
-// Last bridge result for retry
-interface LastBridgeResult {
-  state: 'pending' | 'success' | 'error';
-  steps: BridgeStep[];
-  source: { address: string; chain: string };
-  destination: { address: string; chain: string };
-}
-
-interface BridgeState {
-  isBridging: boolean;
-  isClaiming: boolean;
-  isEstimating: boolean;
-  error: string | null;
-  result: any | null;
-  transactions: BridgeTransaction[];
-  mintConfirmed: boolean;
-  pendingBurn: PendingBurn | null;
-  estimate: BridgeEstimate | null;
-  steps: BridgeStep[];
-  lastResult: LastBridgeResult | null;
-}
-
-// Map our network names to Bridge Kit Blockchain enum
-const NETWORK_TO_BLOCKCHAIN: Record<BridgeNetwork, Blockchain> = {
+// Map our network names to Bridge Kit Blockchain enum (excludes solanaDevnet - handled by useBridgeSolana)
+const NETWORK_TO_BLOCKCHAIN: Record<string, Blockchain> = {
   ethereumSepolia: Blockchain.Ethereum_Sepolia,
   arcTestnet: Blockchain.Arc_Testnet,
-};
-
-// LocalStorage key for pending burns (per wallet address)
-const PENDING_BURN_STORAGE_KEY = 'arc_treasury_pending_burn';
-
-// Helper to save pending burn to localStorage
-const savePendingBurn = (address: string, pendingBurn: PendingBurn | null) => {
-  try {
-    if (pendingBurn) {
-      const data = { [address.toLowerCase()]: pendingBurn };
-      localStorage.setItem(PENDING_BURN_STORAGE_KEY, JSON.stringify(data));
-    } else {
-      // Remove for this address
-      const stored = localStorage.getItem(PENDING_BURN_STORAGE_KEY);
-      if (stored) {
-        const data = JSON.parse(stored);
-        delete data[address.toLowerCase()];
-        if (Object.keys(data).length === 0) {
-          localStorage.removeItem(PENDING_BURN_STORAGE_KEY);
-        } else {
-          localStorage.setItem(PENDING_BURN_STORAGE_KEY, JSON.stringify(data));
-        }
-      }
-    }
-  } catch (e) {
-    console.error('[useBridgeCCTP] Failed to save pending burn:', e);
-  }
-};
-
-// Helper to load pending burn from localStorage
-const loadPendingBurn = (address: string): PendingBurn | null => {
-  try {
-    const stored = localStorage.getItem(PENDING_BURN_STORAGE_KEY);
-    if (stored) {
-      const data = JSON.parse(stored);
-      return data[address.toLowerCase()] || null;
-    }
-  } catch (e) {
-    console.error('[useBridgeCCTP] Failed to load pending burn:', e);
-  }
-  return null;
 };
 
 export const useBridgeCCTP = () => {
@@ -342,8 +208,8 @@ export const useBridgeCCTP = () => {
         debug(' Estimating fees for:', { fromChain, toChain, amount });
 
         const estimate = await bridgeKit.estimate({
-          from: { adapter, chain: fromChain },
-          to: { adapter, chain: toChain },
+          from: { adapter, chain: fromChain as any },
+          to: { adapter, chain: toChain as any },
           amount,
         });
 
@@ -427,7 +293,7 @@ export const useBridgeCCTP = () => {
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error: any) {
           console.error('[useBridgeCCTP] Network switch error:', error);
-          setState({ isBridging: false, error: 'Failed to switch network', result: null, transactions: [] });
+          setState(prev => ({ ...prev, isBridging: false, error: 'Failed to switch network', result: null, transactions: [] }));
           toast.error('Failed to switch network', {
             description: `Please manually switch to ${SUPPORTED_NETWORKS[fromNetwork].name} in your wallet`,
           });
@@ -690,16 +556,7 @@ export const useBridgeCCTP = () => {
               chain: arcTestnetChain,
               account: address as `0x${string}`,
               address: CCTP_CONTRACTS.arcTestnet.MessageTransmitter,
-              abi: [{
-                name: 'receiveMessage',
-                type: 'function',
-                stateMutability: 'nonpayable',
-                inputs: [
-                  { name: 'message', type: 'bytes' },
-                  { name: 'attestation', type: 'bytes' }
-                ],
-                outputs: [{ name: 'success', type: 'bool' }]
-              }],
+              abi: MESSAGE_TRANSMITTER_ABI,
               functionName: 'receiveMessage',
               args: [messageBytes, attestationBytes],
             });
@@ -962,16 +819,7 @@ export const useBridgeCCTP = () => {
             chain: sepolia,
             account: address as `0x${string}`,
             address: CCTP_CONTRACTS.ethereumSepolia.MessageTransmitter,
-            abi: [{
-              name: 'receiveMessage',
-              type: 'function',
-              stateMutability: 'nonpayable',
-              inputs: [
-                { name: 'message', type: 'bytes' },
-                { name: 'attestation', type: 'bytes' },
-              ],
-              outputs: [{ name: 'success', type: 'bool' }],
-            }],
+            abi: MESSAGE_TRANSMITTER_ABI,
             functionName: 'receiveMessage',
             args: [messageBytes, attestationBytes],
           });
@@ -1047,7 +895,7 @@ export const useBridgeCCTP = () => {
           setState(prev => ({
             ...prev,
             isBridging: false,
-            pendingBurn: { txHash: burnTxHash, fromNetwork, toNetwork, amount, timestamp: Date.now() }
+            pendingBurn: { txHash: burnTxHash || '', fromNetwork, toNetwork, amount, timestamp: Date.now() }
           }));
           return;
         }
@@ -1185,7 +1033,7 @@ export const useBridgeCCTP = () => {
       }
 
       const destNetwork = detectedDestNetwork;
-      const destContracts = CCTP_CONTRACTS[destNetwork];
+      const destContracts = CCTP_CONTRACTS[destNetwork as keyof typeof CCTP_CONTRACTS];
 
       debug(' Dest network:', destNetwork);
 
@@ -1246,25 +1094,11 @@ export const useBridgeCCTP = () => {
 
       debug(' Created destination wallet client, calling receiveMessage...');
 
-      // MessageTransmitter ABI for receiveMessage
-      const messageTransmitterABI = [
-        {
-          name: 'receiveMessage',
-          type: 'function',
-          stateMutability: 'nonpayable',
-          inputs: [
-            { name: 'message', type: 'bytes' },
-            { name: 'attestation', type: 'bytes' }
-          ],
-          outputs: [{ name: 'success', type: 'bool' }]
-        }
-      ] as const;
-
       const hash = await destWalletClient.writeContract({
         chain: destChain,
         account: address as `0x${string}`,
         address: destContracts.MessageTransmitter,
-        abi: messageTransmitterABI,
+        abi: MESSAGE_TRANSMITTER_ABI,
         functionName: 'receiveMessage',
         args: [messageBytes as `0x${string}`, attestation as `0x${string}`],
       });
@@ -1380,19 +1214,19 @@ export const useBridgeCCTP = () => {
           isBridging: false,
           mintConfirmed: true,
           lastResult: null,
-          steps: retryResult.steps || [],
+          steps: (retryResult.steps || []) as BridgeStep[],
         }));
       } else {
         // Still failed - save for another retry
-        const errorStep = retryResult.steps?.find((s: any) => s.state === 'error');
-        const errorMsg = errorStep?.error || 'Retry failed';
+        const errorStep = (retryResult as any).steps?.find((s: any) => s.state === 'error');
+        const errorMsg = String(errorStep?.error || 'Retry failed');
         toast.error('Retry failed', { description: errorMsg });
         setState(prev => ({
           ...prev,
           isBridging: false,
           error: errorMsg,
-          lastResult: retryResult as LastBridgeResult,
-          steps: retryResult.steps || [],
+          lastResult: retryResult as unknown as LastBridgeResult,
+          steps: (retryResult.steps || []) as BridgeStep[],
         }));
       }
 

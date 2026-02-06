@@ -34,7 +34,7 @@ export const TOKEN_MESSENGER_ABI = parseAbi([
 
   // Events
   'event DepositForBurn(uint64 indexed nonce, address indexed burnToken, uint256 amount, address indexed depositor, bytes32 mintRecipient, uint32 destinationDomain, bytes32 destinationTokenMessenger, bytes32 destinationCaller)',
-]) as const;
+]);
 
 /**
  * MessageTransmitter ABI
@@ -54,7 +54,7 @@ export const MESSAGE_TRANSMITTER_ABI = parseAbi([
 
   // Events
   'event MessageReceived(address indexed caller, uint32 sourceDomain, uint64 indexed nonce, bytes32 sender, bytes messageBody)',
-]) as const;
+]);
 
 /**
  * ERC20 ABI (minimal)
@@ -65,7 +65,7 @@ export const ERC20_ABI = parseAbi([
   'function allowance(address owner, address spender) external view returns (uint256)',
   'function balanceOf(address account) external view returns (uint256)',
   'function decimals() external view returns (uint8)',
-]) as const;
+]);
 
 /**
  * CCTP Domain IDs
@@ -86,4 +86,4 @@ export const CCTP_DOMAIN_IDS = {
 export const ARC_BRIDGE_ABI = parseAbi([
   // Bridge with preapproval - includes destination token messenger and finality threshold
   'function bridgeWithPreapproval((uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, address destinationTokenMessenger, uint32 destinationDomain2, uint32 finalityThreshold) bridgeParams) external returns (uint64 nonce)',
-]) as const;
+]);

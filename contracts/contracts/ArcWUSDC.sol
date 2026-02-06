@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ArcWUSDC
@@ -16,7 +17,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *   deposit(): native USDC (18 dec) -> wrapped balance (6 dec)
  *   withdraw(): wrapped balance (6 dec) -> native USDC (18 dec)
  */
-contract ArcWUSDC {
+contract ArcWUSDC is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @notice The native USDC ERC20 address on Arc (6 decimals)
@@ -69,7 +70,7 @@ contract ArcWUSDC {
      * @notice Unwrap WUSDC to native USDC
      * @param amount Amount in 6 decimals to unwrap
      */
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be > 0");
         require(balanceOf[msg.sender] >= amount, "Insufficient balance");
 
@@ -77,15 +78,16 @@ contract ArcWUSDC {
         uint256 nativeAmount = amount * 1e12;
         require(address(this).balance >= nativeAmount, "Insufficient native balance");
 
+        // CEI: update state before external call
         balanceOf[msg.sender] -= amount;
         totalSupply -= amount;
 
-        // Transfer native USDC
-        (bool success, ) = payable(msg.sender).call{value: nativeAmount}("");
-        require(success, "Transfer failed");
-
         emit Transfer(msg.sender, address(0), amount);
         emit Withdraw(msg.sender, amount, nativeAmount);
+
+        // External call last
+        (bool success, ) = payable(msg.sender).call{value: nativeAmount}("");
+        require(success, "Transfer failed");
     }
 
     /**

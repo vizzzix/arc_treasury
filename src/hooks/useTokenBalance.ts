@@ -3,6 +3,7 @@ import { useMemo, useEffect, useState, useRef } from 'react';
 import { formatUnits, createPublicClient, http } from 'viem';
 import { defineChain } from 'viem';
 import { rpcRateLimiter } from '@/lib/rpcRateLimiter';
+import { ERC20_ABI } from '@/lib/abis/erc20';
 
 // Arc Testnet chain definition
 const arcTestnet = defineChain({
@@ -16,25 +17,7 @@ const arcTestnet = defineChain({
     default: { name: 'Arc Explorer', url: 'https://testnet.arcscan.app' },
   },
   testnet: true,
-}) as const;
-
-// ERC20 ABI for balanceOf and decimals
-const ERC20_ABI = [
-  {
-    inputs: [{ name: 'account', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'decimals',
-    outputs: [{ name: '', type: 'uint8' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
+});
 
 interface UseTokenBalanceParams {
   tokenAddress: `0x${string}`;

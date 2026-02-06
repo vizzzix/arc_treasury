@@ -42,7 +42,7 @@ const arcTestnet = defineChain({
     default: { name: 'Arc Explorer', url: 'https://testnet.arcscan.app' },
   },
   testnet: true,
-}) as const;
+});
 
 export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
   const account = useAccount();

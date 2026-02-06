@@ -31,8 +31,8 @@ contract USYCOracle is IUSYCOracle, Ownable {
     /// @notice Maximum time before price is considered stale (24 hours)
     uint256 public constant MAX_STALE_TIME = 86400;
 
-    /// @notice Maximum price drift per update (5% = 500 basis points)
-    uint256 public constant MAX_PRICE_DRIFT_BPS = 500;
+    /// @notice Maximum price drift per update (1% = 100 basis points)
+    uint256 public constant MAX_PRICE_DRIFT_BPS = 100;
 
     /// @notice Whether oracle is paused
     bool public paused;
