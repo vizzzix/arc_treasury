@@ -338,7 +338,10 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
   const account = privateKeyToAccount(cleanKey as `0x${string}`);
 
   const destChain = isArcToSepolia ? sepoliaChain : arcTestnet;
-  const destRpc = isArcToSepolia ? 'https://rpc.sepolia.org' : 'https://rpc.testnet.arc.network';
+  const sepoliaRpc = process.env.INFURA_API
+    ? `https://sepolia.infura.io/v3/${process.env.INFURA_API}`
+    : 'https://rpc.sepolia.org';
+  const destRpc = isArcToSepolia ? sepoliaRpc : 'https://rpc.testnet.arc.network';
   const destTransmitter = isArcToSepolia ? SEPOLIA_MESSAGE_TRANSMITTER : ARC_MESSAGE_TRANSMITTER;
 
   const publicClient = createPublicClient({
