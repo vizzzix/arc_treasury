@@ -18,8 +18,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleBalance(req, res);
       case 'get':
         return await handleGet(req, res);
+      case 'health':
+        return res.status(200).json({
+          ok: true,
+          hasApiKey: !!process.env.CircleAPI,
+          hasEntitySecret: !!process.env.CIRCLE_ENTITY_SECRET,
+          apiKeyPrefix: process.env.CircleAPI?.substring(0, 12) || 'missing',
+        });
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: create, balance, get' });
+        return res.status(400).json({ error: 'Invalid action. Use: create, balance, get, health' });
     }
   } catch (error: any) {
     console.error('[Wallet API] Error:', error?.response?.data || error.message || error);
