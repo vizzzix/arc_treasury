@@ -331,7 +331,8 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
 
   const { privateKeyToAccount } = await import('viem/accounts');
   const { createPublicClient, createWalletClient, http } = await import('viem');
-  const account = privateKeyToAccount(relayerKey as `0x${string}`);
+  const formattedKey = relayerKey.startsWith('0x') ? relayerKey : `0x${relayerKey}`;
+  const account = privateKeyToAccount(formattedKey as `0x${string}`);
 
   const destChain = isArcToSepolia ? sepoliaChain : arcTestnet;
   const destRpc = isArcToSepolia ? 'https://rpc.sepolia.org' : 'https://rpc.testnet.arc.network';
