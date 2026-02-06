@@ -4,7 +4,7 @@ import crypto from 'crypto';
 const CIRCLE_API_BASE = 'https://api.circle.com/v1/w3s';
 
 // CCTP / Bridge constants — Sepolia
-const ARC_BRIDGE_CONTRACT = '0xC5567a5E3370d4DBfB0540025078e283e36A363d';
+const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
 const USDC_SEPOLIA = '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238';
 const SEPOLIA_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275';
 const SEPOLIA_DOMAIN = 0;
@@ -128,7 +128,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
   const approveAmount = (amountMicro * 10n).toString();
 
   const contractAddress = isArcToSepolia ? USDC_ARC : USDC_SEPOLIA;
-  const spender = isArcToSepolia ? ARC_TOKEN_MESSENGER : ARC_BRIDGE_CONTRACT;
+  const spender = isArcToSepolia ? ARC_TOKEN_MESSENGER : SEPOLIA_TOKEN_MESSENGER;
 
   console.log(`[Bridge] Approve: wallet=${walletId}, amount=${amount}, direction=${direction || 'sepolia-to-arc'}, spender=${spender}`);
 
@@ -193,20 +193,20 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
       state: result?.state,
     });
   } else {
-    // Sepolia → Arc: bridgeWithPreapproval on ARC_BRIDGE_CONTRACT
+    // Sepolia → Arc: CCTP V2 depositForBurn on TokenMessenger
+    const mintRecipient = padAddress(recipientAddress);
+
     const result = await circlePost('/developer/transactions/contractExecution', {
       walletId,
-      contractAddress: ARC_BRIDGE_CONTRACT,
-      abiFunctionSignature: 'bridgeWithPreapproval(uint256,uint256,uint256,address,bytes32,address,address,uint256,uint256)',
+      contractAddress: SEPOLIA_TOKEN_MESSENGER,
+      abiFunctionSignature: 'depositForBurn(uint256,uint32,bytes32,address,bytes32,uint256,uint32)',
       abiParameters: [
         amountMicro.toString(),
-        maxFee.toString(),
-        '0',
-        recipientAddress,
-        zeroBytes32,
-        USDC_SEPOLIA,
-        ARC_BRIDGE_CONTRACT,
         ARC_DESTINATION_DOMAIN.toString(),
+        mintRecipient,
+        USDC_SEPOLIA,
+        zeroBytes32,
+        maxFee.toString(),
         '1000',
       ],
       feeLevel: 'HIGH',
