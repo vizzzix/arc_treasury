@@ -272,14 +272,14 @@ async function isSiteBridge(walletAddress: string, direction: 'to_arc' | 'to_sep
   if (!supabase) return false;
 
   try {
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
     const { data, error } = await supabase
       .from('site_bridges')
       .select('tx_hash')
       .eq('wallet_address', walletAddress.toLowerCase())
       .eq('direction', direction)
-      .gte('created_at', tenMinutesAgo)
+      .gte('created_at', thirtyMinutesAgo)
       .limit(1);
 
     if (error) {
@@ -717,6 +717,13 @@ async function checkDepositEvents() {
     // Check for new blocks
     if (currentBlock <= lastBlockChecked) return;
 
+    // Limit range to 10000 blocks to avoid RPC eth_getLogs limit
+    const MAX_EVENT_RANGE = 10000n;
+    if (currentBlock - lastBlockChecked > MAX_EVENT_RANGE) {
+      console.log(`[${new Date().toISOString()}] Block gap too large (${currentBlock - lastBlockChecked}), skipping to recent`);
+      lastBlockChecked = currentBlock - MAX_EVENT_RANGE;
+    }
+
     console.log(`[${new Date().toISOString()}] Checking blocks ${lastBlockChecked + 1n} to ${currentBlock}`);
 
     // Get Deposit events (flexible deposits)
@@ -922,6 +929,10 @@ async function checkBadgeMints() {
 
     if (currentBlock <= lastBadgeBlockChecked) return;
 
+    if (currentBlock - lastBadgeBlockChecked > 10000n) {
+      lastBadgeBlockChecked = currentBlock - 10000n;
+    }
+
     // Get Transfer events from badge contract (from 0x0 = mint)
     const logs = await publicClient.getLogs({
       address: BADGE_ADDRESS,
@@ -982,7 +993,7 @@ Supply: ${totalSupply.toString()} / ${maxSupply.toString()}
 async function checkBridgeEvents() {
   if (!TELEGRAM_CHAT_ID) return;
 
-  const MAX_BLOCK_RANGE = 500n; // Limit to avoid RPC errors
+  const MAX_BLOCK_RANGE = 9999n; // Just under RPC 10000 block limit
 
   try {
     // === Monitor Arc Testnet (incoming from Sepolia) ===
@@ -1173,6 +1184,11 @@ async function checkSwapEvents() {
     }
 
     if (currentBlock <= lastSwapBlockChecked) return;
+
+    // Limit range to avoid RPC errors
+    if (currentBlock - lastSwapBlockChecked > 10000n) {
+      lastSwapBlockChecked = currentBlock - 10000n;
+    }
 
     // Monitor Swap events
     const swapLogs = await publicClient.getLogs({
