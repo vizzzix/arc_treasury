@@ -245,17 +245,46 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   const { txId } = req.query;
   if (!txId || typeof txId !== 'string') return res.status(400).json({ error: 'txId required' });
 
-  const result = await circleGet(`/transactions/${txId}`);
-  const tx = result?.transaction;
+  const apiKey = process.env.CircleAPI;
+  if (!apiKey) throw new Error('Missing CircleAPI');
 
-  return res.status(200).json({
-    id: tx?.id,
-    state: tx?.state,
-    txHash: tx?.txHash,
-    errorReason: tx?.errorReason,
-    createDate: tx?.createDate,
-    updateDate: tx?.updateDate,
-  });
+  // Try the standard path first, then fallback to /developer/ path
+  const paths = [
+    `/transactions/${txId}`,
+    `/developer/transactions/${txId}`,
+  ];
+
+  for (const path of paths) {
+    const url = `${CIRCLE_API_BASE}${path}`;
+    try {
+      const r = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+      });
+      const data = await r.json();
+
+      console.log(`[Bridge] tx-status GET ${path} → ${r.status}:`, JSON.stringify(data));
+
+      if (!r.ok) continue; // Try next path
+
+      // Handle both response structures:
+      // { data: { transaction: { id, state, ... } } } or { data: { id, state, ... } }
+      const inner = data.data;
+      const tx = inner?.transaction || inner;
+
+      return res.status(200).json({
+        id: tx?.id,
+        state: tx?.state,
+        txHash: tx?.txHash,
+        errorReason: tx?.errorReason,
+        createDate: tx?.createDate,
+        updateDate: tx?.updateDate,
+      });
+    } catch (e: any) {
+      console.warn(`[Bridge] tx-status ${path} error:`, e.message);
+    }
+  }
+
+  return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
 }
 
 // --- Step 4: Claim on destination chain (backend relayer) ---
