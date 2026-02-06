@@ -8,6 +8,7 @@ import { formatUnits } from "viem";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletConnect } from "@/components/WalletConnect";
 import { WalletHeader } from "@/components/WalletHeader";
+import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useBridgeCCTP } from "@/hooks/useBridgeCCTP";
 import { useBridgeSolana, EVMNetwork } from "@/hooks/useBridgeSolana";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
@@ -74,7 +75,9 @@ const AttestationCounter = () => {
 const Bridge = () => {
   const navigate = useNavigate();
   const account = useAccount();
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const isExternalWallet = account?.isConnected ?? false;
+  const isConnected = isExternalWallet || unifiedWallet.isConnected;
 
   // Unified network selection
   const [fromNetwork, setFromNetwork] = useState<NetworkType>('ethereumSepolia');
@@ -236,14 +239,15 @@ const Bridge = () => {
   }, [showTwitterBoost]);
 
   // Fetch Twitter status to show boost notification
+  const walletAddress = account?.address || unifiedWallet.address;
   useEffect(() => {
-    if (!account?.address || !showTwitterBoost) return;
+    if (!walletAddress || !showTwitterBoost) return;
 
-    fetch(`/api/twitter?action=status&walletAddress=${account.address}`)
+    fetch(`/api/twitter?action=status&walletAddress=${walletAddress}`)
       .then(res => res.json())
       .then(data => setTwitterStatus(data))
       .catch(() => {});
-  }, [account?.address, showTwitterBoost]);
+  }, [walletAddress, showTwitterBoost]);
 
   // Handle bridge based on networks
   const handleBridge = async () => {
@@ -477,8 +481,8 @@ const Bridge = () => {
     const epsilon = 0.000001; // 1 micro-unit tolerance
     if (amountNum > exactSourceBalance + epsilon) return false;
 
-    // Need EVM wallet for EVM networks
-    if (fromNetwork !== 'solanaDevnet' && !isConnected) return false;
+    // Need external EVM wallet for signing bridge transactions
+    if (fromNetwork !== 'solanaDevnet' && !isExternalWallet) return false;
 
     // Need Solana wallet for Solana
     if (isSolanaInvolved && !solanaConnected) return false;
@@ -488,7 +492,7 @@ const Bridge = () => {
 
   const getButtonText = () => {
     if (currentIsBridging) return 'Bridging...';
-    if (!isConnected && fromNetwork !== 'solanaDevnet') return 'Connect EVM Wallet';
+    if (!isExternalWallet && fromNetwork !== 'solanaDevnet') return 'Connect Browser Wallet to Bridge';
     if (isSolanaInvolved && !solanaConnected) return 'Connect Solana Wallet';
     return `Bridge to ${getNetworkName(toNetwork)}`;
   };

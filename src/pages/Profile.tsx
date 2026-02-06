@@ -456,11 +456,6 @@ const Profile = () => {
               )}
             </div>
 
-            {/* Session */}
-            <div className="p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Session</h3>
-              <WalletConnect />
-            </div>
           </div>
         )}
       </div>
