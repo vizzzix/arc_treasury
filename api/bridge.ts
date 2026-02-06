@@ -91,7 +91,12 @@ async function circlePost(path: string, body: any) {
   });
 
   const data = await r.json();
-  if (!r.ok) throw new Error(data?.message || JSON.stringify(data) || `Circle API error: ${r.status}`);
+  if (!r.ok) {
+    const errMsg = data?.message || 'Unknown error';
+    const errDetails = data?.errors ? JSON.stringify(data.errors) : '';
+    console.error('[Circle API] Error:', r.status, errMsg, errDetails, JSON.stringify(data));
+    throw new Error(`${errMsg}${errDetails ? ` | ${errDetails}` : ''}`);
+  }
   return data.data;
 }
 
@@ -127,7 +132,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
     contractAddress: USDC_SEPOLIA,
     abiFunctionSignature: 'approve(address,uint256)',
     abiParameters: [ARC_BRIDGE_CONTRACT, approveAmount],
-    fee: { type: 'level', config: { feeLevel: 'HIGH' } },
+    feeLevel: 'HIGH',
   });
 
   console.log('[Bridge] Approve result:', JSON.stringify(result));
@@ -175,7 +180,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
       ARC_DESTINATION_DOMAIN.toString(),
       minFinalityThreshold.toString(),
     ],
-    fee: { type: 'level', config: { feeLevel: 'HIGH' } },
+    feeLevel: 'HIGH',
   });
 
   console.log('[Bridge] Burn result:', JSON.stringify(result));
@@ -194,7 +199,7 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   const { txId } = req.query;
   if (!txId || typeof txId !== 'string') return res.status(400).json({ error: 'txId required' });
 
-  const result = await circleGet(`/transactions/${txId}`);
+  const result = await circleGet(`/developer/transactions/${txId}`);
   const tx = result?.transaction;
 
   return res.status(200).json({
