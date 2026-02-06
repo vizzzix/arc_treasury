@@ -101,17 +101,10 @@ export const WalletConnect = () => {
     setOtp('');
   };
 
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const hasInjectedProvider = typeof window !== 'undefined' && !!(window as any).ethereum;
-
-  const handleButtonClick = () => {
-    setShowModal(true);
-  };
-
   return (
     <>
       <Button
-        onClick={handleButtonClick}
+        onClick={() => setShowModal(true)}
         disabled={isPending || circleWallet.isLoading}
         className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-glow hover:shadow-glow-lg transition-all"
       >

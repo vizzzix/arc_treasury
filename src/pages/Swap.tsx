@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useAccount, useSwitchChain } from "wagmi";
 import { useToast } from "@/hooks/use-toast";
 import { WalletConnect } from "@/components/WalletConnect";
-import { UserMenu } from "@/components/UserMenu";
+import { WalletHeader } from "@/components/WalletHeader";
 import { useSwapPool } from "@/hooks/useSwapPool";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -197,7 +197,7 @@ const Swap = () => {
               <div className="h-4 w-px bg-border/30" />
               <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Swap</h1>
             </div>
-            {isConnected ? <UserMenu /> : <WalletConnect />}
+            <WalletHeader />
           </div>
         </div>
       </nav>

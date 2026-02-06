@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WalletConnect } from "@/components/WalletConnect";
-import { UserMenu } from "@/components/UserMenu";
+import { WalletHeader } from "@/components/WalletHeader";
 import TwitterConnect from "@/components/TwitterConnect";
 import { ArrowLeft, ExternalLink, Copy, Check, Wallet, Link, Mail, Loader2, Shield } from "lucide-react";
 import { SUPPORTED_NETWORKS } from "@/lib/constants";
@@ -245,7 +245,7 @@ const Profile = () => {
               <div className="h-4 w-px bg-border/30" />
               <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Profile</h1>
             </div>
-            {isConnected ? <UserMenu /> : <WalletConnect />}
+            <WalletHeader />
           </div>
         </div>
       </nav>

@@ -1,17 +1,14 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { WalletConnect } from "@/components/WalletConnect";
-import { UserMenu } from "@/components/UserMenu";
+import { WalletHeader } from "@/components/WalletHeader";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAccount } from "wagmi";
 import { TREASURY_CONTRACTS, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
 import arcLogo from "@/assets/arc-logo.png";
 
 const FAQ = () => {
   const navigate = useNavigate();
-  const { isConnected } = useAccount();
   const { apy } = useUSYCPrice();
 
   const faqs = [
@@ -95,7 +92,7 @@ const FAQ = () => {
               <h1 className="text-2xl font-bold">FAQ</h1>
             </div>
             <div className="flex items-center gap-3">
-              {isConnected ? <UserMenu /> : <WalletConnect />}
+              <WalletHeader />
             </div>
           </div>
         </div>

@@ -4,7 +4,7 @@ import { useAccount, useSwitchChain } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { WalletConnect } from "@/components/WalletConnect";
-import { UserMenu } from "@/components/UserMenu";
+import { WalletHeader } from "@/components/WalletHeader";
 import { LockedPositionCard } from "@/components/LockedPositionCard";
 import { LockPeriod } from "@/components/LockPeriodSelector";
 import { DepositModal } from "@/components/DepositModal";
@@ -16,6 +16,7 @@ import { useLockedPositions, useWithdrawLocked, useEarlyWithdrawLocked, useClaim
 import { useTreasuryVault } from "@/hooks/useTreasuryVault";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
+import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useTVL } from "@/hooks/useTVL";
 import { TOKEN_ADDRESSES, TOKEN_DECIMALS, MIGRATION_IN_PROGRESS, SHOW_MIGRATION_SUCCESS, USYC_WHITELIST_PENDING, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +25,8 @@ import arcLogo from "@/assets/arc-logo.png";
 const DashboardSimplified = () => {
   const navigate = useNavigate();
   const account = useAccount();
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
   const chainId = account?.chainId;
   const isArcTestnet = chainId === 5042002;
   const { switchChainAsync } = useSwitchChain();
@@ -297,11 +299,7 @@ const DashboardSimplified = () => {
                 <ArrowLeftRight className="w-4 h-4" />
                 Bridge
               </Button>
-              {isConnected ? (
-                <UserMenu />
-              ) : (
-                <WalletConnect />
-              )}
+              <WalletHeader />
             </div>
           </div>
         </div>

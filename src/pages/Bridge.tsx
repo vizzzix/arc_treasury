@@ -7,7 +7,7 @@ import { useAccount } from "wagmi";
 import { formatUnits } from "viem";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletConnect } from "@/components/WalletConnect";
-import { UserMenu } from "@/components/UserMenu";
+import { WalletHeader } from "@/components/WalletHeader";
 import { useBridgeCCTP } from "@/hooks/useBridgeCCTP";
 import { useBridgeSolana, EVMNetwork } from "@/hooks/useBridgeSolana";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
@@ -547,7 +547,7 @@ const Bridge = () => {
                   </Button>
                 )
               )}
-              {isConnected ? <UserMenu /> : <WalletConnect />}
+              <WalletHeader />
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { useAccount, useReadContract, useSwitchChain } from "wagmi";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
-import { UserMenu } from "@/components/UserMenu";
+import { WalletHeader } from "@/components/WalletHeader";
 import { ArrowLeft, Copy, Check, Twitter, Send, Loader2, Trophy, ChevronDown, ChevronUp } from "lucide-react";
 import { useUserPoints } from "@/hooks/useUserPoints";
 import { useReferral } from "@/hooks/useReferral";
@@ -198,7 +198,7 @@ const Rewards = () => {
               <div className="h-4 w-px bg-border/30" />
               <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Rewards</h1>
             </div>
-            {isConnected ? <UserMenu /> : <WalletConnect />}
+            <WalletHeader />
           </div>
         </div>
       </nav>
