@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 interface ReferralStats {
   address: string;
@@ -32,7 +33,8 @@ interface Referral {
 
 export const useReferral = () => {
   const account = useAccount();
-  const address = account?.address;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
 
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);

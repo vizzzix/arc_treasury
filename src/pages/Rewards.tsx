@@ -263,7 +263,7 @@ const Rewards = () => {
             <p className="text-muted-foreground">Connect wallet to view your rewards</p>
             <WalletConnect />
           </div>
-        ) : isArcTestnet && (
+        ) : (isArcTestnet || !isExternalWallet) && (
           <div className="space-y-4">
             {/* Top Row: Points + Badge + Referral Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

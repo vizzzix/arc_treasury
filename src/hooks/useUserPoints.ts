@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { supabase } from '@/lib/supabase';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 export interface PointsBreakdown {
   bridgePoints: number;
@@ -23,8 +24,9 @@ export interface UserPointsData {
 
 export const useUserPoints = () => {
   const account = useAccount();
-  const address = account?.address;
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
 
   const [pointsData, setPointsData] = useState<UserPointsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
