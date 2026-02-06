@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { initiateCircleSdk, createWalletSet, createWallet, getWalletBalance, getWallet } from '../src/lib/circle-server';
+import { createWalletSet, createWallet, getWalletBalance, getWallet } from '../src/lib/circle-server';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,17 +23,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ok: true,
           hasApiKey: !!process.env.CircleAPI,
           hasEntitySecret: !!process.env.CIRCLE_ENTITY_SECRET,
-          apiKeyPrefix: process.env.CircleAPI?.substring(0, 12) || 'missing',
         });
       default:
         return res.status(400).json({ error: 'Invalid action. Use: create, balance, get, health' });
     }
   } catch (error: any) {
-    console.error('[Wallet API] Error:', error?.response?.data || error.message || error);
-    return res.status(500).json({
-      error: error.message || 'Internal server error',
-      details: error?.response?.data || undefined,
-    });
+    console.error('[Wallet API] Error:', error.message || error);
+    return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }
 
@@ -43,27 +39,17 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'userId required' });
 
-  try {
-    const sdk = initiateCircleSdk();
+  // Create wallet set for this user
+  const walletSetId = await createWalletSet(`user-${userId}`);
 
-    // Create wallet set for this user (or reuse existing)
-    const walletSetId = await createWalletSet(sdk, `user-${userId}`);
+  // Create wallet on Ethereum Sepolia (EOA address works across all EVM chains)
+  const wallet = await createWallet(walletSetId, ['ETH-SEPOLIA']);
 
-    // Create wallet on Ethereum Sepolia (EOA address works across all EVM chains)
-    const wallet = await createWallet(sdk, walletSetId, ['ETH-SEPOLIA']);
-
-    return res.status(200).json({
-      walletId: wallet.id,
-      address: wallet.address,
-      blockchain: wallet.blockchain,
-    });
-  } catch (error: any) {
-    console.error('[Wallet Create] SDK error:', error?.response?.data || error.message || error);
-    return res.status(500).json({
-      error: 'Wallet creation failed',
-      details: error?.response?.data?.message || error.message,
-    });
-  }
+  return res.status(200).json({
+    walletId: wallet.id,
+    address: wallet.address,
+    blockchain: wallet.blockchain,
+  });
 }
 
 async function handleBalance(req: VercelRequest, res: VercelResponse) {
@@ -74,9 +60,7 @@ async function handleBalance(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'walletId required' });
   }
 
-  const sdk = initiateCircleSdk();
-  const balances = await getWalletBalance(sdk, walletId);
-
+  const balances = await getWalletBalance(walletId);
   return res.status(200).json({ balances });
 }
 
@@ -88,9 +72,7 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'walletId required' });
   }
 
-  const sdk = initiateCircleSdk();
-  const wallet = await getWallet(sdk, walletId);
-
+  const wallet = await getWallet(walletId);
   return res.status(200).json({
     walletId: wallet.id,
     address: wallet.address,
