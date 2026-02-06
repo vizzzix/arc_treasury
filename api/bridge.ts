@@ -331,8 +331,11 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
 
   const { privateKeyToAccount } = await import('viem/accounts');
   const { createPublicClient, createWalletClient, http } = await import('viem');
-  const formattedKey = relayerKey.startsWith('0x') ? relayerKey : `0x${relayerKey}`;
-  const account = privateKeyToAccount(formattedKey as `0x${string}`);
+  // Sanitize: trim whitespace/quotes, ensure 0x prefix, validate hex
+  let cleanKey = relayerKey.trim().replace(/^["']|["']$/g, '');
+  if (!cleanKey.startsWith('0x')) cleanKey = `0x${cleanKey}`;
+  console.log(`[Bridge] Relayer key length: ${cleanKey.length}, starts with 0x: ${cleanKey.startsWith('0x')}, hex chars after 0x: ${/^0x[0-9a-fA-F]{64}$/.test(cleanKey)}`);
+  const account = privateKeyToAccount(cleanKey as `0x${string}`);
 
   const destChain = isArcToSepolia ? sepoliaChain : arcTestnet;
   const destRpc = isArcToSepolia ? 'https://rpc.sepolia.org' : 'https://rpc.testnet.arc.network';
