@@ -267,14 +267,15 @@ const Bridge = () => {
     if (isCircleWallet && isEVMtoEVM) {
       const isArcToSepolia = fromNetwork === 'arcTestnet' && toNetwork === 'ethereumSepolia';
       const walletId = isArcToSepolia ? circleWallet.arcWalletId : circleWallet.walletId;
+      const destWalletId = isArcToSepolia ? circleWallet.walletId : circleWallet.arcWalletId;
       const address = unifiedWallet.address;
       const direction = isArcToSepolia ? 'arc-to-sepolia' : 'sepolia-to-arc';
       console.log('[Bridge.tsx] Using server bridge for Circle wallet, direction:', direction);
-      if (!walletId || !address) {
-        console.error('[Bridge.tsx] Missing walletId or address for server bridge');
+      if (!walletId || !destWalletId || !address) {
+        console.error('[Bridge.tsx] Missing walletId, destWalletId, or address for server bridge');
         return;
       }
-      await serverBridge.bridge(walletId, amount, address, direction as any);
+      await serverBridge.bridge(walletId, amount, address, direction as any, destWalletId);
       return;
     }
 

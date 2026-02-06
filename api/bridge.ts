@@ -287,21 +287,18 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
 }
 
-// --- Step 4: Claim on destination chain (backend relayer) ---
+// --- Step 4: Claim on destination chain (via Circle API — no relayer needed) ---
 
 async function handleClaim(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { burnTxHash, direction } = req.body;
+  const { burnTxHash, direction, destWalletId } = req.body;
   if (!burnTxHash) return res.status(400).json({ error: 'burnTxHash required' });
-
-  const relayerKey = process.env.BRIDGE_RELAYER_KEY;
-  if (!relayerKey) {
-    return res.status(500).json({ error: 'Bridge relayer not configured' });
-  }
+  if (!destWalletId) return res.status(400).json({ error: 'destWalletId required' });
 
   const isArcToSepolia = direction === 'arc-to-sepolia';
   const sourceDomain = isArcToSepolia ? ARC_DESTINATION_DOMAIN : SEPOLIA_DOMAIN;
+  const destTransmitter = isArcToSepolia ? SEPOLIA_MESSAGE_TRANSMITTER : ARC_MESSAGE_TRANSMITTER;
 
   console.log(`[Bridge] Claim: fetching attestation for ${burnTxHash}, direction=${direction || 'sepolia-to-arc'}`);
 
@@ -324,71 +321,24 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const messageBytes = msg.message as `0x${string}`;
-  const attestationBytes = msg.attestation as `0x${string}`;
+  const messageBytes = msg.message;
+  const attestationBytes = msg.attestation;
 
-  console.log('[Bridge] Attestation received, calling receiveMessage...');
+  console.log('[Bridge] Attestation received, calling receiveMessage via Circle API...');
 
-  const { privateKeyToAccount } = await import('viem/accounts');
-  const { createPublicClient, createWalletClient, http } = await import('viem');
-  // Sanitize: trim whitespace/quotes, ensure 0x prefix, validate hex
-  let cleanKey = relayerKey.trim().replace(/^["']|["']$/g, '');
-  if (!cleanKey.startsWith('0x')) cleanKey = `0x${cleanKey}`;
-  console.log(`[Bridge] Relayer key length: ${cleanKey.length}, starts with 0x: ${cleanKey.startsWith('0x')}, hex chars after 0x: ${/^0x[0-9a-fA-F]{64}$/.test(cleanKey)}`);
-  const account = privateKeyToAccount(cleanKey as `0x${string}`);
-
-  const destChain = isArcToSepolia ? sepoliaChain : arcTestnet;
-  const sepoliaRpc = process.env.Ethereum_Sepolia
-    || (process.env.INFURA_API ? `https://sepolia.infura.io/v3/${process.env.INFURA_API}` : null)
-    || 'https://ethereum-sepolia-rpc.publicnode.com';
-  const destRpc = isArcToSepolia ? sepoliaRpc : 'https://rpc.testnet.arc.network';
-  const destTransmitter = isArcToSepolia ? SEPOLIA_MESSAGE_TRANSMITTER : ARC_MESSAGE_TRANSMITTER;
-
-  const publicClient = createPublicClient({
-    chain: destChain as any,
-    transport: http(destRpc),
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId: destWalletId,
+    contractAddress: destTransmitter,
+    abiFunctionSignature: 'receiveMessage(bytes,bytes)',
+    abiParameters: [messageBytes, attestationBytes],
+    feeLevel: 'HIGH',
   });
 
-  const walletClient = createWalletClient({
-    account,
-    chain: destChain as any,
-    transport: http(destRpc),
-  });
+  console.log('[Bridge] Claim submitted via Circle:', JSON.stringify(result));
 
-  const MESSAGE_TRANSMITTER_ABI = [
-    {
-      name: 'receiveMessage',
-      type: 'function' as const,
-      stateMutability: 'nonpayable' as const,
-      inputs: [
-        { name: 'message', type: 'bytes' },
-        { name: 'attestation', type: 'bytes' },
-      ],
-      outputs: [{ name: 'success', type: 'bool' }],
-    },
-  ];
-
-  const claimHash = await walletClient.writeContract({
-    address: destTransmitter as `0x${string}`,
-    abi: MESSAGE_TRANSMITTER_ABI,
-    functionName: 'receiveMessage',
-    args: [messageBytes, attestationBytes],
-  });
-
-  console.log('[Bridge] Claim tx sent:', claimHash);
-
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: claimHash });
-
-  if (receipt.status !== 'success') {
-    return res.status(500).json({ error: 'Claim transaction failed on-chain' });
-  }
-
-  console.log('[Bridge] Claim confirmed!');
-
-  const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
   return res.status(200).json({
-    status: 'complete',
-    claimTxHash: claimHash,
-    message: `Bridge complete! USDC minted on ${destName}`,
+    status: 'submitted',
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
   });
 }

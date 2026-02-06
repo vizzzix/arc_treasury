@@ -90,7 +90,7 @@ export const useServerBridge = () => {
   };
 
   // Main bridge function — supports both directions
-  const bridge = useCallback(async (walletId: string, amount: string, recipientAddress: string, direction: BridgeDirection = 'sepolia-to-arc') => {
+  const bridge = useCallback(async (walletId: string, amount: string, recipientAddress: string, direction: BridgeDirection = 'sepolia-to-arc', destWalletId?: string) => {
     setState({ phase: 'approving', error: null, burnTxHash: null, claimTxHash: null });
     const isArcToSepolia = direction === 'arc-to-sepolia';
     const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
@@ -137,30 +137,38 @@ export const useServerBridge = () => {
       await waitForAttestation(burnTxHash, direction);
       console.log('[ServerBridge] Attestation received');
 
-      // Step 4: Claim on destination chain (backend relayer)
+      // Step 4: Claim on destination chain (via Circle API)
       setState(s => ({ ...s, phase: 'claiming' }));
       toast.info(`Claiming USDC on ${destName}...`);
       const claimRes = await fetch('/api/bridge?action=claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ burnTxHash, direction }),
+        body: JSON.stringify({ burnTxHash, direction, destWalletId }),
       });
       const claimData = await claimRes.json();
 
       if (claimData.status === 'pending') {
+        // Attestation not ready yet — retry after delay
         await new Promise(r => setTimeout(r, 3000));
         const retryRes = await fetch('/api/bridge?action=claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ burnTxHash, direction }),
+          body: JSON.stringify({ burnTxHash, direction, destWalletId }),
         });
         const retryData = await retryRes.json();
-        if (retryData.status !== 'complete') {
+        if (retryData.status !== 'submitted' && retryData.status !== 'complete') {
           throw new Error(retryData.error || 'Claim failed after retry');
         }
-        setState(s => ({ ...s, phase: 'complete', claimTxHash: retryData.claimTxHash }));
+        if (retryData.transactionId) {
+          const { txHash: claimTxHash } = await waitForTx(retryData.transactionId, 'Claim');
+          setState(s => ({ ...s, phase: 'complete', claimTxHash }));
+        }
       } else if (!claimRes.ok) {
         throw new Error(claimData.error || 'Claim failed');
+      } else if (claimData.transactionId) {
+        // Poll Circle tx until confirmed
+        const { txHash: claimTxHash } = await waitForTx(claimData.transactionId, 'Claim');
+        setState(s => ({ ...s, phase: 'complete', claimTxHash }));
       } else {
         setState(s => ({ ...s, phase: 'complete', claimTxHash: claimData.claimTxHash }));
       }
