@@ -13,17 +13,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     switch (action) {
       case 'create':
-        return handleCreate(req, res);
+        return await handleCreate(req, res);
       case 'balance':
-        return handleBalance(req, res);
+        return await handleBalance(req, res);
       case 'get':
-        return handleGet(req, res);
+        return await handleGet(req, res);
       default:
         return res.status(400).json({ error: 'Invalid action. Use: create, balance, get' });
     }
   } catch (error: any) {
-    console.error('[Wallet API] Error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    console.error('[Wallet API] Error:', error?.response?.data || error.message || error);
+    return res.status(500).json({
+      error: error.message || 'Internal server error',
+      details: error?.response?.data || undefined,
+    });
   }
 }
 
@@ -33,19 +36,27 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'userId required' });
 
-  const sdk = initiateCircleSdk();
+  try {
+    const sdk = initiateCircleSdk();
 
-  // Create wallet set for this user (or reuse existing)
-  const walletSetId = await createWalletSet(sdk, `user-${userId}`);
+    // Create wallet set for this user (or reuse existing)
+    const walletSetId = await createWalletSet(sdk, `user-${userId}`);
 
-  // Create wallet on Arc Testnet (blockchain: ARC-TESTNET)
-  const wallet = await createWallet(sdk, walletSetId, ['ARC-TESTNET']);
+    // Create wallet on Ethereum Sepolia (EOA address works across all EVM chains)
+    const wallet = await createWallet(sdk, walletSetId, ['ETH-SEPOLIA']);
 
-  return res.status(200).json({
-    walletId: wallet.id,
-    address: wallet.address,
-    blockchain: wallet.blockchain,
-  });
+    return res.status(200).json({
+      walletId: wallet.id,
+      address: wallet.address,
+      blockchain: wallet.blockchain,
+    });
+  } catch (error: any) {
+    console.error('[Wallet Create] SDK error:', error?.response?.data || error.message || error);
+    return res.status(500).json({
+      error: 'Wallet creation failed',
+      details: error?.response?.data?.message || error.message,
+    });
+  }
 }
 
 async function handleBalance(req: VercelRequest, res: VercelResponse) {
