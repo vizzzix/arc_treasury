@@ -1,4 +1,5 @@
 import { useAccount, useReadContract, useSwitchChain } from "wagmi";
+import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { WalletConnect } from "@/components/WalletConnect";
@@ -59,8 +60,10 @@ const Rewards = () => {
   const { apy } = useUSYCPrice();
   const { leaderboard, isLoading: isLoadingLeaderboard, userRank, userEntry, totalDepositors } = useLeaderboard(account?.address);
   const { switchChain, isPending: isSwitching } = useSwitchChain();
-  const isConnected = account?.isConnected ?? false;
-  const address = account?.address;
+  const unifiedWallet = useUnifiedWallet();
+  const isExternalWallet = account?.isConnected ?? false;
+  const isConnected = isExternalWallet || unifiedWallet.isConnected;
+  const address = account?.address || unifiedWallet.address;
   const isArcTestnet = account?.chainId === ARC_TESTNET_CHAIN_ID;
   const [copied, setCopied] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -205,7 +208,7 @@ const Rewards = () => {
 
       <div className="pt-24 pb-20 container mx-auto px-4 sm:px-6 max-w-4xl overflow-x-hidden">
         {/* Wrong Network */}
-        {isConnected && !isArcTestnet && (
+        {isExternalWallet && !isArcTestnet && (
           <div className="mb-8 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 backdrop-blur-sm">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm text-red-400">Switch to Arc Testnet to continue</p>

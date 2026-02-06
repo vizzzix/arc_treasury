@@ -11,6 +11,7 @@ import { WalletHeader } from "@/components/WalletHeader";
 import { useSwapPool } from "@/hooks/useSwapPool";
 import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { LiveSwapFeed } from "@/components/LiveSwapFeed";
 
 const formatBalance = (balance: string | number) => {
@@ -28,8 +29,10 @@ type TabType = 'swap' | 'pool';
 const Swap = () => {
   const navigate = useNavigate();
   const account = useAccount();
-  const isConnected = account?.isConnected ?? false;
-  const address = account?.address;
+  const unifiedWallet = useUnifiedWallet();
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
+  const isExternalWallet = account?.isConnected ?? false;
+  const address = account?.address || unifiedWallet.address;
   const chainId = account?.chainId;
   const isArcTestnet = chainId === 5042002;
   const { switchChainAsync } = useSwitchChain();
@@ -214,8 +217,8 @@ const Swap = () => {
           </p>
         </div>
 
-        {/* Wrong Network Warning */}
-        {!isArcTestnet && isConnected && (
+        {/* Wrong Network Warning — only for external wallets */}
+        {!isArcTestnet && isExternalWallet && (
           <Card className="p-4 mb-6 border-red-500/50 bg-red-500/10 animate-in fade-in slide-in-from-top-2 duration-500">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center gap-3 flex-1">

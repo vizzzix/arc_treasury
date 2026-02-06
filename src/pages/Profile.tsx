@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAccount, useSignMessage } from "wagmi";
+import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,8 +45,9 @@ const Profile = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [showVerificationInput, setShowVerificationInput] = useState(false);
 
-  const isConnected = account?.isConnected ?? false;
-  const address = account?.address;
+  const unifiedWallet = useUnifiedWallet();
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
+  const address = account?.address || unifiedWallet.address;
 
   // Load saved bindings on mount
   useEffect(() => {

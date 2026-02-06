@@ -26,7 +26,8 @@ const DashboardSimplified = () => {
   const navigate = useNavigate();
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
-  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
+  const isExternalWallet = account?.isConnected ?? false;
+  const isConnected = isExternalWallet || unifiedWallet.isConnected;
   const chainId = account?.chainId;
   const isArcTestnet = chainId === 5042002;
   const { switchChainAsync } = useSwitchChain();
@@ -346,7 +347,7 @@ const DashboardSimplified = () => {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12">
         {/* Wrong Network Warning */}
-        {!isArcTestnet && isConnected && (
+        {!isArcTestnet && isExternalWallet && (
           <div className="max-w-7xl mx-auto mb-8">
             <Card className="p-4 border-red-500/50 bg-red-500/10 animate-in fade-in slide-in-from-top-2 duration-500">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
