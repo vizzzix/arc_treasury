@@ -98,7 +98,30 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'userId required' });
 
-  const wsData = await circlePost('/developer/walletSets', { name: `user-${userId}` });
+  const walletSetName = `user-${userId}`;
+
+  // 1. Check for existing wallet set for this user
+  const existingSets = await circleGet('/walletSets');
+  const userSet = existingSets?.walletSets?.find(
+    (s: any) => s.name === walletSetName
+  );
+
+  if (userSet) {
+    // 2. Found existing set — get its wallets
+    const existingWallets = await circleGet(`/wallets?walletSetId=${userSet.id}`);
+    const wallet = existingWallets?.wallets?.[0];
+    if (wallet) {
+      return res.status(200).json({
+        walletId: wallet.id,
+        address: wallet.address,
+        blockchain: wallet.blockchain,
+        existing: true,
+      });
+    }
+  }
+
+  // 3. No existing wallet — create new wallet set + wallet
+  const wsData = await circlePost('/developer/walletSets', { name: walletSetName });
   const walletSetId = wsData?.walletSet?.id;
   if (!walletSetId) throw new Error('Failed to create wallet set');
 
@@ -115,6 +138,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     walletId: wallet.id,
     address: wallet.address,
     blockchain: wallet.blockchain,
+    existing: false,
   });
 }
 
