@@ -245,7 +245,7 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   const { txId } = req.query;
   if (!txId || typeof txId !== 'string') return res.status(400).json({ error: 'txId required' });
 
-  const result = await circleGet(`/developer/transactions/${txId}`);
+  const result = await circleGet(`/transactions/${txId}`);
   const tx = result?.transaction;
 
   return res.status(200).json({
