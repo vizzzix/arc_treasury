@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { useUnifiedWallet } from '@/hooks/useUnifiedWallet';
 import { Button } from '@/components/ui/button';
 import { Loader2, Shield } from 'lucide-react';
 
@@ -20,7 +21,9 @@ const XIcon = ({ className }: { className?: string }) => (
 );
 
 const TwitterConnect = () => {
-  const { address } = useAccount();
+  const account = useAccount();
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
   const [status, setStatus] = useState<TwitterStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [verifying, setVerifying] = useState(false);

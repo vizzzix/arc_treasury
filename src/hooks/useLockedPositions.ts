@@ -6,6 +6,7 @@ import TreasuryVaultABI from '@/lib/abis/TreasuryVault.json';
 import { useUSYCPrice } from './useUSYCPrice';
 import { arcTestnet } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 // Create public client for waiting on receipts
 const client = createPublicClient({
@@ -120,7 +121,9 @@ export function useLockedPositions(address?: `0x${string}`) {
  * Hook to deposit with lock
  */
 export function useDepositLocked() {
-  const { address } = useAccount();
+  const account = useAccount();
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
   const { data: hash, writeContractAsync, isPending, error } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({

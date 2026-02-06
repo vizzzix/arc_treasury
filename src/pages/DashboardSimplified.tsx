@@ -82,7 +82,7 @@ const DashboardSimplified = () => {
 
   // Fetch real locked positions from contract
   const { positions: lockedPositions, isLoading: isLoadingPositions, refetch: refetchPositions } = useLockedPositions(
-    account.address as `0x${string}` | undefined
+    (account.address || unifiedWallet.address) as `0x${string}` | undefined
   );
 
   // Hooks for deposits, withdraw and claim

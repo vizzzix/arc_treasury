@@ -8,6 +8,7 @@ import { formatEther, formatUnits, parseEther, parseUnits } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useExchangeRate } from './useExchangeRate';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 // StablecoinSwap ABI (minimal)
 const SWAP_ABI = [
@@ -170,7 +171,10 @@ export interface SwapTransaction {
 }
 
 export function useSwapPool() {
-  const { address, isConnected } = useAccount();
+  const account = useAccount();
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { eurToUsd: liveRate } = useExchangeRate();

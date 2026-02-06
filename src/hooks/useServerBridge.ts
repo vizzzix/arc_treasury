@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { trackSiteBridge } from './bridge/utils';
 
 type BridgePhase = 'idle' | 'approving' | 'waiting-approve' | 'burning' | 'waiting-burn' | 'attestation' | 'claiming' | 'complete' | 'error';
 type BridgeDirection = 'sepolia-to-arc' | 'arc-to-sepolia';
@@ -130,6 +131,10 @@ export const useServerBridge = () => {
       toast.info('Waiting for bridge transaction...');
       const { txHash: burnTxHash } = await waitForTx(burnData.transactionId, 'Bridge');
       console.log('[ServerBridge] Burn confirmed, txHash:', burnTxHash);
+
+      // Track in site_bridges for Live Activity
+      const feedDirection = isArcToSepolia ? 'to_sepolia' : 'to_arc';
+      trackSiteBridge(burnTxHash, recipientAddress, amount, feedDirection as any);
 
       setState(s => ({ ...s, burnTxHash, phase: 'attestation' }));
 

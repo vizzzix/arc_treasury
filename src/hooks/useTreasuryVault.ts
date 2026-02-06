@@ -1,5 +1,6 @@
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { useMemo, useRef, useEffect } from 'react';
+import { useUnifiedWallet } from './useUnifiedWallet';
 import { formatUnits, parseUnits, maxUint256, createPublicClient, http } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
@@ -132,8 +133,9 @@ const TREASURY_VAULT_ABI = [
  */
 export const useTreasuryVault = () => {
   const account = useAccount();
-  const address = account?.address;
-  const isConnected = account?.isConnected ?? false;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
+  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
   const chainId = account?.chainId;
 
   const publicClient = usePublicClient({ chainId: arcTestnet.id });
