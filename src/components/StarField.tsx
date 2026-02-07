@@ -27,6 +27,9 @@ interface ShootingStar {
   trailLength: number;
 }
 
+const isMobile = () =>
+  /Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(navigator.userAgent);
+
 export const StarField = ({ count = 150 }: { count?: number }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
@@ -34,6 +37,7 @@ export const StarField = ({ count = 150 }: { count?: number }) => {
   const starsRef = useRef<Star[]>([]);
   const shootingStarsRef = useRef<ShootingStar[]>([]);
   const lastShootRef = useRef(0);
+  const mobileRef = useRef(isMobile());
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,10 +45,13 @@ export const StarField = ({ count = 150 }: { count?: number }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const mobile = mobileRef.current;
+    const starCount = mobile ? 80 : count;
     let animationId: number;
+    let frameSkip = 0;
 
     const initStars = () => {
-      starsRef.current = Array.from({ length: count }, () => ({
+      starsRef.current = Array.from({ length: starCount }, () => ({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         size: Math.random() * 1.5 + 0.3,
@@ -85,13 +92,26 @@ export const StarField = ({ count = 150 }: { count?: number }) => {
     };
 
     const render = (time: number) => {
+      // Mobile: throttle to ~30fps
+      if (mobile) {
+        frameSkip++;
+        if (frameSkip % 2 !== 0) {
+          animationId = requestAnimationFrame(render);
+          return;
+        }
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Smooth mouse interpolation (lerp)
-      smoothMouseRef.current.x += (mouseRef.current.x - smoothMouseRef.current.x) * 0.03;
-      smoothMouseRef.current.y += (mouseRef.current.y - smoothMouseRef.current.y) * 0.03;
-      const smx = smoothMouseRef.current.x * 0.008;
-      const smy = smoothMouseRef.current.y * 0.008;
+      // Parallax (desktop only)
+      let smx = 0;
+      let smy = 0;
+      if (!mobile) {
+        smoothMouseRef.current.x += (mouseRef.current.x - smoothMouseRef.current.x) * 0.03;
+        smoothMouseRef.current.y += (mouseRef.current.y - smoothMouseRef.current.y) * 0.03;
+        smx = smoothMouseRef.current.x * 0.008;
+        smy = smoothMouseRef.current.y * 0.008;
+      }
 
       // Stars
       for (const star of starsRef.current) {
@@ -106,75 +126,72 @@ export const StarField = ({ count = 150 }: { count?: number }) => {
         ctx.fill();
       }
 
-      // Shooting stars — spawn every 5-10 seconds
-      if (time - lastShootRef.current > (Math.random() * 5000 + 5000)) {
-        spawnShootingStar();
-        lastShootRef.current = time;
-      }
+      // Shooting stars (desktop only)
+      if (!mobile) {
+        if (time - lastShootRef.current > (Math.random() * 5000 + 5000)) {
+          spawnShootingStar();
+          lastShootRef.current = time;
+        }
 
-      // Render shooting stars with trail
-      shootingStarsRef.current = shootingStarsRef.current.filter(s => {
-        s.life++;
-        s.x += Math.cos(s.angle) * s.speed;
-        s.y += Math.sin(s.angle) * s.speed;
+        shootingStarsRef.current = shootingStarsRef.current.filter(s => {
+          s.life++;
+          s.x += Math.cos(s.angle) * s.speed;
+          s.y += Math.sin(s.angle) * s.speed;
 
-        // Add current position to trail
-        const fadeIn = Math.min(s.life / 15, 1);
-        const fadeOut = Math.max(1 - s.life / s.maxLife, 0);
-        const headOpacity = fadeIn * fadeOut;
+          const fadeIn = Math.min(s.life / 15, 1);
+          const fadeOut = Math.max(1 - s.life / s.maxLife, 0);
+          const headOpacity = fadeIn * fadeOut;
 
-        s.trail.push({ x: s.x, y: s.y, opacity: headOpacity });
-        if (s.trail.length > s.trailLength) s.trail.shift();
+          s.trail.push({ x: s.x, y: s.y, opacity: headOpacity });
+          if (s.trail.length > s.trailLength) s.trail.shift();
 
-        if (headOpacity <= 0 && s.life > 15) return false;
+          if (headOpacity <= 0 && s.life > 15) return false;
 
-        // Draw trail as fading curve
-        if (s.trail.length > 1) {
-          for (let i = 1; i < s.trail.length; i++) {
-            const prev = s.trail[i - 1];
-            const curr = s.trail[i];
-            const progress = i / s.trail.length;
-            const trailAlpha = progress * curr.opacity * 0.6;
+          if (s.trail.length > 1) {
+            for (let i = 1; i < s.trail.length; i++) {
+              const prev = s.trail[i - 1];
+              const curr = s.trail[i];
+              const progress = i / s.trail.length;
+              const trailAlpha = progress * curr.opacity * 0.6;
 
-            if (trailAlpha <= 0) continue;
+              if (trailAlpha <= 0) continue;
+
+              ctx.beginPath();
+              ctx.moveTo(prev.x, prev.y);
+              ctx.lineTo(curr.x, curr.y);
+              ctx.strokeStyle = `rgba(200, 220, 255, ${trailAlpha})`;
+              ctx.lineWidth = progress * 1.5;
+              ctx.stroke();
+            }
+          }
+
+          if (headOpacity > 0) {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255, 255, 255, ${headOpacity})`;
+            ctx.fill();
 
             ctx.beginPath();
-            ctx.moveTo(prev.x, prev.y);
-            ctx.lineTo(curr.x, curr.y);
-            ctx.strokeStyle = `rgba(200, 220, 255, ${trailAlpha})`;
-            ctx.lineWidth = progress * 1.5;
-            ctx.stroke();
+            ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(200, 220, 255, ${headOpacity * 0.2})`;
+            ctx.fill();
           }
-        }
 
-        // Bright head glow
-        if (headOpacity > 0) {
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 255, 255, ${headOpacity})`;
-          ctx.fill();
-
-          // Soft glow around head
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(200, 220, 255, ${headOpacity * 0.2})`;
-          ctx.fill();
-        }
-
-        return true;
-      });
+          return true;
+        });
+      }
 
       animationId = requestAnimationFrame(render);
     };
 
     resize();
     window.addEventListener('resize', resize);
-    window.addEventListener('mousemove', onMouseMove);
+    if (!mobile) window.addEventListener('mousemove', onMouseMove);
     animationId = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener('resize', resize);
-      window.removeEventListener('mousemove', onMouseMove);
+      if (!mobile) window.removeEventListener('mousemove', onMouseMove);
       cancelAnimationFrame(animationId);
     };
   }, [count]);
