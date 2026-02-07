@@ -35,12 +35,12 @@ const ActivityRow = ({ item, isTop10 }: ActivityRowProps) => {
   };
 
   return (
-    <div className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${isTop10 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
-      {isTop10 ? <span className="text-yellow-500">👑</span> : getIcon()}
-      <span className={`font-mono ${isTop10 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(item.wallet_address)}</span>
-      <span className="text-muted-foreground">{formatAmount(item.amount_usd)}</span>
-      <span className={getTypeColor()}>{item.details}</span>
-      <span className="ml-auto text-muted-foreground/60">{timeAgo}</span>
+    <div className={`flex items-center gap-1.5 sm:gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs overflow-hidden ${isTop10 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
+      {isTop10 ? <span className="text-yellow-500 shrink-0">👑</span> : <span className="shrink-0">{getIcon()}</span>}
+      <span className={`font-mono truncate min-w-0 ${isTop10 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(item.wallet_address)}</span>
+      <span className="text-muted-foreground shrink-0">{formatAmount(item.amount_usd)}</span>
+      <span className={`shrink-0 ${getTypeColor()}`}>{item.details}</span>
+      <span className="ml-auto shrink-0 text-muted-foreground/60">{timeAgo}</span>
     </div>
   );
 };
@@ -106,7 +106,7 @@ export const LiveSwapFeed = () => {
           </div>
           <h3 className="font-semibold text-sm">Live Activity</h3>
           {(stats.swapCount > 0 || stats.lpCount > 0) && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
               {stats.swapCount > 0 && `${stats.swapCount} swaps`}
               {stats.swapCount > 0 && stats.lpCount > 0 && ' • '}
               {stats.lpCount > 0 && `${stats.lpCount} LP`}

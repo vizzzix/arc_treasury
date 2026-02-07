@@ -79,13 +79,13 @@ const TransactionRow = ({ tx, isTop5 }: TransactionRowProps) => {
   const { label, color } = getDirectionLabel(tx.direction);
 
   return (
-    <div className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${isTop5 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
-      {isTop5 && <span className="text-yellow-500">👑</span>}
-      <span className={`font-mono ${isTop5 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(tx.wallet_address)}</span>
-      <span className="text-muted-foreground">{formatAmount(tx.amount_usd, true)}</span>
-      <span>{getTierBadge(tx.amount_usd)}</span>
-      <span className={color}>{label}</span>
-      <span className="ml-auto text-muted-foreground/60">{timeAgo}</span>
+    <div className={`flex items-center gap-1.5 sm:gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs overflow-hidden ${isTop5 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-white/[0.02] hover:bg-white/[0.05]'}`}>
+      {isTop5 && <span className="text-yellow-500 shrink-0">👑</span>}
+      <span className={`font-mono truncate min-w-0 ${isTop5 ? 'text-yellow-500 font-medium' : 'text-foreground/70'}`}>{formatAddress(tx.wallet_address)}</span>
+      <span className="text-muted-foreground shrink-0">{formatAmount(tx.amount_usd, true)}</span>
+      <span className="hidden sm:inline shrink-0">{getTierBadge(tx.amount_usd)}</span>
+      <span className={`shrink-0 ${color}`}>{label}</span>
+      <span className="ml-auto shrink-0 text-muted-foreground/60">{timeAgo}</span>
     </div>
   );
 };
@@ -169,7 +169,7 @@ export const LiveBridgeFeed = () => {
           </div>
           <h3 className="font-semibold text-sm">Live Activity</h3>
           {(stats.totalVolume24h > 0 || stats.transactionCount24h > 0) && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
               • {formatAmount(stats.totalVolume24h)} • {stats.transactionCount24h} bridges
             </span>
           )}

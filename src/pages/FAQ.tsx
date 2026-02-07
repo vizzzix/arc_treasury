@@ -77,7 +77,7 @@ const FAQ = () => {
 
       {/* Header */}
       <header className="border-b border-border/20 sticky top-0 bg-background/60 backdrop-blur-xl z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
@@ -99,7 +99,7 @@ const FAQ = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-12">
+      <main className="container mx-auto px-4 sm:px-6 py-12">
         <div className="max-w-3xl mx-auto">
           {faqs.map((section, sectionIndex) => (
             <div key={sectionIndex} className="mb-10">
@@ -133,13 +133,13 @@ const FAQ = () => {
                   { name: "EarlySupporterBadge", address: TREASURY_CONTRACTS.EarlySupporterBadge },
                   { name: "USYCOracle", address: TREASURY_CONTRACTS.USYCOracle },
                 ].map((contract) => (
-                  <div key={contract.name} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
-                    <span className="text-muted-foreground">{contract.name}</span>
+                  <div key={contract.name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-primary/20 transition-colors">
+                    <span className="text-muted-foreground text-xs sm:text-sm">{contract.name}</span>
                     <a
                       href={`${SUPPORTED_NETWORKS.arcTestnet.explorerUrl}/address/${contract.address}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline flex items-center gap-1"
+                      className="text-primary hover:underline flex items-center gap-1 text-xs sm:text-sm"
                     >
                       {contract.address.slice(0, 6)}...{contract.address.slice(-4)}
                       <ExternalLink className="w-3 h-3" />

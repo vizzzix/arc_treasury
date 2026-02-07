@@ -548,7 +548,7 @@ const Bridge = () => {
 
       {/* Header */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button onClick={() => navigate("/dashboard")} variant="ghost" size="sm" className="gap-2 hover:bg-white/5">
@@ -588,7 +588,7 @@ const Bridge = () => {
         </div>
       </nav>
 
-      <div className="pt-24 pb-20 container mx-auto px-6 max-w-2xl">
+      <div className="pt-24 pb-20 container mx-auto px-4 sm:px-6 max-w-2xl">
         {/* Hero */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 mb-4">

@@ -91,7 +91,7 @@ const Support = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <nav className="border-b border-border/30 bg-background/80 backdrop-blur-lg">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <button
             onClick={() => navigate("/")}
             className="flex items-center gap-2 hover:text-primary transition-colors"
@@ -103,7 +103,7 @@ const Support = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-12 max-w-2xl">
+      <div className="container mx-auto px-4 sm:px-6 py-12 max-w-2xl">
         <div className="w-full">
           {isSuccess ? (
             <div className="flex flex-col items-center justify-center space-y-6 animate-in fade-in zoom-in duration-500">

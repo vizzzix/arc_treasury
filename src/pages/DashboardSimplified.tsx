@@ -264,10 +264,10 @@ const DashboardSimplified = () => {
     <div className="min-h-screen bg-background">
       {/* Header with Profile button */}
       <header className="border-b border-border/30 sticky top-0 bg-background/80 backdrop-blur-lg z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo & Title */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Button
                 variant="ghost"
                 size="icon"
@@ -276,8 +276,8 @@ const DashboardSimplified = () => {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <img src={arcLogo} alt="Arc Treasury" className="w-8 h-8" />
-              <h1 className="text-2xl font-bold">Dashboard</h1>
+              <img src={arcLogo} alt="Arc Treasury" className="w-7 h-7 sm:w-8 sm:h-8" />
+              <h1 className="text-lg sm:text-2xl font-bold">Dashboard</h1>
             </div>
 
             {/* Right: Navigation & Wallet */}
@@ -309,7 +309,7 @@ const DashboardSimplified = () => {
       {/* Migration Success Banner */}
       {SHOW_MIGRATION_SUCCESS && (
         <div className="bg-green-500/10 border-b border-green-500/30">
-          <div className="container mx-auto px-6 py-4">
+          <div className="container mx-auto px-4 sm:px-6 py-4">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-green-600 dark:text-green-400 text-center">
               <Shield className="w-5 h-5 flex-shrink-0" />
               <div>
@@ -328,7 +328,7 @@ const DashboardSimplified = () => {
       {/* USYC Whitelist Pending Banner */}
       {USYC_WHITELIST_PENDING && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/30">
-          <div className="container mx-auto px-6 py-4">
+          <div className="container mx-auto px-4 sm:px-6 py-4">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-yellow-600 dark:text-yellow-400 text-center">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
               <div>
@@ -345,7 +345,7 @@ const DashboardSimplified = () => {
       )}
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-12">
+      <main className="container mx-auto px-4 sm:px-6 py-12">
         {/* Wrong Network Warning */}
         {!isArcTestnet && isExternalWallet && (
           <div className="max-w-7xl mx-auto mb-8">
@@ -597,9 +597,9 @@ const DashboardSimplified = () => {
 
             {/* Locked Positions Section */}
             <div>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-1">Locked Positions</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-1">Locked Positions</h2>
                   <p className="text-sm text-muted-foreground">
                     {lockedPositions.length} active lock
                     {lockedPositions.length !== 1 ? "s" : ""} • More Points
@@ -608,7 +608,7 @@ const DashboardSimplified = () => {
                 </div>
                 <Button
                   onClick={() => setLockPositionModalOpen(true)}
-                  className="bg-primary hover:bg-primary/90 gap-2"
+                  className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto"
                   disabled={MIGRATION_IN_PROGRESS || USYC_WHITELIST_PENDING}
                   title={MIGRATION_IN_PROGRESS ? "Locks disabled during migration" : USYC_WHITELIST_PENDING ? "Locks disabled - awaiting USYC whitelist" : undefined}
                 >

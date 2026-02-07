@@ -21,7 +21,7 @@ const Litepaper = () => {
 
       {/* Header */}
       <header className="border-b border-border/20 sticky top-0 bg-background/60 backdrop-blur-xl z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button
@@ -43,7 +43,7 @@ const Litepaper = () => {
       </header>
 
       {/* Content */}
-      <main className="container mx-auto px-6 py-12">
+      <main className="container mx-auto px-4 sm:px-6 py-12">
         <article className="max-w-3xl mx-auto space-y-10">
           {/* Cover */}
           <div className="text-center space-y-4 pb-8 border-b border-white/10">
@@ -154,8 +154,8 @@ const Litepaper = () => {
             <p className="text-muted-foreground">
               All deposits earn same APY. Locks give bonus Points (not extra yield).
             </p>
-            <div className="rounded-2xl overflow-hidden border border-white/10 backdrop-blur-sm">
-              <table className="w-full text-sm">
+            <div className="rounded-2xl overflow-x-auto border border-white/10 backdrop-blur-sm">
+              <table className="w-full text-sm min-w-[400px]">
                 <thead className="bg-white/5">
                   <tr>
                     <th className="py-3 px-4 text-left font-medium">Type</th>
