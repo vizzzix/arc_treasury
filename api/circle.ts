@@ -120,11 +120,18 @@ async function verifyWebhookSignature(
     if (!r.ok) return false;
 
     const data = await r.json();
-    const publicKeyPem = Buffer.from(data.data.publicKey, 'base64').toString();
+    const publicKeyBase64 = data.data.publicKey;
+    const publicKeyBytes = Buffer.from(publicKeyBase64, 'base64');
+    const publicKey = crypto.createPublicKey({
+      key: publicKeyBytes,
+      format: 'der',
+      type: 'spki',
+    });
 
-    const verifier = crypto.createVerify('SHA256');
-    verifier.update(body);
-    return verifier.verify(publicKeyPem, signature, 'base64');
+    const signatureBytes = Buffer.from(signature, 'base64');
+    const messageBytes = Buffer.from(body);
+
+    return crypto.verify('sha256', messageBytes, publicKey, signatureBytes);
   } catch (e) {
     console.error('[Webhook] Signature verification error:', e);
     return false;
