@@ -28,11 +28,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleSwapUsdcForEurc(req, res);
       case 'swap-eurc-usdc':
         return await handleSwapEurcForUsdc(req, res);
+      case 'deposit-locked-usdc':
+        return await handleDepositLockedUsdc(req, res);
+      case 'deposit-locked-eurc':
+        return await handleDepositLockedEurc(req, res);
       case 'tx-status':
         return await handleTxStatus(req, res);
       default:
         return res.status(400).json({
-          error: 'Invalid action. Use: deposit-usdc, deposit-eurc, withdraw-usdc, withdraw-eurc, swap-usdc-eurc, swap-eurc-usdc, tx-status',
+          error: 'Invalid action. Use: deposit-usdc, deposit-eurc, withdraw-usdc, withdraw-eurc, swap-usdc-eurc, swap-eurc-usdc, deposit-locked-usdc, deposit-locked-eurc, tx-status',
         });
     }
   } catch (error: any) {
@@ -277,6 +281,105 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
+  });
+}
+
+// --- Deposit Locked USDC (payable) ---
+// depositLockedUSDC(uint256 amount, uint256 lockPeriodMonths) — payable, 18 decimals
+
+async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, amount, lockPeriodMonths } = req.body;
+  if (!walletId || !amount || !lockPeriodMonths) {
+    return res.status(400).json({ error: 'walletId, amount and lockPeriodMonths required' });
+  }
+
+  const parsedAmount = parseFloat(amount);
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  const months = parseInt(lockPeriodMonths);
+  if (![1, 3, 12].includes(months)) {
+    return res.status(400).json({ error: 'lockPeriodMonths must be 1, 3, or 12' });
+  }
+
+  const amountWei = BigInt(Math.round(parsedAmount * 1e18)).toString();
+
+  console.log(`[Vault] Deposit Locked USDC: wallet=${walletId}, amount=${amount}, months=${months}`);
+
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: TREASURY_VAULT,
+    abiFunctionSignature: 'depositLockedUSDC(uint256,uint256)',
+    abiParameters: [amountWei, months.toString()],
+    amount: amount,
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Deposit Locked USDC result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
+  });
+}
+
+// --- Deposit Locked EURC (ERC20, needs approve) ---
+// approve EURC + depositLockedEURC(uint256 amount, uint256 lockPeriodMonths) — 6 decimals
+
+async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, amount, lockPeriodMonths } = req.body;
+  if (!walletId || !amount || !lockPeriodMonths) {
+    return res.status(400).json({ error: 'walletId, amount and lockPeriodMonths required' });
+  }
+
+  const parsedAmount = parseFloat(amount);
+  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  const months = parseInt(lockPeriodMonths);
+  if (![1, 3, 12].includes(months)) {
+    return res.status(400).json({ error: 'lockPeriodMonths must be 1, 3, or 12' });
+  }
+
+  const amountMicro = BigInt(Math.round(parsedAmount * 1e6)).toString();
+  const approveAmount = (BigInt(amountMicro) * 10n).toString();
+
+  console.log(`[Vault] Deposit Locked EURC: wallet=${walletId}, amount=${amount}, months=${months}`);
+
+  // Step 1: Approve EURC
+  const approveResult = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: EURC_ADDRESS,
+    abiFunctionSignature: 'approve(address,uint256)',
+    abiParameters: [TREASURY_VAULT, approveAmount],
+    feeLevel: 'HIGH',
+  });
+
+  const approveTxId = approveResult?.id || approveResult?.transactionId;
+  console.log('[Vault] EURC approve for locked deposit submitted:', approveTxId);
+
+  await waitForCircleTx(approveTxId);
+
+  // Step 2: Deposit Locked EURC
+  const depositResult = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: TREASURY_VAULT,
+    abiFunctionSignature: 'depositLockedEURC(uint256,uint256)',
+    abiParameters: [amountMicro, months.toString()],
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Deposit Locked EURC result:', JSON.stringify(depositResult));
+
+  return res.status(200).json({
+    transactionId: depositResult?.id || depositResult?.transactionId,
+    state: depositResult?.state,
   });
 }
 

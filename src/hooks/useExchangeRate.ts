@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-const FIXER_API_KEY = import.meta.env.VITE_FIXER_API_KEY || '80f6690ad5c8e6aafe4373f4a0ce6e96';
-const CACHE_KEY = 'eur_usd_rate_cache_v4';
+const CACHE_KEY = 'eur_usd_rate_cache_v5';
 const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 hours
 
 interface CachedRate {
@@ -24,18 +23,31 @@ let pendingFetch: Promise<number | null> | null = null;
 
 async function fetchRateOnce(): Promise<number | null> {
   try {
-    const response = await fetch(
-      `https://data.fixer.io/api/latest?access_key=${FIXER_API_KEY}&symbols=USD`
-    );
+    // Primary: frankfurter.app (ECB data, free, HTTPS, no API key)
+    const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD');
     const data = await response.json();
-    if (data.success && data.rates?.USD) {
+    if (data.rates?.USD) {
       const rate = data.rates.USD;
       localStorage.setItem(CACHE_KEY, JSON.stringify({ rate, timestamp: Date.now() }));
       return rate;
     }
   } catch (error) {
-    console.warn('Failed to fetch EUR/USD rate:', error);
+    console.warn('Failed to fetch EUR/USD rate from frankfurter.app:', error);
   }
+
+  // Fallback: exchangerate.host
+  try {
+    const response = await fetch('https://api.exchangerate.host/latest?base=EUR&symbols=USD');
+    const data = await response.json();
+    if (data.rates?.USD) {
+      const rate = data.rates.USD;
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ rate, timestamp: Date.now() }));
+      return rate;
+    }
+  } catch (error) {
+    console.warn('Failed to fetch EUR/USD rate from exchangerate.host:', error);
+  }
+
   return null;
 }
 

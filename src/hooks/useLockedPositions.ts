@@ -7,6 +7,8 @@ import { useUSYCPrice } from './useUSYCPrice';
 import { arcTestnet } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 import { useUnifiedWallet } from './useUnifiedWallet';
+import { useCircleWallet } from '@/providers/CircleWalletProvider';
+import { useServerVault } from './useServerVault';
 
 // Create public client for waiting on receipts
 const client = createPublicClient({
@@ -54,6 +56,7 @@ export function useLockedPositions(address?: `0x${string}`) {
     abi: TreasuryVaultABI.abi,
     functionName: 'getUserLockedPositions',
     args: address ? [address] : undefined,
+    chainId: arcTestnet.id,
     query: {
       enabled: !!address,
     },
@@ -123,7 +126,10 @@ export function useLockedPositions(address?: `0x${string}`) {
 export function useDepositLocked() {
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
   const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
+  const isCircle = unifiedWallet.walletType === 'circle';
   const { data: hash, writeContractAsync, isPending, error } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -136,33 +142,50 @@ export function useDepositLocked() {
     abi: ERC20_ABI,
     functionName: 'allowance',
     args: address ? [address, TREASURY_CONTRACTS.TreasuryVault] : undefined,
+    chainId: arcTestnet.id,
     query: {
       enabled: !!address,
     },
   });
 
   const depositLockedUSDC = async (amount: string, lockPeriodMonths: 1 | 3 | 12) => {
+    // Circle wallet path — server-side execution
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      const txHash = await serverVault.depositLocked(arcWalletId, amount, 'USDC', lockPeriodMonths);
+      if (!txHash) throw new Error('Locked deposit failed');
+      return txHash as `0x${string}`;
+    }
+
     if (!writeContractAsync) {
       throw new Error('Write function not available');
     }
 
     // For Native USDC on Arc Testnet, both amount and msg.value must use 18 decimals
-    const amountWei = parseUnits(amount, 18); // Convert to 18 decimals for Native USDC
+    const amountWei = parseUnits(amount, 18);
 
     const txHash = await writeContractAsync({
       address: TREASURY_CONTRACTS.TreasuryVault,
       abi: TreasuryVaultABI.abi,
       functionName: 'depositLockedUSDC',
       args: [amountWei, lockPeriodMonths],
-      value: amountWei, // Must equal amount for Native USDC (both 18 decimals)
+      value: amountWei,
     });
 
-    // Don't wait for confirmation - let wagmi's useWaitForTransactionReceipt handle it
-    // This allows the modal to close immediately after tx is submitted
     return txHash;
   };
 
   const depositLockedEURC = async (amount: string, lockPeriodMonths: 1 | 3 | 12) => {
+    // Circle wallet path — server-side execution
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      const txHash = await serverVault.depositLocked(arcWalletId, amount, 'EURC', lockPeriodMonths);
+      if (!txHash) throw new Error('Locked deposit failed');
+      return txHash as `0x${string}`;
+    }
+
     if (!writeContractAsync) {
       throw new Error('Write function not available');
     }
@@ -212,11 +235,11 @@ export function useDepositLocked() {
   return {
     depositLockedUSDC,
     depositLockedEURC,
-    isPending,
-    isConfirming,
-    isSuccess,
-    error,
-    hash,
+    isPending: isCircle ? serverVault.isProcessing : isPending,
+    isConfirming: isCircle ? serverVault.isProcessing : isConfirming,
+    isSuccess: isCircle ? serverVault.isComplete : isSuccess,
+    error: isCircle ? (serverVault.error ? new Error(serverVault.error) : null) : error,
+    hash: isCircle ? (serverVault.txHash as `0x${string}` | undefined) : hash,
   };
 }
 
@@ -318,6 +341,7 @@ export function useLockedPositionYield(address?: `0x${string}`, positionIndex?: 
     abi: TreasuryVaultABI.abi,
     functionName: 'getLockedPositionYield',
     args: address && positionIndex !== undefined ? [address, BigInt(positionIndex)] : undefined,
+    chainId: arcTestnet.id,
     query: {
       enabled: !!address && positionIndex !== undefined,
     },

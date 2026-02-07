@@ -99,6 +99,11 @@ export const useServerVault = () => {
     return executeAction('swap-eurc-usdc', { walletId, amount, minOutput }, 'Swap EURC → USDC');
   }, [executeAction]);
 
+  const depositLocked = useCallback(async (walletId: string, amount: string, currency: 'USDC' | 'EURC', lockPeriodMonths: number) => {
+    const action = currency === 'EURC' ? 'deposit-locked-eurc' : 'deposit-locked-usdc';
+    return executeAction(action, { walletId, amount, lockPeriodMonths }, `Lock ${currency} (${lockPeriodMonths}m)`);
+  }, [executeAction]);
+
   return {
     ...state,
     isProcessing: state.phase !== 'idle' && state.phase !== 'complete' && state.phase !== 'error',
@@ -107,6 +112,7 @@ export const useServerVault = () => {
     withdraw,
     swapUsdcForEurc,
     swapEurcForUsdc,
+    depositLocked,
     reset,
   };
 };
