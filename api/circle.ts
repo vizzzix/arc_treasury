@@ -1,19 +1,26 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import crypto from 'crypto';
+import { updateCircleTxStatus } from './lib/supabase';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, HEAD, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
+  const { action } = req.query;
+
+  // Webhook endpoint (POST/HEAD)
+  if (action === 'webhook') {
+    return handleWebhook(req, res);
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
-  const { action } = req.query;
 
   switch (action) {
     case 'fees':
@@ -21,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case 'messages':
       return handleMessages(req, res);
     default:
-      return res.status(400).json({ error: 'Invalid action. Use: fees, messages' });
+      return res.status(400).json({ error: 'Invalid action. Use: fees, messages, webhook' });
   }
 }
 
@@ -68,5 +75,123 @@ async function handleMessages(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     console.error('[Circle Messages Proxy] Error:', error);
     return res.status(500).json({ error: error.message || 'Failed to fetch messages' });
+  }
+}
+
+// --- Circle Webhook ---
+
+const CIRCLE_IPS = new Set([
+  '54.243.112.156',
+  '100.24.191.35',
+  '54.165.52.248',
+  '54.87.106.46',
+]);
+
+interface CircleNotification {
+  subscriptionId: string;
+  notificationId: string;
+  notificationType: string;
+  notification: {
+    id: string;
+    state?: string;
+    status?: string;
+    txHash?: string;
+    errorReason?: string;
+    errorMessage?: string;
+    [key: string]: unknown;
+  };
+  timestamp: string;
+  version: number;
+}
+
+async function verifyWebhookSignature(
+  body: string,
+  signature: string,
+  keyId: string
+): Promise<boolean> {
+  const apiKey = process.env.CircleAPI;
+  if (!apiKey) return false;
+
+  try {
+    const r = await fetch(
+      `https://api.circle.com/v2/notifications/publicKey/${keyId}`,
+      { headers: { 'Authorization': `Bearer ${apiKey}` } }
+    );
+    if (!r.ok) return false;
+
+    const data = await r.json();
+    const publicKeyPem = Buffer.from(data.data.publicKey, 'base64').toString();
+
+    const verifier = crypto.createVerify('SHA256');
+    verifier.update(body);
+    return verifier.verify(publicKeyPem, signature, 'base64');
+  } catch (e) {
+    console.error('[Webhook] Signature verification error:', e);
+    return false;
+  }
+}
+
+async function handleWebhook(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'HEAD') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'POST or HEAD required' });
+  }
+
+  // IP allowlist check
+  const forwarded = req.headers['x-forwarded-for'];
+  const clientIp = typeof forwarded === 'string'
+    ? forwarded.split(',')[0].trim()
+    : req.socket?.remoteAddress || '';
+
+  if (clientIp && !CIRCLE_IPS.has(clientIp)) {
+    console.warn(`[Webhook] Request from non-Circle IP: ${clientIp}`);
+  }
+
+  // Signature verification
+  const signature = req.headers['x-circle-signature'] as string | undefined;
+  const keyId = req.headers['x-circle-key-id'] as string | undefined;
+
+  if (signature && keyId) {
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    const valid = await verifyWebhookSignature(rawBody, signature, keyId);
+    if (!valid) {
+      console.warn('[Webhook] Invalid signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+  }
+
+  try {
+    const payload = req.body as CircleNotification;
+    const { notificationType, notification, notificationId } = payload;
+
+    console.log(`[Webhook] Received: type=${notificationType}, id=${notificationId}`);
+
+    if (notificationType === 'webhooks.test') {
+      return res.status(200).json({ status: 'ok' });
+    }
+
+    if (
+      notificationType === 'transactions.outbound' ||
+      notificationType === 'transactions.inbound'
+    ) {
+      const txId = notification.id;
+      const state = notification.state || notification.status || 'PENDING';
+      const txHash = notification.txHash;
+      const errorReason = notification.errorReason || notification.errorMessage;
+
+      console.log(`[Webhook] Transaction update: id=${txId}, state=${state}, hash=${txHash || 'none'}`);
+      await updateCircleTxStatus(txId, state, txHash, errorReason);
+
+      return res.status(200).json({ status: 'ok' });
+    }
+
+    console.log(`[Webhook] Unknown type: ${notificationType}`);
+    return res.status(200).json({ status: 'ok' });
+  } catch (error: any) {
+    console.error('[Webhook] Error processing:', error);
+    return res.status(200).json({ status: 'error', message: error.message });
   }
 }
