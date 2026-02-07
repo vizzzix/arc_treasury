@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { circlePost, getClient, CIRCLE_API_BASE } from './lib/circle';
-import { insertCircleTx, updateCircleTxStatus } from './lib/supabase';
+import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
+import { insertCircleTx, updateCircleTxStatus } from './_lib/supabase';
 
 // Helper: persist Circle tx to Supabase for history + Realtime
 async function trackTx(

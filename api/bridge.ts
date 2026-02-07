@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { circlePost, getClient } from './lib/circle';
-import { insertCircleTx, updateCircleTxStatus } from './lib/supabase';
+import { circlePost, getClient } from './_lib/circle';
+import { insertCircleTx, updateCircleTxStatus } from './_lib/supabase';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
