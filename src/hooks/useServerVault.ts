@@ -112,6 +112,22 @@ export const useServerVault = () => {
     return executeAction('remove-liquidity', { walletId, lpAmount }, 'Remove Liquidity');
   }, [executeAction]);
 
+  const withdrawLocked = useCallback(async (walletId: string, positionIndex: number) => {
+    return executeAction('withdraw-locked', { walletId, positionIndex }, 'Withdraw Locked');
+  }, [executeAction]);
+
+  const earlyWithdrawLocked = useCallback(async (walletId: string, positionIndex: number) => {
+    return executeAction('early-withdraw-locked', { walletId, positionIndex }, 'Early Withdraw');
+  }, [executeAction]);
+
+  const claimLockedYield = useCallback(async (walletId: string, positionIndex: number) => {
+    return executeAction('claim-locked-yield', { walletId, positionIndex }, 'Claim Yield');
+  }, [executeAction]);
+
+  const mintBadge = useCallback(async (walletId: string) => {
+    return executeAction('mint-badge', { walletId }, 'Mint Badge');
+  }, [executeAction]);
+
   return {
     ...state,
     isProcessing: state.phase !== 'idle' && state.phase !== 'complete' && state.phase !== 'error',
@@ -123,6 +139,10 @@ export const useServerVault = () => {
     depositLocked,
     addLiquidity,
     removeLiquidity,
+    withdrawLocked,
+    earlyWithdrawLocked,
+    claimLockedYield,
+    mintBadge,
     reset,
   };
 };

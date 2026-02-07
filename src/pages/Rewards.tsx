@@ -17,6 +17,8 @@ import { TREASURY_CONTRACTS } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useCircleWallet } from "@/providers/CircleWalletProvider";
+import { useServerVault } from "@/hooks/useServerVault";
 import confetti from "canvas-confetti";
 import earlyBadgeImg from "@/assets/early1_small.webp";
 
@@ -61,6 +63,9 @@ const Rewards = () => {
   const { leaderboard, isLoading: isLoadingLeaderboard, userRank, userEntry, totalDepositors } = useLeaderboard(account?.address);
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
+  const isCircle = unifiedWallet.walletType === 'circle';
   const isExternalWallet = account?.isConnected ?? false;
   const isConnected = isExternalWallet || unifiedWallet.isConnected;
   const address = account?.address || unifiedWallet.address;
@@ -103,12 +108,14 @@ const Rewards = () => {
     address: TREASURY_CONTRACTS.EarlySupporterBadge,
     abi: BADGE_ABI,
     functionName: 'totalSupply',
+    chainId: ARC_TESTNET_CHAIN_ID,
   });
 
   const { data: maxSupply } = useReadContract({
     address: TREASURY_CONTRACTS.EarlySupporterBadge,
     abi: BADGE_ABI,
     functionName: 'MAX_SUPPLY',
+    chainId: ARC_TESTNET_CHAIN_ID,
   });
 
   const { data: badgeBalance, refetch: refetchBalance } = useReadContract({
@@ -116,6 +123,7 @@ const Rewards = () => {
     abi: BADGE_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: !!address },
   });
 
@@ -123,6 +131,7 @@ const Rewards = () => {
     address: TREASURY_CONTRACTS.EarlySupporterBadge,
     abi: BADGE_ABI,
     functionName: 'mintingEnabled',
+    chainId: ARC_TESTNET_CHAIN_ID,
   });
 
   const { data: userShareValue } = useReadContract({
@@ -130,11 +139,16 @@ const Rewards = () => {
     abi: VAULT_ABI,
     functionName: 'getUserShareValue',
     args: address ? [address] : undefined,
+    chainId: ARC_TESTNET_CHAIN_ID,
     query: { enabled: !!address },
   });
 
-  const { writeContract, data: mintTxHash, isPending: isMinting } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isMinted } = useWaitForTransactionReceipt({ hash: mintTxHash });
+  const { writeContract, data: mintTxHash, isPending: isMintingWagmi } = useWriteContract();
+  const { isLoading: isConfirmingWagmi, isSuccess: isMintedWagmi } = useWaitForTransactionReceipt({ hash: mintTxHash });
+
+  const isMinting = isCircle ? serverVault.isProcessing : isMintingWagmi;
+  const isConfirming = isCircle ? serverVault.isProcessing : isConfirmingWagmi;
+  const isMinted = isCircle ? serverVault.isComplete : isMintedWagmi;
 
   const MIN_DEPOSIT = 10_000_000n; // $10 with 6 decimals
   const userBalance = userShareValue ?? 0n;
@@ -163,8 +177,19 @@ const Rewards = () => {
     window.open(`https://t.me/share/url?url=${encodeURIComponent(referralUrl || '')}&text=${text}`, "_blank");
   };
 
-  const handleMint = () => {
+  const handleMint = async () => {
     if (!canMint) return;
+
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) {
+        toast({ title: "Mint Failed", description: "Arc wallet not found", variant: "destructive" });
+        return;
+      }
+      await serverVault.mintBadge(arcWalletId);
+      return;
+    }
+
     writeContract({
       address: TREASURY_CONTRACTS.EarlySupporterBadge,
       abi: BADGE_ABI,

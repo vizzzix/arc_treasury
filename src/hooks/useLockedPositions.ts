@@ -247,6 +247,10 @@ export function useDepositLocked() {
  * Hook to withdraw locked position
  */
 export function useWithdrawLocked() {
+  const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
+  const isCircle = unifiedWallet.walletType === 'circle';
   const { data: hash, writeContractAsync, isPending, error } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -254,6 +258,14 @@ export function useWithdrawLocked() {
   });
 
   const withdrawLocked = async (positionIndex: number) => {
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      const txHash = await serverVault.withdrawLocked(arcWalletId, positionIndex);
+      if (!txHash) throw new Error('Withdraw locked failed');
+      return txHash as `0x${string}`;
+    }
+
     const txHash = await writeContractAsync({
       address: TREASURY_CONTRACTS.TreasuryVault,
       abi: TreasuryVaultABI.abi,
@@ -265,11 +277,11 @@ export function useWithdrawLocked() {
 
   return {
     withdrawLocked,
-    isPending,
-    isConfirming,
-    isSuccess,
-    error,
-    hash,
+    isPending: isCircle ? serverVault.isProcessing : isPending,
+    isConfirming: isCircle ? serverVault.isProcessing : isConfirming,
+    isSuccess: isCircle ? serverVault.isComplete : isSuccess,
+    error: isCircle ? (serverVault.error ? new Error(serverVault.error) : null) : error,
+    hash: isCircle ? (serverVault.txHash as `0x${string}` | undefined) : hash,
   };
 }
 
@@ -277,6 +289,10 @@ export function useWithdrawLocked() {
  * Hook to early withdraw with penalty
  */
 export function useEarlyWithdrawLocked() {
+  const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
+  const isCircle = unifiedWallet.walletType === 'circle';
   const { data: hash, writeContractAsync, isPending, error } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -284,6 +300,14 @@ export function useEarlyWithdrawLocked() {
   });
 
   const earlyWithdrawLocked = async (positionIndex: number) => {
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      const txHash = await serverVault.earlyWithdrawLocked(arcWalletId, positionIndex);
+      if (!txHash) throw new Error('Early withdraw failed');
+      return txHash as `0x${string}`;
+    }
+
     const txHash = await writeContractAsync({
       address: TREASURY_CONTRACTS.TreasuryVault,
       abi: TreasuryVaultABI.abi,
@@ -295,11 +319,11 @@ export function useEarlyWithdrawLocked() {
 
   return {
     earlyWithdrawLocked,
-    isPending,
-    isConfirming,
-    isSuccess,
-    error,
-    hash,
+    isPending: isCircle ? serverVault.isProcessing : isPending,
+    isConfirming: isCircle ? serverVault.isProcessing : isConfirming,
+    isSuccess: isCircle ? serverVault.isComplete : isSuccess,
+    error: isCircle ? (serverVault.error ? new Error(serverVault.error) : null) : error,
+    hash: isCircle ? (serverVault.txHash as `0x${string}` | undefined) : hash,
   };
 }
 
@@ -307,6 +331,10 @@ export function useEarlyWithdrawLocked() {
  * Hook to claim yield from locked position
  */
 export function useClaimLockedYield() {
+  const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
+  const isCircle = unifiedWallet.walletType === 'circle';
   const { data: hash, writeContract, isPending, error } = useWriteContract();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -314,6 +342,14 @@ export function useClaimLockedYield() {
   });
 
   const claimYield = async (positionIndex: number) => {
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      const txHash = await serverVault.claimLockedYield(arcWalletId, positionIndex);
+      if (!txHash) throw new Error('Claim yield failed');
+      return txHash as `0x${string}`;
+    }
+
     writeContract({
       address: TREASURY_CONTRACTS.TreasuryVault,
       abi: TreasuryVaultABI.abi,
@@ -324,11 +360,11 @@ export function useClaimLockedYield() {
 
   return {
     claimYield,
-    isPending,
-    isConfirming,
-    isSuccess,
-    error,
-    hash,
+    isPending: isCircle ? serverVault.isProcessing : isPending,
+    isConfirming: isCircle ? serverVault.isProcessing : isConfirming,
+    isSuccess: isCircle ? serverVault.isComplete : isSuccess,
+    error: isCircle ? (serverVault.error ? new Error(serverVault.error) : null) : error,
+    hash: isCircle ? (serverVault.txHash as `0x${string}` | undefined) : hash,
   };
 }
 

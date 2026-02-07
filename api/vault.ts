@@ -5,6 +5,7 @@ import { circlePost, circleGet, CIRCLE_API_BASE } from './lib/circle';
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
 const STABLECOIN_SWAP = '0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf';
 const EURC_ADDRESS = '0x742b2d045d430fe718b57046645ba33295914b69';
+const EARLY_BADGE = '0xb26a5b1d783646a7236ca956f2e954e002bf8d13';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -36,11 +37,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleAddLiquidity(req, res);
       case 'remove-liquidity':
         return await handleRemoveLiquidity(req, res);
+      case 'withdraw-locked':
+        return await handleWithdrawLocked(req, res);
+      case 'early-withdraw-locked':
+        return await handleEarlyWithdrawLocked(req, res);
+      case 'claim-locked-yield':
+        return await handleClaimLockedYield(req, res);
+      case 'mint-badge':
+        return await handleMintBadge(req, res);
       case 'tx-status':
         return await handleTxStatus(req, res);
       default:
         return res.status(400).json({
-          error: 'Invalid action. Use: deposit-usdc, deposit-eurc, withdraw-usdc, withdraw-eurc, swap-usdc-eurc, swap-eurc-usdc, deposit-locked-usdc, deposit-locked-eurc, tx-status',
+          error: 'Invalid action',
         });
     }
   } catch (error: any) {
@@ -471,6 +480,135 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
   });
 
   console.log('[Vault] Remove Liquidity result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
+  });
+}
+
+// --- Withdraw Locked Position ---
+// withdrawLocked(uint256 positionIndex) — nonpayable
+
+async function handleWithdrawLocked(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, positionIndex } = req.body;
+  if (!walletId || positionIndex === undefined) {
+    return res.status(400).json({ error: 'walletId and positionIndex required' });
+  }
+
+  const idx = parseInt(positionIndex);
+  if (!Number.isFinite(idx) || idx < 0) {
+    return res.status(400).json({ error: 'Invalid positionIndex' });
+  }
+
+  console.log(`[Vault] Withdraw Locked: wallet=${walletId}, index=${idx}`);
+
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: TREASURY_VAULT,
+    abiFunctionSignature: 'withdrawLocked(uint256)',
+    abiParameters: [idx.toString()],
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Withdraw Locked result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
+  });
+}
+
+// --- Early Withdraw Locked Position (with penalty) ---
+// earlyWithdrawLocked(uint256 positionIndex) — nonpayable
+
+async function handleEarlyWithdrawLocked(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, positionIndex } = req.body;
+  if (!walletId || positionIndex === undefined) {
+    return res.status(400).json({ error: 'walletId and positionIndex required' });
+  }
+
+  const idx = parseInt(positionIndex);
+  if (!Number.isFinite(idx) || idx < 0) {
+    return res.status(400).json({ error: 'Invalid positionIndex' });
+  }
+
+  console.log(`[Vault] Early Withdraw Locked: wallet=${walletId}, index=${idx}`);
+
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: TREASURY_VAULT,
+    abiFunctionSignature: 'earlyWithdrawLocked(uint256)',
+    abiParameters: [idx.toString()],
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Early Withdraw Locked result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
+  });
+}
+
+// --- Claim Locked Yield ---
+// claimLockedYield(uint256 positionIndex) — nonpayable
+
+async function handleClaimLockedYield(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, positionIndex } = req.body;
+  if (!walletId || positionIndex === undefined) {
+    return res.status(400).json({ error: 'walletId and positionIndex required' });
+  }
+
+  const idx = parseInt(positionIndex);
+  if (!Number.isFinite(idx) || idx < 0) {
+    return res.status(400).json({ error: 'Invalid positionIndex' });
+  }
+
+  console.log(`[Vault] Claim Locked Yield: wallet=${walletId}, index=${idx}`);
+
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: TREASURY_VAULT,
+    abiFunctionSignature: 'claimLockedYield(uint256)',
+    abiParameters: [idx.toString()],
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Claim Locked Yield result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
+  });
+}
+
+// --- Mint Early Supporter Badge ---
+// mint() — nonpayable, no parameters
+
+async function handleMintBadge(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId } = req.body;
+  if (!walletId) return res.status(400).json({ error: 'walletId required' });
+
+  console.log(`[Vault] Mint Badge: wallet=${walletId}`);
+
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: EARLY_BADGE,
+    abiFunctionSignature: 'mint()',
+    abiParameters: [],
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Mint Badge result:', JSON.stringify(result));
 
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,

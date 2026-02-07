@@ -3,8 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Sparkles, Twitter } from "lucide-react";
 import { TREASURY_CONTRACTS } from "@/lib/constants";
+import { arcTestnet } from "@/lib/wagmi";
 import { useToast } from "@/hooks/use-toast";
 import { useReferral } from "@/hooks/useReferral";
+import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
+import { useCircleWallet } from "@/providers/CircleWalletProvider";
+import { useServerVault } from "@/hooks/useServerVault";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import confetti from "canvas-confetti";
@@ -67,10 +71,14 @@ const fireConfetti = () => {
 
 export const EarlyBadgeSection = () => {
   const account = useAccount();
+  const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
+  const isCircle = unifiedWallet.walletType === 'circle';
   const { toast } = useToast();
   const navigate = useNavigate();
   const { referralUrl } = useReferral();
-  const address = account?.address;
+  const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const shareOnTwitter = () => {
@@ -92,6 +100,7 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
     abi: BADGE_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
+    chainId: arcTestnet.id,
     query: { enabled: !!address && isContractDeployed },
   });
 
@@ -99,6 +108,7 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
     address: TREASURY_CONTRACTS.EarlySupporterBadge,
     abi: BADGE_ABI,
     functionName: 'totalSupply',
+    chainId: arcTestnet.id,
     query: { enabled: isContractDeployed },
   });
 
@@ -106,6 +116,7 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
     address: TREASURY_CONTRACTS.EarlySupporterBadge,
     abi: BADGE_ABI,
     functionName: 'MAX_SUPPLY',
+    chainId: arcTestnet.id,
     query: { enabled: isContractDeployed },
   });
 
@@ -113,6 +124,7 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
     address: TREASURY_CONTRACTS.EarlySupporterBadge,
     abi: BADGE_ABI,
     functionName: 'mintingEnabled',
+    chainId: arcTestnet.id,
     query: { enabled: isContractDeployed },
   });
 
@@ -122,11 +134,16 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
     abi: VAULT_ABI,
     functionName: 'getUserShareValue',
     args: address ? [address] : undefined,
+    chainId: arcTestnet.id,
     query: { enabled: !!address },
   });
 
-  const { writeContract, data: mintTxHash, isPending: isMinting } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess: isMinted } = useWaitForTransactionReceipt({ hash: mintTxHash });
+  const { writeContract, data: mintTxHash, isPending: isMintingWagmi } = useWriteContract();
+  const { isLoading: isConfirmingWagmi, isSuccess: isMintedWagmi } = useWaitForTransactionReceipt({ hash: mintTxHash });
+
+  const isMinting = isCircle ? serverVault.isProcessing : isMintingWagmi;
+  const isConfirming = isCircle ? serverVault.isProcessing : isConfirmingWagmi;
+  const isMinted = isCircle ? serverVault.isComplete : isMintedWagmi;
 
   // Check if user has deposited at least $10
   const MIN_DEPOSIT = 10_000_000n; // $10 with 6 decimals
@@ -136,8 +153,18 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
   const alreadyOwns = badgeBalance !== undefined && badgeBalance > 0n;
   const canMint = hasDeposit && !alreadyOwns && mintingEnabled;
 
-  const handleMint = () => {
+  const handleMint = async () => {
     if (!canMint) return;
+
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) {
+        toast({ title: "Mint Failed", description: "Arc wallet not found", variant: "destructive" });
+        return;
+      }
+      await serverVault.mintBadge(arcWalletId);
+      return;
+    }
 
     writeContract({
       address: TREASURY_CONTRACTS.EarlySupporterBadge,
@@ -158,7 +185,6 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
       toast({ title: "Badge Minted!", description: "You are now an Early Supporter!" });
       fireConfetti();
       setShowSuccess(true);
-      // Refetch balance to update UI
       setTimeout(() => refetchBalance(), 2000);
     }
   }, [isMinted, toast, refetchBalance]);
