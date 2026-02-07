@@ -62,10 +62,19 @@ export const StarField = ({ count = 150 }: { count?: number }) => {
       }));
     };
 
+    let lastWidth = 0;
+
     const resize = () => {
-      canvas.width = window.innerWidth;
+      const newWidth = window.innerWidth;
+      canvas.width = newWidth;
       canvas.height = window.innerHeight;
-      initStars();
+
+      // On mobile, only reinit stars if WIDTH changed (not height)
+      // Height changes constantly due to address bar show/hide
+      if (!mobile || lastWidth !== newWidth || starsRef.current.length === 0) {
+        initStars();
+      }
+      lastWidth = newWidth;
     };
 
     const onMouseMove = (e: MouseEvent) => {
