@@ -91,7 +91,7 @@ export const useServerBridge = () => {
   };
 
   // Main bridge function — supports both directions
-  const bridge = useCallback(async (walletId: string, amount: string, recipientAddress: string, direction: BridgeDirection = 'sepolia-to-arc', destWalletId?: string) => {
+  const bridge = useCallback(async (walletId: string, amount: string, recipientAddress: string, direction: BridgeDirection = 'sepolia-to-arc', destWalletId?: string, walletAddress?: string) => {
     setState({ phase: 'approving', error: null, burnTxHash: null, claimTxHash: null });
     const isArcToSepolia = direction === 'arc-to-sepolia';
     const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
@@ -102,7 +102,7 @@ export const useServerBridge = () => {
       const approveRes = await fetch('/api/bridge?action=approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletId, amount, direction }),
+        body: JSON.stringify({ walletId, amount, direction, walletAddress }),
       });
       const approveData = await approveRes.json();
       if (!approveRes.ok) throw new Error(approveData.error || 'Approve failed');
@@ -120,7 +120,7 @@ export const useServerBridge = () => {
       const burnRes = await fetch('/api/bridge?action=burn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletId, amount, recipientAddress, direction }),
+        body: JSON.stringify({ walletId, amount, recipientAddress, direction, walletAddress }),
       });
       const burnData = await burnRes.json();
       if (!burnRes.ok) throw new Error(burnData.error || 'Bridge failed');
@@ -148,7 +148,7 @@ export const useServerBridge = () => {
       const claimRes = await fetch('/api/bridge?action=claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ burnTxHash, direction, destWalletId }),
+        body: JSON.stringify({ burnTxHash, direction, destWalletId, walletAddress }),
       });
       const claimData = await claimRes.json();
 
@@ -158,7 +158,7 @@ export const useServerBridge = () => {
         const retryRes = await fetch('/api/bridge?action=claim', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ burnTxHash, direction, destWalletId }),
+          body: JSON.stringify({ burnTxHash, direction, destWalletId, walletAddress }),
         });
         const retryData = await retryRes.json();
         if (retryData.status !== 'submitted' && retryData.status !== 'complete') {

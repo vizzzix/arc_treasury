@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, Gift, LogOut, Wallet, ChevronDown, ArrowLeftRight, ArrowDownUp, Coins, LayoutDashboard, Chrome, Copy, Check } from "lucide-react";
+import { User, Gift, LogOut, Wallet, ChevronDown, ArrowLeftRight, ArrowDownUp, Coins, LayoutDashboard, Chrome, Copy, Check, History } from "lucide-react";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { TOKEN_ADDRESSES } from "@/lib/constants";
 import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
@@ -127,6 +127,10 @@ export const UserMenu = () => {
         <DropdownMenuItem onClick={() => navigate("/profile")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
           <User className="w-4 h-4 mr-2" />
           Profile & Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/history")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
+          <History className="w-4 h-4 mr-2" />
+          Transaction History
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/rewards")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
           <Gift className="w-4 h-4 mr-2" />

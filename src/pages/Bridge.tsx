@@ -275,7 +275,7 @@ const Bridge = () => {
         console.error('[Bridge.tsx] Missing walletId, destWalletId, or address for server bridge');
         return;
       }
-      await serverBridge.bridge(walletId, amount, address, direction as any, destWalletId);
+      await serverBridge.bridge(walletId, amount, address, direction as any, destWalletId, address);
       return;
     }
 

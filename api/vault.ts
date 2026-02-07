@@ -1,5 +1,30 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { circlePost, circleGet, CIRCLE_API_BASE } from './lib/circle';
+import { circlePost, getClient, CIRCLE_API_BASE } from './lib/circle';
+import { insertCircleTx, updateCircleTxStatus } from './lib/supabase';
+
+// Helper: persist Circle tx to Supabase for history + Realtime
+async function trackTx(
+  result: any,
+  txType: string,
+  walletId: string,
+  walletAddress?: string,
+  amount?: string,
+  currency?: string,
+  metadata?: Record<string, unknown>
+) {
+  const txId = result?.id || result?.transactionId;
+  if (!txId) return;
+  await insertCircleTx({
+    circle_tx_id: txId,
+    tx_type: txType,
+    status: result?.state || 'PENDING',
+    wallet_address: (walletAddress || '').toLowerCase(),
+    wallet_id: walletId,
+    amount,
+    currency,
+    metadata,
+  });
+}
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -64,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount } = req.body;
+  const { walletId, amount, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
   const parsedAmount = parseFloat(amount);
@@ -88,6 +113,8 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Deposit USDC result:', JSON.stringify(result));
 
+  await trackTx(result, 'deposit-usdc', walletId, walletAddress, amount, 'USDC');
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -101,7 +128,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
 async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount } = req.body;
+  const { walletId, amount, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
   const parsedAmount = parseFloat(amount);
@@ -142,6 +169,8 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Deposit EURC result:', JSON.stringify(depositResult));
 
+  await trackTx(depositResult, 'deposit-eurc', walletId, walletAddress, amount, 'EURC');
+
   return res.status(200).json({
     transactionId: depositResult?.id || depositResult?.transactionId,
     state: depositResult?.state,
@@ -154,7 +183,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
 async function handleWithdrawUsdc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, shares } = req.body;
+  const { walletId, shares, walletAddress } = req.body;
   if (!walletId || !shares) return res.status(400).json({ error: 'walletId and shares required' });
 
   console.log(`[Vault] Withdraw USDC: wallet=${walletId}, shares=${shares}`);
@@ -169,6 +198,8 @@ async function handleWithdrawUsdc(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Withdraw USDC result:', JSON.stringify(result));
 
+  await trackTx(result, 'withdraw-usdc', walletId, walletAddress, shares, 'USDC');
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -181,7 +212,7 @@ async function handleWithdrawUsdc(req: VercelRequest, res: VercelResponse) {
 async function handleWithdrawEurc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, shares } = req.body;
+  const { walletId, shares, walletAddress } = req.body;
   if (!walletId || !shares) return res.status(400).json({ error: 'walletId and shares required' });
 
   console.log(`[Vault] Withdraw EURC: wallet=${walletId}, shares=${shares}`);
@@ -196,6 +227,8 @@ async function handleWithdrawEurc(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Withdraw EURC result:', JSON.stringify(result));
 
+  await trackTx(result, 'withdraw-eurc', walletId, walletAddress, shares, 'EURC');
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -208,7 +241,7 @@ async function handleWithdrawEurc(req: VercelRequest, res: VercelResponse) {
 async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, minOutput } = req.body;
+  const { walletId, amount, minOutput, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
   const parsedAmount = parseFloat(amount);
@@ -234,6 +267,8 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Swap USDC→EURC result:', JSON.stringify(result));
 
+  await trackTx(result, 'swap-usdc-eurc', walletId, walletAddress, amount, 'USDC');
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -247,7 +282,7 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
 async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, minOutput } = req.body;
+  const { walletId, amount, minOutput, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
   const parsedAmount = parseFloat(amount);
@@ -291,6 +326,8 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Swap EURC→USDC result:', JSON.stringify(result));
 
+  await trackTx(result, 'swap-eurc-usdc', walletId, walletAddress, amount, 'EURC');
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -303,7 +340,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
 async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, lockPeriodMonths } = req.body;
+  const { walletId, amount, lockPeriodMonths, walletAddress } = req.body;
   if (!walletId || !amount || !lockPeriodMonths) {
     return res.status(400).json({ error: 'walletId, amount and lockPeriodMonths required' });
   }
@@ -333,6 +370,8 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
 
   console.log('[Vault] Deposit Locked USDC result:', JSON.stringify(result));
 
+  await trackTx(result, 'deposit-locked-usdc', walletId, walletAddress, amount, 'USDC', { lockPeriodMonths: months });
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -345,7 +384,7 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
 async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, lockPeriodMonths } = req.body;
+  const { walletId, amount, lockPeriodMonths, walletAddress } = req.body;
   if (!walletId || !amount || !lockPeriodMonths) {
     return res.status(400).json({ error: 'walletId, amount and lockPeriodMonths required' });
   }
@@ -390,6 +429,8 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
 
   console.log('[Vault] Deposit Locked EURC result:', JSON.stringify(depositResult));
 
+  await trackTx(depositResult, 'deposit-locked-eurc', walletId, walletAddress, amount, 'EURC', { lockPeriodMonths: months });
+
   return res.status(200).json({
     transactionId: depositResult?.id || depositResult?.transactionId,
     state: depositResult?.state,
@@ -402,7 +443,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
 async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, usdcAmount, eurcAmount } = req.body;
+  const { walletId, usdcAmount, eurcAmount, walletAddress } = req.body;
   if (!walletId || !usdcAmount || !eurcAmount) {
     return res.status(400).json({ error: 'walletId, usdcAmount and eurcAmount required' });
   }
@@ -444,6 +485,8 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Add Liquidity result:', JSON.stringify(result));
 
+  await trackTx(result, 'add-liquidity', walletId, walletAddress, usdcAmount, 'USDC', { eurcAmount });
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -456,7 +499,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
 async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, lpAmount } = req.body;
+  const { walletId, lpAmount, walletAddress } = req.body;
   if (!walletId || !lpAmount) {
     return res.status(400).json({ error: 'walletId and lpAmount required' });
   }
@@ -481,6 +524,8 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Remove Liquidity result:', JSON.stringify(result));
 
+  await trackTx(result, 'remove-liquidity', walletId, walletAddress, lpAmount, 'LP');
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -493,7 +538,7 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
 async function handleWithdrawLocked(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, positionIndex } = req.body;
+  const { walletId, positionIndex, walletAddress } = req.body;
   if (!walletId || positionIndex === undefined) {
     return res.status(400).json({ error: 'walletId and positionIndex required' });
   }
@@ -515,6 +560,8 @@ async function handleWithdrawLocked(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Withdraw Locked result:', JSON.stringify(result));
 
+  await trackTx(result, 'withdraw-locked', walletId, walletAddress, undefined, undefined, { positionIndex: idx });
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -527,7 +574,7 @@ async function handleWithdrawLocked(req: VercelRequest, res: VercelResponse) {
 async function handleEarlyWithdrawLocked(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, positionIndex } = req.body;
+  const { walletId, positionIndex, walletAddress } = req.body;
   if (!walletId || positionIndex === undefined) {
     return res.status(400).json({ error: 'walletId and positionIndex required' });
   }
@@ -549,6 +596,8 @@ async function handleEarlyWithdrawLocked(req: VercelRequest, res: VercelResponse
 
   console.log('[Vault] Early Withdraw Locked result:', JSON.stringify(result));
 
+  await trackTx(result, 'early-withdraw-locked', walletId, walletAddress, undefined, undefined, { positionIndex: idx });
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -561,7 +610,7 @@ async function handleEarlyWithdrawLocked(req: VercelRequest, res: VercelResponse
 async function handleClaimLockedYield(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, positionIndex } = req.body;
+  const { walletId, positionIndex, walletAddress } = req.body;
   if (!walletId || positionIndex === undefined) {
     return res.status(400).json({ error: 'walletId and positionIndex required' });
   }
@@ -583,6 +632,8 @@ async function handleClaimLockedYield(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Claim Locked Yield result:', JSON.stringify(result));
 
+  await trackTx(result, 'claim-locked-yield', walletId, walletAddress, undefined, undefined, { positionIndex: idx });
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
@@ -595,7 +646,7 @@ async function handleClaimLockedYield(req: VercelRequest, res: VercelResponse) {
 async function handleMintBadge(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId } = req.body;
+  const { walletId, walletAddress } = req.body;
   if (!walletId) return res.status(400).json({ error: 'walletId required' });
 
   console.log(`[Vault] Mint Badge: wallet=${walletId}`);
@@ -610,13 +661,15 @@ async function handleMintBadge(req: VercelRequest, res: VercelResponse) {
 
   console.log('[Vault] Mint Badge result:', JSON.stringify(result));
 
+  await trackTx(result, 'mint-badge', walletId, walletAddress);
+
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
     state: result?.state,
   });
 }
 
-// --- Transaction status ---
+// --- Transaction status (uses Circle SDK) ---
 
 async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET required' });
@@ -624,67 +677,51 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   const { txId } = req.query;
   if (!txId || typeof txId !== 'string') return res.status(400).json({ error: 'txId required' });
 
-  const apiKey = process.env.CircleAPI;
-  if (!apiKey) throw new Error('Missing CircleAPI');
+  try {
+    const client = getClient();
+    const response = await client.getTransaction({ id: txId });
+    const tx = response.data?.transaction;
 
-  const paths = [
-    `/transactions/${txId}`,
-    `/developer/transactions/${txId}`,
-  ];
-
-  for (const path of paths) {
-    const url = `${CIRCLE_API_BASE}${path}`;
-    try {
-      const r = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-      const data = await r.json();
-
-      if (!r.ok) continue;
-
-      const inner = data.data;
-      const tx = inner?.transaction || inner;
-
-      return res.status(200).json({
-        id: tx?.id,
-        state: tx?.state,
-        txHash: tx?.txHash,
-        errorReason: tx?.errorReason,
-      });
-    } catch (e: any) {
-      console.warn(`[Vault] tx-status ${path} error:`, e.message);
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
     }
-  }
 
-  return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
+    // Update Supabase on every poll (keeps Realtime fed even without webhooks)
+    const state = tx.state || 'PENDING';
+    if (state === 'COMPLETE' || state === 'CONFIRMED' || state === 'FAILED' || state === 'CANCELLED') {
+      await updateCircleTxStatus(txId, state, tx.txHash, tx.errorReason);
+    }
+
+    return res.status(200).json({
+      id: tx.id,
+      state: tx.state,
+      txHash: tx.txHash,
+      errorReason: tx.errorReason,
+    });
+  } catch (e: any) {
+    console.warn(`[Vault] tx-status error:`, e.message);
+    return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
+  }
 }
 
-// --- Internal helper: wait for Circle tx to complete ---
+// --- Internal helper: wait for Circle tx to complete (uses SDK) ---
 
 async function waitForCircleTx(txId: string, maxAttempts = 30): Promise<void> {
-  const apiKey = process.env.CircleAPI;
-  if (!apiKey) throw new Error('Missing CircleAPI');
+  const client = getClient();
 
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 2000));
 
-    const paths = [`/transactions/${txId}`, `/developer/transactions/${txId}`];
-    for (const path of paths) {
-      try {
-        const r = await fetch(`${CIRCLE_API_BASE}${path}`, {
-          headers: { 'Authorization': `Bearer ${apiKey}` },
-        });
-        if (!r.ok) continue;
-        const data = await r.json();
-        const tx = data.data?.transaction || data.data;
+    try {
+      const response = await client.getTransaction({ id: txId });
+      const tx = response.data?.transaction;
 
-        if (tx?.state === 'COMPLETE' || tx?.state === 'CONFIRMED') return;
-        if (tx?.state === 'FAILED' || tx?.state === 'CANCELLED') {
-          throw new Error(`Transaction failed: ${tx.errorReason || tx.state}`);
-        }
-      } catch (e: any) {
-        if (e.message?.includes('failed') || e.message?.includes('Transaction failed')) throw e;
+      if (tx?.state === 'COMPLETE' || tx?.state === 'CONFIRMED') return;
+      if (tx?.state === 'FAILED' || tx?.state === 'CANCELLED') {
+        throw new Error(`Transaction failed: ${tx.errorReason || tx.state}`);
       }
+    } catch (e: any) {
+      if (e.message?.includes('failed') || e.message?.includes('Transaction failed')) throw e;
     }
   }
   throw new Error(`Transaction timeout after ${maxAttempts * 2}s`);

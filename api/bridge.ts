@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { circlePost, CIRCLE_API_BASE } from './lib/circle';
+import { circlePost, getClient } from './lib/circle';
+import { insertCircleTx, updateCircleTxStatus } from './lib/supabase';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -14,6 +15,29 @@ const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275';
 const ARC_DESTINATION_DOMAIN = 26;
 
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages';
+
+async function trackTx(
+  result: any, txType: string, walletId: string,
+  walletAddress?: string, amount?: string, currency?: string,
+  metadata?: Record<string, unknown>,
+) {
+  try {
+    const txId = result?.id || result?.transactionId;
+    if (!txId) return;
+    await insertCircleTx({
+      circle_tx_id: txId,
+      tx_type: txType,
+      status: result?.state || 'PENDING',
+      wallet_address: (walletAddress || '').toLowerCase(),
+      wallet_id: walletId,
+      amount,
+      currency,
+      metadata,
+    });
+  } catch (e: any) {
+    console.warn('[Bridge] trackTx failed:', e.message);
+  }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -58,7 +82,7 @@ function padAddress(addr: string): string {
 async function handleApprove(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, direction } = req.body;
+  const { walletId, amount, direction, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
   const isArcToSepolia = direction === 'arc-to-sepolia';
@@ -79,6 +103,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
   });
 
   console.log('[Bridge] Approve result:', JSON.stringify(result));
+  await trackTx(result, 'bridge-approve', walletId, walletAddress, amount, 'USDC', { direction: direction || 'sepolia-to-arc' });
 
   return res.status(200).json({
     transactionId: result?.id || result?.transactionId,
@@ -91,7 +116,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
 async function handleBurn(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { walletId, amount, recipientAddress, direction } = req.body;
+  const { walletId, amount, recipientAddress, direction, walletAddress } = req.body;
   if (!walletId || !amount || !recipientAddress) {
     return res.status(400).json({ error: 'walletId, amount, and recipientAddress required' });
   }
@@ -125,6 +150,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
     });
 
     console.log('[Bridge] Burn (Arc→Sepolia) result:', JSON.stringify(result));
+    await trackTx(result, 'bridge-burn', walletId, walletAddress, amount, 'USDC', { direction: 'arc-to-sepolia' });
 
     return res.status(200).json({
       transactionId: result?.id || result?.transactionId,
@@ -151,6 +177,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
     });
 
     console.log('[Bridge] Burn (Sepolia→Arc) result:', JSON.stringify(result));
+    await trackTx(result, 'bridge-burn', walletId, walletAddress, amount, 'USDC', { direction: 'sepolia-to-arc' });
 
     return res.status(200).json({
       transactionId: result?.id || result?.transactionId,
@@ -167,46 +194,38 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
   const { txId } = req.query;
   if (!txId || typeof txId !== 'string') return res.status(400).json({ error: 'txId required' });
 
-  const apiKey = process.env.CircleAPI;
-  if (!apiKey) throw new Error('Missing CircleAPI');
+  try {
+    const client = getClient();
+    const response = await client.getTransaction({ id: txId });
+    const tx = response.data?.transaction;
 
-  // Try the standard path first, then fallback to /developer/ path
-  const paths = [
-    `/transactions/${txId}`,
-    `/developer/transactions/${txId}`,
-  ];
-
-  for (const path of paths) {
-    const url = `${CIRCLE_API_BASE}${path}`;
-    try {
-      const r = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${apiKey}` },
-      });
-      const data = await r.json();
-
-      console.log(`[Bridge] tx-status GET ${path} → ${r.status}:`, JSON.stringify(data));
-
-      if (!r.ok) continue; // Try next path
-
-      // Handle both response structures:
-      // { data: { transaction: { id, state, ... } } } or { data: { id, state, ... } }
-      const inner = data.data;
-      const tx = inner?.transaction || inner;
-
-      return res.status(200).json({
-        id: tx?.id,
-        state: tx?.state,
-        txHash: tx?.txHash,
-        errorReason: tx?.errorReason,
-        createDate: tx?.createDate,
-        updateDate: tx?.updateDate,
-      });
-    } catch (e: any) {
-      console.warn(`[Bridge] tx-status ${path} error:`, e.message);
+    if (!tx) {
+      return res.status(404).json({ error: 'Transaction not found' });
     }
-  }
 
-  return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
+    const state = tx.state as string;
+    const terminal = ['COMPLETE', 'CONFIRMED', 'FAILED', 'CANCELLED'];
+    if (terminal.includes(state)) {
+      await updateCircleTxStatus(
+        txId,
+        state,
+        (tx as any).txHash || undefined,
+        (tx as any).errorReason || undefined,
+      );
+    }
+
+    return res.status(200).json({
+      id: tx.id,
+      state,
+      txHash: (tx as any).txHash,
+      errorReason: (tx as any).errorReason,
+      createDate: (tx as any).createDate,
+      updateDate: (tx as any).updateDate,
+    });
+  } catch (e: any) {
+    console.error('[Bridge] tx-status error:', e.message);
+    return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
+  }
 }
 
 // --- Step 4: Claim on destination chain (via Circle API — no relayer needed) ---
@@ -214,7 +233,7 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
 async function handleClaim(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { burnTxHash, direction, destWalletId } = req.body;
+  const { burnTxHash, direction, destWalletId, walletAddress } = req.body;
   if (!burnTxHash) return res.status(400).json({ error: 'burnTxHash required' });
   if (!destWalletId) return res.status(400).json({ error: 'destWalletId required' });
 
@@ -257,6 +276,7 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
   });
 
   console.log('[Bridge] Claim submitted via Circle:', JSON.stringify(result));
+  await trackTx(result, 'bridge-claim', destWalletId, walletAddress, undefined, 'USDC', { direction: direction || 'sepolia-to-arc', burnTxHash });
 
   return res.status(200).json({
     status: 'submitted',

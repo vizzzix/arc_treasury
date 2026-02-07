@@ -24,6 +24,7 @@ const Litepaper = lazy(() => import("./pages/Litepaper"));
 const LockDesignPreview = lazy(() => import("./pages/LockDesignPreview"));
 const Swap = lazy(() => import("./pages/Swap"));
 const PitchDeck = lazy(() => import("./pages/PitchDeck"));
+const History = lazy(() => import("./pages/History"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Bridge pages: lazy-load WITH SolanaWalletProvider to defer ~2MB of Solana deps
@@ -67,6 +68,7 @@ const AppRoutes = () => {
           <Route path="/swap" element={<Swap />} />
           <Route path="/bridge-solana" element={<BridgeSolana />} />
           <Route path="/pitch/:token" element={<PitchDeck />} />
+          <Route path="/history" element={<History />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

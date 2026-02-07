@@ -1,32 +1,53 @@
-import crypto from 'crypto';
+import {
+  CircleDeveloperControlledWalletsClient,
+  initiateDeveloperControlledWalletsClient,
+} from '@circle-fin/developer-controlled-wallets';
 
 export const CIRCLE_API_BASE = 'https://api.circle.com/v1/w3s';
 
-export async function getCirclePublicKey(apiKey: string): Promise<string> {
-  const r = await fetch(`${CIRCLE_API_BASE}/config/entity/publicKey`, {
-    headers: { 'Authorization': `Bearer ${apiKey}` },
-  });
-  if (!r.ok) throw new Error(`Failed to get public key: ${r.status}`);
-  const data = await r.json();
-  return data.data.publicKey;
-}
+let _client: CircleDeveloperControlledWalletsClient | null = null;
 
-export function encryptEntitySecret(entitySecret: string, publicKeyPem: string): string {
-  const buf = Buffer.from(entitySecret, 'hex');
-  const encrypted = crypto.publicEncrypt(
-    { key: publicKeyPem, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
-    buf
-  );
-  return encrypted.toString('base64');
-}
+function getClient(): CircleDeveloperControlledWalletsClient {
+  if (_client) return _client;
 
-export async function circlePost(path: string, body: any) {
   const apiKey = process.env.CircleAPI;
   const entitySecret = process.env.CIRCLE_ENTITY_SECRET;
   if (!apiKey || !entitySecret) throw new Error('Missing CircleAPI or CIRCLE_ENTITY_SECRET');
 
-  const publicKey = await getCirclePublicKey(apiKey);
-  const ciphertext = encryptEntitySecret(entitySecret, publicKey);
+  _client = initiateDeveloperControlledWalletsClient({
+    apiKey,
+    entitySecret,
+  });
+  return _client;
+}
+
+export { getClient };
+
+// Backward-compatible wrapper: translates old circlePost calls to SDK
+export async function circlePost(path: string, body: any) {
+  const client = getClient();
+
+  // Contract execution — the primary use case
+  if (path === '/developer/transactions/contractExecution') {
+    const { walletId, contractAddress, abiFunctionSignature, abiParameters, amount, feeLevel: _fl, ...rest } = body;
+
+    const input: any = {
+      walletId,
+      contractAddress,
+      abiFunctionSignature,
+      abiParameters: abiParameters || [],
+      fee: { type: 'level' as const, config: { feeLevel: 'HIGH' as const } },
+    };
+
+    if (amount) input.amount = String(amount);
+
+    const response = await client.createContractExecutionTransaction(input);
+    return response.data;
+  }
+
+  // Fallback for any other paths — use raw fetch with SDK-generated ciphertext
+  const apiKey = process.env.CircleAPI!;
+  const ciphertext = await client.generateEntitySecretCiphertext();
 
   const r = await fetch(`${CIRCLE_API_BASE}${path}`, {
     method: 'POST',
