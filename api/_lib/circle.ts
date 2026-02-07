@@ -10,8 +10,8 @@ let _client: CircleDeveloperControlledWalletsClient | null = null;
 function getClient(): CircleDeveloperControlledWalletsClient {
   if (_client) return _client;
 
-  const apiKey = process.env.CircleAPI;
-  const entitySecret = process.env.CIRCLE_ENTITY_SECRET;
+  const apiKey = process.env.CircleAPI?.trim();
+  const entitySecret = process.env.CIRCLE_ENTITY_SECRET?.trim();
   if (!apiKey || !entitySecret) throw new Error('Missing CircleAPI or CIRCLE_ENTITY_SECRET');
 
   _client = initiateDeveloperControlledWalletsClient({
@@ -46,7 +46,7 @@ export async function circlePost(path: string, body: any) {
   }
 
   // Fallback for any other paths — use raw fetch with SDK-generated ciphertext
-  const apiKey = process.env.CircleAPI!;
+  const apiKey = process.env.CircleAPI!.trim();
   const ciphertext = await client.generateEntitySecretCiphertext();
 
   const r = await fetch(`${CIRCLE_API_BASE}${path}`, {
@@ -70,7 +70,7 @@ export async function circlePost(path: string, body: any) {
 }
 
 export async function circleGet(path: string) {
-  const apiKey = process.env.CircleAPI;
+  const apiKey = process.env.CircleAPI?.trim();
   if (!apiKey) throw new Error('Missing CircleAPI');
 
   const r = await fetch(`${CIRCLE_API_BASE}${path}`, {

@@ -109,7 +109,7 @@ async function verifyWebhookSignature(
   signature: string,
   keyId: string
 ): Promise<boolean> {
-  const apiKey = process.env.CircleAPI;
+  const apiKey = process.env.CircleAPI?.trim();
   if (!apiKey) return false;
 
   try {
