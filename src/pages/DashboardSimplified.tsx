@@ -20,7 +20,7 @@ import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useTVL } from "@/hooks/useTVL";
 import { TOKEN_ADDRESSES, TOKEN_DECIMALS, MIGRATION_IN_PROGRESS, SHOW_MIGRATION_SUCCESS, USYC_WHITELIST_PENDING, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
-import arcLogo from "@/assets/arc-logo.png";
+import arcLogo from "@/assets/arc-logo.webp";
 
 const DashboardSimplified = () => {
   const navigate = useNavigate();

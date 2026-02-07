@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TREASURY_CONTRACTS, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
-import arcLogo from "@/assets/arc-logo.png";
+import arcLogo from "@/assets/arc-logo.webp";
 
 const FAQ = () => {
   const navigate = useNavigate();

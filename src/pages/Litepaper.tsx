@@ -3,7 +3,7 @@ import { WalletHeader } from "@/components/WalletHeader";
 import { ArrowLeft, Shield, Users, Zap, Target } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
-import arcLogo from "@/assets/arc-logo.png";
+import arcLogo from "@/assets/arc-logo.webp";
 
 const Litepaper = () => {
   const navigate = useNavigate();

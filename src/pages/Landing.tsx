@@ -6,7 +6,7 @@ import { Vault, Coins, TrendingUp, ArrowRight, Github, Twitter, Shield, Zap, Men
 import { useNavigate } from "react-router-dom";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
-import arcLogo from "@/assets/arc-logo.png";
+import arcLogo from "@/assets/arc-logo.webp";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
