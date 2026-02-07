@@ -20,16 +20,25 @@ export interface CircleTransaction {
   metadata?: Record<string, unknown>;
 }
 
+const VALID_STATUSES = new Set(['PENDING', 'QUEUED', 'SENT', 'CONFIRMED', 'COMPLETE', 'FAILED', 'CANCELLED']);
+
+function sanitizeStatus(status: string): string {
+  return VALID_STATUSES.has(status) ? status : 'PENDING';
+}
+
 export async function insertCircleTx(tx: CircleTransaction): Promise<void> {
-  if (!supabaseAdmin) return;
-  try {
-    await supabaseAdmin.from('circle_transactions').upsert({
-      ...tx,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'circle_tx_id' });
-  } catch (e) {
-    console.error('[Supabase] Failed to insert circle_tx:', e);
+  if (!supabaseAdmin) {
+    console.warn('[Supabase] Client not initialized, skipping insert');
+    return;
+  }
+  const { error } = await supabaseAdmin.from('circle_transactions').upsert({
+    ...tx,
+    status: sanitizeStatus(tx.status),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'circle_tx_id' });
+  if (error) {
+    console.error('[Supabase] insertCircleTx error:', error.message, error.details, error.hint);
   }
 }
 
@@ -39,17 +48,19 @@ export async function updateCircleTxStatus(
   txHash?: string,
   errorReason?: string
 ): Promise<void> {
-  if (!supabaseAdmin) return;
-  try {
-    const update: Record<string, unknown> = { status };
-    if (txHash) update.tx_hash = txHash;
-    if (errorReason) update.error_reason = errorReason;
+  if (!supabaseAdmin) {
+    console.warn('[Supabase] Client not initialized, skipping update');
+    return;
+  }
+  const update: Record<string, unknown> = { status: sanitizeStatus(status) };
+  if (txHash) update.tx_hash = txHash;
+  if (errorReason) update.error_reason = errorReason;
 
-    await supabaseAdmin
-      .from('circle_transactions')
-      .update(update)
-      .eq('circle_tx_id', circleTxId);
-  } catch (e) {
-    console.error('[Supabase] Failed to update circle_tx status:', e);
+  const { error } = await supabaseAdmin
+    .from('circle_transactions')
+    .update(update)
+    .eq('circle_tx_id', circleTxId);
+  if (error) {
+    console.error('[Supabase] updateCircleTxStatus error:', error.message, error.details, error.hint);
   }
 }
