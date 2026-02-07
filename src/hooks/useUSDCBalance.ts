@@ -3,47 +3,14 @@ import { useMemo, useEffect, useState, useRef } from 'react';
 import { formatUnits, createPublicClient, http } from 'viem';
 import { SUPPORTED_NETWORKS } from '@/lib/constants';
 import { sepolia } from 'viem/chains';
-import { defineChain } from 'viem';
+import { ERC20_ABI } from '@/lib/abis/erc20';
+import { arcTestnet } from '@/lib/wagmi';
 import { useUnifiedWallet } from './useUnifiedWallet';
 
-// USDC contract addresses for different networks
 const USDC_ADDRESSES: Record<string, `0x${string}`> = {
-  // Testnet
-  ethereumSepolia: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`, // USDC on Sepolia
-  arcTestnet: '0x3600000000000000000000000000000000000000' as `0x${string}`, // USDC on Arc Testnet (native currency)
+  ethereumSepolia: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
+  arcTestnet: '0x3600000000000000000000000000000000000000' as `0x${string}`,
 };
-
-// ERC20 ABI for balanceOf
-const ERC20_ABI = [
-  {
-    inputs: [{ name: 'account', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'decimals',
-    outputs: [{ name: '', type: 'uint8' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
-
-// Arc Testnet chain definition
-const arcTestnet = defineChain({
-  id: 5042002, // Correct Arc Testnet chain ID
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://rpc.testnet.arc.network'] }, // Correct RPC URL
-  },
-  blockExplorers: {
-    default: { name: 'Arc Explorer', url: 'https://testnet.arcscan.app' },
-  },
-  testnet: true,
-});
 
 export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
   const account = useAccount();

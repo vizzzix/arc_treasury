@@ -25,9 +25,8 @@ dist-ssr
 
 # Environment variables
 .env
-.env.local
-.env.*.local
-.env.test
+.env.*
+!.env.example
 
 # Hardhat
 cache
@@ -167,4 +166,3 @@ docs/PitchWeb.pdf
 docs/*.pptx
 public/docs/pitch-deck-dcvc-*
 public/docs/pitch-deck-hivemind-*
-.env*.local

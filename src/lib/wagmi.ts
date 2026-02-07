@@ -2,8 +2,7 @@ import { createConfig, http, fallback } from 'wagmi'
 import { mainnet, sepolia, base, baseSepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains'
 import { injected, walletConnect } from 'wagmi/connectors'
 
-// Get your free Project ID at https://cloud.walletconnect.com/
-const WALLETCONNECT_PROJECT_ID = '***REDACTED_WC_PROJECT_ID***'
+const WALLETCONNECT_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || ''
 
 // Re-export official Arc Testnet chain from viem/chains
 export const arcTestnet = arcTestnetChain

@@ -1,24 +1,10 @@
 import { useAccount } from 'wagmi';
 import { useMemo, useEffect, useState, useRef } from 'react';
 import { formatUnits, createPublicClient, http } from 'viem';
-import { defineChain } from 'viem';
 import { rpcRateLimiter } from '@/lib/rpcRateLimiter';
 import { ERC20_ABI } from '@/lib/abis/erc20';
+import { arcTestnet } from '@/lib/wagmi';
 import { useUnifiedWallet } from './useUnifiedWallet';
-
-// Arc Testnet chain definition
-const arcTestnet = defineChain({
-  id: 5042002,
-  name: 'Arc Testnet',
-  nativeCurrency: { name: 'Ethereum', symbol: 'ETH', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://rpc.testnet.arc.network'] },
-  },
-  blockExplorers: {
-    default: { name: 'Arc Explorer', url: 'https://testnet.arcscan.app' },
-  },
-  testnet: true,
-});
 
 interface UseTokenBalanceParams {
   tokenAddress: `0x${string}`;
