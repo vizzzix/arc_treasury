@@ -195,41 +195,6 @@ arc_treasury/
 └── supabase/               # Database migrations
 ```
 
-## Local Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-```
-
-### Environment Variables
-
-```bash
-# Supabase
-SUPABASE_URL=
-SUPABASE_KEY=
-VITE_SUPABASE_URL=
-VITE_SUPABASE_KEY=
-
-# Circle Developer Controlled Wallets
-CircleAPI=
-CIRCLE_ENTITY_SECRET=
-
-# WalletConnect
-VITE_WALLETCONNECT_PROJECT_ID=
-
-# Optional
-RESEND_API_KEY=
-TWITTER_CLIENT_ID=
-TWITTER_CLIENT_SECRET=
-```
-
 ## Security
 
 - Non-custodial for MetaMask users
