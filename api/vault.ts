@@ -32,6 +32,24 @@ const STABLECOIN_SWAP = '0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf';
 const EURC_ADDRESS = '0x742b2d045d430fe718b57046645ba33295914b69';
 const EARLY_BADGE = '0xb26a5b1d783646a7236ca956f2e954e002bf8d13';
 
+const ARC_RPC = 'https://rpc.testnet.arc.network';
+
+async function getEurcBalance(walletAddress: string): Promise<bigint> {
+  const balanceOfSelector = '0x70a08231';
+  const paddedAddr = walletAddress.toLowerCase().replace('0x', '').padStart(64, '0');
+  const res = await fetch(ARC_RPC, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0', method: 'eth_call', id: 1,
+      params: [{ to: EURC_ADDRESS, data: `${balanceOfSelector}${paddedAddr}` }, 'latest'],
+    }),
+  });
+  const data = await res.json();
+  if (data.error || !data.result) return 0n;
+  return BigInt(data.result);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -142,6 +160,17 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   const approveAmount = (BigInt(amountMicro) * 10n).toString();
 
   console.log(`[Vault] Deposit EURC: wallet=${walletId}, amount=${amount}, micro=${amountMicro}`);
+
+  // Pre-check: verify EURC balance
+  if (walletAddress) {
+    const balance = await getEurcBalance(walletAddress);
+    if (balance < BigInt(amountMicro)) {
+      const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
+      return res.status(400).json({
+        error: `Insufficient EURC balance: ${balanceFormatted} EURC. Swap USDC → EURC first.`,
+      });
+    }
+  }
 
   // Step 1: Approve EURC
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
@@ -301,6 +330,17 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
 
   console.log(`[Vault] Swap EURC→USDC: wallet=${walletId}, amount=${amount}, minOutput=${minOutputWei}`);
 
+  // Pre-check: verify EURC balance
+  if (walletAddress) {
+    const balance = await getEurcBalance(walletAddress);
+    if (balance < BigInt(amountMicro)) {
+      const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
+      return res.status(400).json({
+        error: `Insufficient EURC balance: ${balanceFormatted} EURC`,
+      });
+    }
+  }
+
   // Step 1: Approve EURC for StablecoinSwap
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -404,6 +444,17 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
 
   console.log(`[Vault] Deposit Locked EURC: wallet=${walletId}, amount=${amount}, months=${months}`);
 
+  // Pre-check: verify EURC balance
+  if (walletAddress) {
+    const balance = await getEurcBalance(walletAddress);
+    if (balance < BigInt(amountMicro)) {
+      const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
+      return res.status(400).json({
+        error: `Insufficient EURC balance: ${balanceFormatted} EURC. Swap USDC → EURC first.`,
+      });
+    }
+  }
+
   // Step 1: Approve EURC
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -458,6 +509,17 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
   const approveAmount = (BigInt(eurcMicro) * 10n).toString();
 
   console.log(`[Vault] Add Liquidity: wallet=${walletId}, usdc=${usdcAmount}, eurc=${eurcAmount}`);
+
+  // Pre-check: verify EURC balance
+  if (walletAddress) {
+    const balance = await getEurcBalance(walletAddress);
+    if (balance < BigInt(eurcMicro)) {
+      const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
+      return res.status(400).json({
+        error: `Insufficient EURC balance: ${balanceFormatted} EURC`,
+      });
+    }
+  }
 
   // Step 1: Approve EURC for StablecoinSwap
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
