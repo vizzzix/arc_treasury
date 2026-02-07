@@ -71,13 +71,13 @@
   </head>
 
   <body>
+    <script>document.head.appendChild(Object.assign(document.createElement('style'),{textContent:'@keyframes _s{to{transform:rotate(360deg)}'}))</script>
     <div id="root">
       <!-- Loading indicator shown until React mounts -->
       <div id="_ld" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:100vh;background:#0c1018">
-        <div id="_sp" style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.08);border-top-color:#3b9eff;border-radius:50%"></div>
+        <div id="_sp" style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.08);border-top-color:#3b9eff;border-radius:50%;animation:_s .8s linear infinite"></div>
       </div>
     </div>
-    <script>!function(){var e=document.getElementById("_sp"),d=0;(function r(){d=(d+6)%360;e.style.transform="rotate("+d+"deg)";requestAnimationFrame(r)})()}()</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
