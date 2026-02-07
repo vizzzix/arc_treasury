@@ -80,9 +80,7 @@ export function useTransactionHistory(): UseTransactionHistoryReturn {
   const [hasMore, setHasMore] = useState(true);
 
   const fetchTransactions = useCallback(async (pageNum: number, append: boolean = false) => {
-    console.log('[TxHistory] fetchTransactions called, supabase:', !!supabase, 'address:', address);
     if (!supabase || !address) {
-      console.warn('[TxHistory] Skipping fetch: supabase=', !!supabase, 'address=', address);
       setIsLoading(false);
       return;
     }
@@ -92,17 +90,14 @@ export function useTransactionHistory(): UseTransactionHistoryReturn {
 
       const from = pageNum * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
-      const queryAddress = address.toLowerCase();
-      console.log('[TxHistory] Querying wallet_address:', queryAddress, 'range:', from, '-', to);
 
       const { data, error: queryError } = await supabase
         .from('circle_transactions')
         .select('*')
-        .eq('wallet_address', queryAddress)
+        .eq('wallet_address', address.toLowerCase())
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      console.log('[TxHistory] Result:', { rows: data?.length, error: queryError?.message });
       if (queryError) throw queryError;
 
       const rows = (data || []) as TransactionRecord[];
