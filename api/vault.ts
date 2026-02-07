@@ -65,7 +65,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
     contractAddress: TREASURY_VAULT,
     abiFunctionSignature: 'deposit(uint256)',
     abiParameters: [amountWei],
-    amount: [amount], // Native USDC amount for msg.value
+    amount: amount, // Native USDC amount for msg.value
     feeLevel: 'HIGH',
   });
 
@@ -206,14 +206,12 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
 
   console.log(`[Vault] Swap USDC→EURC: wallet=${walletId}, amount=${amount}, minOutput=${minOutputMicro}`);
 
-  const amountWei = BigInt(Math.round(parsedAmount * 1e18)).toString();
-
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: STABLECOIN_SWAP,
     abiFunctionSignature: 'swapUsdcForEurc(uint256)',
     abiParameters: [minOutputMicro],
-    amount: [amount], // Native USDC for msg.value
+    amount: amount, // Native USDC for msg.value
     feeLevel: 'HIGH',
   });
 
