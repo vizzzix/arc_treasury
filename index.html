@@ -73,15 +73,11 @@
   <body>
     <div id="root">
       <!-- Loading indicator shown until React mounts -->
-      <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0c1018">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <circle cx="16" cy="16" r="13" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
-          <circle cx="16" cy="16" r="13" stroke="#3b9eff" stroke-width="3" stroke-dasharray="20 62" stroke-linecap="round">
-            <animateTransform attributeName="transform" type="rotate" from="0 16 16" to="360 16 16" dur="0.7s" repeatCount="indefinite"/>
-          </circle>
-        </svg>
+      <div id="_ld" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:100vh;background:#0c1018">
+        <div id="_sp" style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.08);border-top-color:#3b9eff;border-radius:50%"></div>
       </div>
     </div>
+    <script>!function(){var e=document.getElementById("_sp"),d=0;(function r(){d=(d+6)%360;e.style.transform="rotate("+d+"deg)";requestAnimationFrame(r)})()}()</script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

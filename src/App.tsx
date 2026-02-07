@@ -9,7 +9,6 @@ import { ThemeProvider } from "next-themes";
 import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
 import { StarField } from './components/StarField';
-import { SolanaWalletProvider } from './providers/SolanaWalletProvider';
 import { CircleWalletProvider } from './providers/CircleWalletProvider';
 
 // Eagerly load landing page for fast initial render
@@ -18,7 +17,6 @@ import Landing from "./pages/Landing";
 // Lazy load all other pages for code splitting
 const DashboardSimplified = lazy(() => import("./pages/DashboardSimplified"));
 const FAQ = lazy(() => import("./pages/FAQ"));
-const Bridge = lazy(() => import("./pages/Bridge"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Rewards = lazy(() => import("./pages/Rewards"));
 const Support = lazy(() => import("./pages/Support"));
@@ -26,8 +24,24 @@ const Litepaper = lazy(() => import("./pages/Litepaper"));
 const LockDesignPreview = lazy(() => import("./pages/LockDesignPreview"));
 const Swap = lazy(() => import("./pages/Swap"));
 const PitchDeck = lazy(() => import("./pages/PitchDeck"));
-const BridgeSolana = lazy(() => import("./pages/BridgeSolana"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Bridge pages: lazy-load WITH SolanaWalletProvider to defer ~2MB of Solana deps
+const Bridge = lazy(async () => {
+  const [{ default: BridgePage }, { SolanaWalletProvider }] = await Promise.all([
+    import("./pages/Bridge"),
+    import("./providers/SolanaWalletProvider"),
+  ]);
+  return { default: () => <SolanaWalletProvider><BridgePage /></SolanaWalletProvider> };
+});
+
+const BridgeSolana = lazy(async () => {
+  const [{ default: BridgeSolanaPage }, { SolanaWalletProvider }] = await Promise.all([
+    import("./pages/BridgeSolana"),
+    import("./providers/SolanaWalletProvider"),
+  ]);
+  return { default: () => <SolanaWalletProvider><BridgeSolanaPage /></SolanaWalletProvider> };
+});
 
 const queryClient = new QueryClient();
 
@@ -64,18 +78,16 @@ const AppRoutes = () => {
 const App = () => (
   <WagmiProvider config={config}>
     <QueryClientProvider client={queryClient}>
-      <SolanaWalletProvider>
-        <CircleWalletProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <TooltipProvider>
-              <StarField />
-              <Toaster />
-              <Sonner />
-              <AppRoutes />
-            </TooltipProvider>
-          </ThemeProvider>
-        </CircleWalletProvider>
-      </SolanaWalletProvider>
+      <CircleWalletProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <TooltipProvider>
+            <StarField />
+            <Toaster />
+            <Sonner />
+            <AppRoutes />
+          </TooltipProvider>
+        </ThemeProvider>
+      </CircleWalletProvider>
     </QueryClientProvider>
   </WagmiProvider>
 );

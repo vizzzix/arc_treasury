@@ -15,6 +15,11 @@ export default defineConfig({
     },
   },
   build: {
+    // Exclude heavy lazy-loaded chunks from modulepreload hints
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter(dep => !dep.includes('solana') && !dep.includes('BridgeSolana') && !dep.includes('useBridgeSolana')),
+    },
     // Optimize production bundle
     minify: 'terser',
     terserOptions: {
@@ -31,6 +36,14 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'web3-vendor': ['viem', 'wagmi', '@tanstack/react-query'],
           'ui-vendor': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-tabs'],
+          'solana-vendor': [
+            '@solana/web3.js',
+            '@solana/wallet-adapter-react',
+            '@solana/wallet-adapter-wallets',
+            '@solana/wallet-adapter-react-ui',
+            '@solana/wallet-adapter-base',
+            '@solana/spl-token',
+          ],
         },
       },
     },
