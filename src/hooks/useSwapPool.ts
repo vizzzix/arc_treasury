@@ -9,6 +9,8 @@ import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { toast } from 'sonner';
 import { useExchangeRate } from './useExchangeRate';
 import { useUnifiedWallet } from './useUnifiedWallet';
+import { useCircleWallet } from '@/providers/CircleWalletProvider';
+import { useServerVault } from './useServerVault';
 
 // StablecoinSwap ABI (minimal)
 const SWAP_ABI = [
@@ -173,8 +175,11 @@ export interface SwapTransaction {
 export function useSwapPool() {
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
   const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
   const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
+  const isCircle = unifiedWallet.walletType === 'circle';
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const { eurToUsd: liveRate } = useExchangeRate();
@@ -333,7 +338,7 @@ export function useSwapPool() {
     minOutput: string,
     slippagePercent: number = 0.5
   ) => {
-    if (!walletClient || !address) {
+    if (!isConnected || !address) {
       toast.error('Please connect wallet');
       return false;
     }
@@ -342,11 +347,36 @@ export function useSwapPool() {
     setLastSwap(null);
 
     try {
+      const minOutputAdjusted = (parseFloat(minOutput) * (1 - slippagePercent / 100)).toFixed(6);
+
+      // Circle wallet path — server-side execution
+      if (isCircle) {
+        const arcWalletId = circleWallet.arcWalletId;
+        if (!arcWalletId) throw new Error('Arc wallet not found');
+        const txHash = await serverVault.swapUsdcForEurc(arcWalletId, amount, minOutputAdjusted);
+        if (!txHash) throw new Error('Swap failed');
+        setLastSwap({
+          hash: txHash,
+          status: 'success',
+          type: 'swap',
+          fromToken: 'USDC',
+          toToken: 'EURC',
+          amountIn: amount,
+          amountOut: minOutput,
+          explorerUrl: `https://testnet.arcscan.app/tx/${txHash}`,
+        });
+        await fetchPoolStats();
+        return true;
+      }
+
+      // External wallet path
+      if (!walletClient) {
+        toast.error('Please connect wallet');
+        return false;
+      }
+
       const amountWei = parseEther(amount);
-      const minOutputWei = parseUnits(
-        (parseFloat(minOutput) * (1 - slippagePercent / 100)).toFixed(6),
-        6
-      );
+      const minOutputWei = parseUnits(minOutputAdjusted, 6);
 
       toast.info('Swapping USDC for EURC...');
 
@@ -358,7 +388,6 @@ export function useSwapPool() {
         value: amountWei,
       });
 
-      // Set pending transaction
       setLastSwap({
         hash,
         status: 'pending',
@@ -373,7 +402,6 @@ export function useSwapPool() {
       toast.info('Waiting for confirmation...');
       await publicClient?.waitForTransactionReceipt({ hash });
 
-      // Update to success
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Swap completed!');
       await fetchPoolStats();
@@ -381,12 +409,12 @@ export function useSwapPool() {
     } catch (error: any) {
       console.error('Swap failed:', error);
       setLastSwap(prev => prev ? { ...prev, status: 'failed' } : null);
-      toast.error(error?.shortMessage || 'Swap failed');
+      toast.error(error?.shortMessage || error?.message || 'Swap failed');
       return false;
     } finally {
       setIsSwapping(false);
     }
-  }, [walletClient, address, publicClient, swapAddress, fetchPoolStats]);
+  }, [walletClient, address, publicClient, swapAddress, fetchPoolStats, isCircle, circleWallet.arcWalletId, serverVault, isConnected]);
 
   // Swap EURC for USDC
   const swapEurcForUsdc = useCallback(async (
@@ -394,7 +422,7 @@ export function useSwapPool() {
     minOutput: string,
     slippagePercent: number = 0.5
   ) => {
-    if (!walletClient || !address || !publicClient) {
+    if (!isConnected || !address) {
       toast.error('Please connect wallet');
       return false;
     }
@@ -403,10 +431,36 @@ export function useSwapPool() {
     setLastSwap(null);
 
     try {
+      const minOutputAdjusted = (parseFloat(minOutput) * (1 - slippagePercent / 100)).toFixed(18);
+
+      // Circle wallet path — server-side execution (approve + swap handled on server)
+      if (isCircle) {
+        const arcWalletId = circleWallet.arcWalletId;
+        if (!arcWalletId) throw new Error('Arc wallet not found');
+        const txHash = await serverVault.swapEurcForUsdc(arcWalletId, amount, minOutputAdjusted);
+        if (!txHash) throw new Error('Swap failed');
+        setLastSwap({
+          hash: txHash,
+          status: 'success',
+          type: 'swap',
+          fromToken: 'EURC',
+          toToken: 'USDC',
+          amountIn: amount,
+          amountOut: minOutput,
+          explorerUrl: `https://testnet.arcscan.app/tx/${txHash}`,
+        });
+        await fetchPoolStats();
+        return true;
+      }
+
+      // External wallet path
+      if (!walletClient || !publicClient) {
+        toast.error('Please connect wallet');
+        return false;
+      }
+
       const amountWei = parseUnits(amount, 6);
-      const minOutputWei = parseEther(
-        (parseFloat(minOutput) * (1 - slippagePercent / 100)).toFixed(18)
-      );
+      const minOutputWei = parseEther(minOutputAdjusted);
 
       // Check allowance
       const allowance = await publicClient.readContract({
@@ -436,7 +490,6 @@ export function useSwapPool() {
         args: [amountWei, minOutputWei],
       });
 
-      // Set pending transaction
       setLastSwap({
         hash,
         status: 'pending',
@@ -451,7 +504,6 @@ export function useSwapPool() {
       toast.info('Waiting for confirmation...');
       await publicClient.waitForTransactionReceipt({ hash });
 
-      // Update to success
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Swap completed!');
       await fetchPoolStats();
@@ -459,12 +511,12 @@ export function useSwapPool() {
     } catch (error: any) {
       console.error('Swap failed:', error);
       setLastSwap(prev => prev ? { ...prev, status: 'failed' } : null);
-      toast.error(error?.shortMessage || 'Swap failed');
+      toast.error(error?.shortMessage || error?.message || 'Swap failed');
       return false;
     } finally {
       setIsSwapping(false);
     }
-  }, [walletClient, address, publicClient, swapAddress, eurcAddress, fetchPoolStats]);
+  }, [walletClient, address, publicClient, swapAddress, eurcAddress, fetchPoolStats, isCircle, circleWallet.arcWalletId, serverVault, isConnected]);
 
   // Add liquidity
   const addLiquidity = useCallback(async (

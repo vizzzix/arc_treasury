@@ -1,6 +1,8 @@
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { useMemo, useRef, useEffect } from 'react';
 import { useUnifiedWallet } from './useUnifiedWallet';
+import { useCircleWallet } from '@/providers/CircleWalletProvider';
+import { useServerVault } from './useServerVault';
 import { formatUnits, parseUnits, maxUint256, createPublicClient, http } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
@@ -134,8 +136,11 @@ const TREASURY_VAULT_ABI = [
 export const useTreasuryVault = () => {
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
+  const circleWallet = useCircleWallet();
+  const serverVault = useServerVault();
   const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
   const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
+  const isCircle = unifiedWallet.walletType === 'circle';
   const chainId = account?.chainId;
 
   const publicClient = usePublicClient({ chainId: arcTestnet.id });
@@ -148,8 +153,8 @@ export const useTreasuryVault = () => {
   });
   const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Check if connected to Arc Testnet
-  const isArcTestnet = chainId === 5042002;
+  // Check if connected to Arc Testnet (Circle wallets are always on Arc)
+  const isArcTestnet = isCircle || chainId === 5042002;
 
   // Read total pool value
   // Common query options to handle 429 errors
@@ -417,6 +422,17 @@ export const useTreasuryVault = () => {
       throw new Error('Please connect your wallet to Arc Testnet');
     }
 
+    // Circle wallet path — server-side execution
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      const txHash = await serverVault.deposit(arcWalletId, amount, currency);
+      if (!txHash) throw new Error('Deposit failed');
+      // Refetch after short delay
+      setTimeout(() => refetchAll(), 3000);
+      return txHash as `0x${string}`;
+    }
+
     // Get public client from hook or create fallback
     const client = publicClient || createPublicClient({
       chain: arcTestnet,
@@ -579,6 +595,18 @@ export const useTreasuryVault = () => {
       throw new Error('Please connect your wallet to Arc Testnet');
     }
 
+    // Circle wallet path — server-side execution
+    if (isCircle) {
+      const arcWalletId = circleWallet.arcWalletId;
+      if (!arcWalletId) throw new Error('Arc wallet not found');
+      // Convert shares to raw string (18 decimals)
+      const sharesStr = typeof shares === 'bigint' ? shares.toString() : parseUnits(shares, 18).toString();
+      const txHash = await serverVault.withdraw(arcWalletId, sharesStr, currency);
+      if (!txHash) throw new Error('Withdraw failed');
+      setTimeout(() => refetchAll(), 3000);
+      return txHash as `0x${string}`;
+    }
+
     if (!writeContractAsync) {
       throw new Error('Write function not available');
     }
@@ -727,13 +755,13 @@ export const useTreasuryVault = () => {
     deposit,
     withdraw,
 
-    // Transaction state
-    isPending,
-    isConfirming,
-    isConfirmed,
-    hash,
-    error,
-    reset,
+    // Transaction state (merged: wagmi for external, serverVault for Circle)
+    isPending: isCircle ? serverVault.isProcessing : isPending,
+    isConfirming: isCircle ? serverVault.isProcessing : isConfirming,
+    isConfirmed: isCircle ? serverVault.isComplete : isConfirmed,
+    hash: isCircle ? (serverVault.txHash as `0x${string}` | undefined) : hash,
+    error: isCircle ? (serverVault.error ? new Error(serverVault.error) : null) : error,
+    reset: isCircle ? serverVault.reset : reset,
 
     // Utils
     refetchAll,
