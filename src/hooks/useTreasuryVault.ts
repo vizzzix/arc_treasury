@@ -426,7 +426,7 @@ export const useTreasuryVault = () => {
     if (isCircle) {
       const arcWalletId = circleWallet.arcWalletId;
       if (!arcWalletId) throw new Error('Arc wallet not found');
-      const txHash = await serverVault.deposit(arcWalletId, amount, currency);
+      const txHash = await serverVault.deposit(arcWalletId, amount, currency, address);
       if (!txHash) throw new Error('Deposit failed');
       // Refetch after short delay
       setTimeout(() => refetchAll(), 3000);
@@ -601,7 +601,7 @@ export const useTreasuryVault = () => {
       if (!arcWalletId) throw new Error('Arc wallet not found');
       // Convert shares to raw string (18 decimals)
       const sharesStr = typeof shares === 'bigint' ? shares.toString() : parseUnits(shares, 18).toString();
-      const txHash = await serverVault.withdraw(arcWalletId, sharesStr, currency);
+      const txHash = await serverVault.withdraw(arcWalletId, sharesStr, currency, address);
       if (!txHash) throw new Error('Withdraw failed');
       setTimeout(() => refetchAll(), 3000);
       return txHash as `0x${string}`;

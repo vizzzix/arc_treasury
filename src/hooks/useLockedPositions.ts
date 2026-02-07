@@ -153,7 +153,7 @@ export function useDepositLocked() {
     if (isCircle) {
       const arcWalletId = circleWallet.arcWalletId;
       if (!arcWalletId) throw new Error('Arc wallet not found');
-      const txHash = await serverVault.depositLocked(arcWalletId, amount, 'USDC', lockPeriodMonths);
+      const txHash = await serverVault.depositLocked(arcWalletId, amount, 'USDC', lockPeriodMonths, address);
       if (!txHash) throw new Error('Locked deposit failed');
       return txHash as `0x${string}`;
     }
@@ -181,7 +181,7 @@ export function useDepositLocked() {
     if (isCircle) {
       const arcWalletId = circleWallet.arcWalletId;
       if (!arcWalletId) throw new Error('Arc wallet not found');
-      const txHash = await serverVault.depositLocked(arcWalletId, amount, 'EURC', lockPeriodMonths);
+      const txHash = await serverVault.depositLocked(arcWalletId, amount, 'EURC', lockPeriodMonths, address);
       if (!txHash) throw new Error('Locked deposit failed');
       return txHash as `0x${string}`;
     }
@@ -261,7 +261,7 @@ export function useWithdrawLocked() {
     if (isCircle) {
       const arcWalletId = circleWallet.arcWalletId;
       if (!arcWalletId) throw new Error('Arc wallet not found');
-      const txHash = await serverVault.withdrawLocked(arcWalletId, positionIndex);
+      const txHash = await serverVault.withdrawLocked(arcWalletId, positionIndex, unifiedWallet.address);
       if (!txHash) throw new Error('Withdraw locked failed');
       return txHash as `0x${string}`;
     }
@@ -303,7 +303,7 @@ export function useEarlyWithdrawLocked() {
     if (isCircle) {
       const arcWalletId = circleWallet.arcWalletId;
       if (!arcWalletId) throw new Error('Arc wallet not found');
-      const txHash = await serverVault.earlyWithdrawLocked(arcWalletId, positionIndex);
+      const txHash = await serverVault.earlyWithdrawLocked(arcWalletId, positionIndex, unifiedWallet.address);
       if (!txHash) throw new Error('Early withdraw failed');
       return txHash as `0x${string}`;
     }
@@ -345,7 +345,7 @@ export function useClaimLockedYield() {
     if (isCircle) {
       const arcWalletId = circleWallet.arcWalletId;
       if (!arcWalletId) throw new Error('Arc wallet not found');
-      const txHash = await serverVault.claimLockedYield(arcWalletId, positionIndex);
+      const txHash = await serverVault.claimLockedYield(arcWalletId, positionIndex, unifiedWallet.address);
       if (!txHash) throw new Error('Claim yield failed');
       return txHash as `0x${string}`;
     }

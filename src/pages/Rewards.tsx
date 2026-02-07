@@ -186,7 +186,7 @@ const Rewards = () => {
         toast({ title: "Mint Failed", description: "Arc wallet not found", variant: "destructive" });
         return;
       }
-      await serverVault.mintBadge(arcWalletId);
+      await serverVault.mintBadge(arcWalletId, address);
       return;
     }
 

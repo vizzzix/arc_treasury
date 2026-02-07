@@ -162,7 +162,7 @@ Deposit $10+ USDC/EURC on testnet to claim your badge:`;
         toast({ title: "Mint Failed", description: "Arc wallet not found", variant: "destructive" });
         return;
       }
-      await serverVault.mintBadge(arcWalletId);
+      await serverVault.mintBadge(arcWalletId, address);
       return;
     }
 

@@ -49,14 +49,27 @@ CREATE POLICY "Allow insert from anon" ON circle_transactions
   FOR INSERT TO anon
   WITH CHECK (true);
 
--- Allow select from anon (frontend reads for history + realtime)
+CREATE POLICY "Allow insert from authenticated" ON circle_transactions
+  FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+-- Allow select (frontend reads for history + realtime)
 CREATE POLICY "Allow select from anon" ON circle_transactions
   FOR SELECT TO anon
   USING (true);
 
--- Allow update from anon (webhook status updates)
+CREATE POLICY "Allow select from authenticated" ON circle_transactions
+  FOR SELECT TO authenticated
+  USING (true);
+
+-- Allow update (webhook status updates)
 CREATE POLICY "Allow update from anon" ON circle_transactions
   FOR UPDATE TO anon
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY "Allow update from authenticated" ON circle_transactions
+  FOR UPDATE TO authenticated
   USING (true)
   WITH CHECK (true);
 

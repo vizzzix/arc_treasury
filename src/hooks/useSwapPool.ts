@@ -354,7 +354,7 @@ export function useSwapPool() {
       if (isCircle) {
         const arcWalletId = circleWallet.arcWalletId;
         if (!arcWalletId) throw new Error('Arc wallet not found');
-        const txHash = await serverVault.swapUsdcForEurc(arcWalletId, amount, minOutputAdjusted);
+        const txHash = await serverVault.swapUsdcForEurc(arcWalletId, amount, minOutputAdjusted, address);
         if (!txHash) throw new Error('Swap failed');
         setLastSwap({
           hash: txHash,
@@ -438,7 +438,7 @@ export function useSwapPool() {
       if (isCircle) {
         const arcWalletId = circleWallet.arcWalletId;
         if (!arcWalletId) throw new Error('Arc wallet not found');
-        const txHash = await serverVault.swapEurcForUsdc(arcWalletId, amount, minOutputAdjusted);
+        const txHash = await serverVault.swapEurcForUsdc(arcWalletId, amount, minOutputAdjusted, address);
         if (!txHash) throw new Error('Swap failed');
         setLastSwap({
           hash: txHash,
@@ -535,7 +535,7 @@ export function useSwapPool() {
       if (isCircle) {
         const arcWalletId = circleWallet.arcWalletId;
         if (!arcWalletId) throw new Error('Arc wallet not found');
-        const txHash = await serverVault.addLiquidity(arcWalletId, usdcAmount, eurcAmount);
+        const txHash = await serverVault.addLiquidity(arcWalletId, usdcAmount, eurcAmount, address);
         if (!txHash) throw new Error('Add liquidity failed');
         setLastSwap({
           hash: txHash,
@@ -632,7 +632,7 @@ export function useSwapPool() {
       if (isCircle) {
         const arcWalletId = circleWallet.arcWalletId;
         if (!arcWalletId) throw new Error('Arc wallet not found');
-        const txHash = await serverVault.removeLiquidity(arcWalletId, lpAmount);
+        const txHash = await serverVault.removeLiquidity(arcWalletId, lpAmount, address);
         if (!txHash) throw new Error('Remove liquidity failed');
         setLastSwap({
           hash: txHash,
