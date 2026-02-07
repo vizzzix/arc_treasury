@@ -104,6 +104,14 @@ export const useServerVault = () => {
     return executeAction(action, { walletId, amount, lockPeriodMonths }, `Lock ${currency} (${lockPeriodMonths}m)`);
   }, [executeAction]);
 
+  const addLiquidity = useCallback(async (walletId: string, usdcAmount: string, eurcAmount: string) => {
+    return executeAction('add-liquidity', { walletId, usdcAmount, eurcAmount }, 'Add Liquidity');
+  }, [executeAction]);
+
+  const removeLiquidity = useCallback(async (walletId: string, lpAmount: string) => {
+    return executeAction('remove-liquidity', { walletId, lpAmount }, 'Remove Liquidity');
+  }, [executeAction]);
+
   return {
     ...state,
     isProcessing: state.phase !== 'idle' && state.phase !== 'complete' && state.phase !== 'error',
@@ -113,6 +121,8 @@ export const useServerVault = () => {
     swapUsdcForEurc,
     swapEurcForUsdc,
     depositLocked,
+    addLiquidity,
+    removeLiquidity,
     reset,
   };
 };

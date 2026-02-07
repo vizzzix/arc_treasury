@@ -32,6 +32,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleDepositLockedUsdc(req, res);
       case 'deposit-locked-eurc':
         return await handleDepositLockedEurc(req, res);
+      case 'add-liquidity':
+        return await handleAddLiquidity(req, res);
+      case 'remove-liquidity':
+        return await handleRemoveLiquidity(req, res);
       case 'tx-status':
         return await handleTxStatus(req, res);
       default:
@@ -312,7 +316,7 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: TREASURY_VAULT,
-    abiFunctionSignature: 'depositLockedUSDC(uint256,uint256)',
+    abiFunctionSignature: 'depositLockedUSDC(uint256,uint8)',
     abiParameters: [amountWei, months.toString()],
     amount: amount,
     feeLevel: 'HIGH',
@@ -370,7 +374,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
   const depositResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: TREASURY_VAULT,
-    abiFunctionSignature: 'depositLockedEURC(uint256,uint256)',
+    abiFunctionSignature: 'depositLockedEURC(uint256,uint8)',
     abiParameters: [amountMicro, months.toString()],
     feeLevel: 'HIGH',
   });
@@ -380,6 +384,97 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
   return res.status(200).json({
     transactionId: depositResult?.id || depositResult?.transactionId,
     state: depositResult?.state,
+  });
+}
+
+// --- Add Liquidity (USDC payable + EURC approve) ---
+// approve EURC for StablecoinSwap, then addLiquidity(uint256 eurcAmount, uint256 minLpTokens) payable
+
+async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, usdcAmount, eurcAmount } = req.body;
+  if (!walletId || !usdcAmount || !eurcAmount) {
+    return res.status(400).json({ error: 'walletId, usdcAmount and eurcAmount required' });
+  }
+
+  const parsedUsdc = parseFloat(usdcAmount);
+  const parsedEurc = parseFloat(eurcAmount);
+  if (!Number.isFinite(parsedUsdc) || parsedUsdc <= 0 || !Number.isFinite(parsedEurc) || parsedEurc <= 0) {
+    return res.status(400).json({ error: 'Invalid amounts' });
+  }
+
+  const eurcMicro = BigInt(Math.round(parsedEurc * 1e6)).toString();
+  const approveAmount = (BigInt(eurcMicro) * 10n).toString();
+
+  console.log(`[Vault] Add Liquidity: wallet=${walletId}, usdc=${usdcAmount}, eurc=${eurcAmount}`);
+
+  // Step 1: Approve EURC for StablecoinSwap
+  const approveResult = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: EURC_ADDRESS,
+    abiFunctionSignature: 'approve(address,uint256)',
+    abiParameters: [STABLECOIN_SWAP, approveAmount],
+    feeLevel: 'HIGH',
+  });
+
+  const approveTxId = approveResult?.id || approveResult?.transactionId;
+  console.log('[Vault] EURC approve for addLiquidity submitted:', approveTxId);
+
+  await waitForCircleTx(approveTxId);
+
+  // Step 2: addLiquidity(uint256 eurcAmount, uint256 minLpTokens) payable
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: STABLECOIN_SWAP,
+    abiFunctionSignature: 'addLiquidity(uint256,uint256)',
+    abiParameters: [eurcMicro, '0'],
+    amount: usdcAmount, // Native USDC for msg.value
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Add Liquidity result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
+  });
+}
+
+// --- Remove Liquidity ---
+// removeLiquidity(uint256 lpTokens, uint256 minUsdcOut, uint256 minEurcOut)
+
+async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { walletId, lpAmount } = req.body;
+  if (!walletId || !lpAmount) {
+    return res.status(400).json({ error: 'walletId and lpAmount required' });
+  }
+
+  const parsedLp = parseFloat(lpAmount);
+  if (!Number.isFinite(parsedLp) || parsedLp <= 0) {
+    return res.status(400).json({ error: 'Invalid lpAmount' });
+  }
+
+  // LP tokens use 18 decimals
+  const lpWei = BigInt(Math.round(parsedLp * 1e18)).toString();
+
+  console.log(`[Vault] Remove Liquidity: wallet=${walletId}, lp=${lpAmount}`);
+
+  const result = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: STABLECOIN_SWAP,
+    abiFunctionSignature: 'removeLiquidity(uint256,uint256,uint256)',
+    abiParameters: [lpWei, '0', '0'],
+    feeLevel: 'HIGH',
+  });
+
+  console.log('[Vault] Remove Liquidity result:', JSON.stringify(result));
+
+  return res.status(200).json({
+    transactionId: result?.id || result?.transactionId,
+    state: result?.state,
   });
 }
 

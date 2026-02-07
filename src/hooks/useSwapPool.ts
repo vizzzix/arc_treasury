@@ -524,13 +524,39 @@ export function useSwapPool() {
     usdcAmount: string,
     eurcAmount: string
   ) => {
-    if (!walletClient || !address || !publicClient) {
+    if (!isConnected || !address) {
       toast.error('Please connect wallet');
       return false;
     }
 
     setIsLoading(true);
     try {
+      // Circle wallet path — server-side execution
+      if (isCircle) {
+        const arcWalletId = circleWallet.arcWalletId;
+        if (!arcWalletId) throw new Error('Arc wallet not found');
+        const txHash = await serverVault.addLiquidity(arcWalletId, usdcAmount, eurcAmount);
+        if (!txHash) throw new Error('Add liquidity failed');
+        setLastSwap({
+          hash: txHash,
+          status: 'success',
+          type: 'addLiquidity',
+          fromToken: 'USDC + EURC',
+          toToken: 'LP',
+          amountIn: `${usdcAmount} + ${eurcAmount}`,
+          amountOut: '?',
+          explorerUrl: `https://testnet.arcscan.app/tx/${txHash}`,
+        });
+        await fetchPoolStats();
+        return true;
+      }
+
+      // External wallet path
+      if (!walletClient || !publicClient) {
+        toast.error('Please connect wallet');
+        return false;
+      }
+
       const usdcWei = parseEther(usdcAmount);
       const eurcWei = parseUnits(eurcAmount, 6);
 
@@ -591,17 +617,43 @@ export function useSwapPool() {
     } finally {
       setIsLoading(false);
     }
-  }, [walletClient, address, publicClient, swapAddress, eurcAddress, fetchPoolStats]);
+  }, [walletClient, address, publicClient, swapAddress, eurcAddress, fetchPoolStats, isCircle, circleWallet.arcWalletId, serverVault, isConnected]);
 
   // Remove liquidity
   const removeLiquidity = useCallback(async (lpAmount: string) => {
-    if (!walletClient || !address || !publicClient) {
+    if (!isConnected || !address) {
       toast.error('Please connect wallet');
       return false;
     }
 
     setIsLoading(true);
     try {
+      // Circle wallet path — server-side execution
+      if (isCircle) {
+        const arcWalletId = circleWallet.arcWalletId;
+        if (!arcWalletId) throw new Error('Arc wallet not found');
+        const txHash = await serverVault.removeLiquidity(arcWalletId, lpAmount);
+        if (!txHash) throw new Error('Remove liquidity failed');
+        setLastSwap({
+          hash: txHash,
+          status: 'success',
+          type: 'removeLiquidity',
+          fromToken: 'LP',
+          toToken: 'USDC + EURC',
+          amountIn: lpAmount,
+          amountOut: '?',
+          explorerUrl: `https://testnet.arcscan.app/tx/${txHash}`,
+        });
+        await fetchPoolStats();
+        return true;
+      }
+
+      // External wallet path
+      if (!walletClient || !publicClient) {
+        toast.error('Please connect wallet');
+        return false;
+      }
+
       const lpWei = parseEther(lpAmount);
 
       toast.info('Removing liquidity...');
@@ -641,7 +693,7 @@ export function useSwapPool() {
     } finally {
       setIsLoading(false);
     }
-  }, [walletClient, address, publicClient, swapAddress, fetchPoolStats]);
+  }, [walletClient, address, publicClient, swapAddress, fetchPoolStats, isCircle, circleWallet.arcWalletId, serverVault, isConnected]);
 
   // Fetch stats on mount and when address changes
   useEffect(() => {
