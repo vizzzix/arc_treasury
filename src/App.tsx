@@ -8,6 +8,7 @@ import { WagmiProvider } from 'wagmi';
 import { ThemeProvider } from "next-themes";
 import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
+import { StarField } from './components/StarField';
 import { SolanaWalletProvider } from './providers/SolanaWalletProvider';
 import { CircleWalletProvider } from './providers/CircleWalletProvider';
 
@@ -67,6 +68,7 @@ const App = () => (
         <CircleWalletProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <TooltipProvider>
+              <StarField />
               <Toaster />
               <Sonner />
               <AppRoutes />
