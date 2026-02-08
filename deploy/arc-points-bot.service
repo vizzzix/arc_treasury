@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/arc-treasury/railway-bot
+WorkingDirectory=/opt/arc-treasury/bots
 ExecStart=/usr/bin/node points-bot-tw.cjs --daemon --interval=60
 Restart=on-failure
 RestartSec=10

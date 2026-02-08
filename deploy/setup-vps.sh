@@ -24,7 +24,7 @@ fi
 
 # 3. Install dependencies for bots
 echo "[3/6] Installing bot dependencies..."
-cd $APP_DIR/railway-bot
+cd $APP_DIR/bots
 npm install --production
 
 # Install tsx globally if not present

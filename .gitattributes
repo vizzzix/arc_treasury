@@ -4,7 +4,7 @@
 # Exclude from language stats
 package-lock.json linguist-generated
 contracts/package-lock.json linguist-generated
-railway-bot/package-lock.json linguist-generated
+bots/package-lock.json linguist-generated
 indexer/package-lock.json linguist-generated
 
 # Mark ABI files as generated (exclude from stats)
