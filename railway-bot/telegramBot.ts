@@ -163,6 +163,55 @@ const TELLER_ABI = [
 const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
 const sepoliaPublicClient = createPublicClient({ chain: sepoliaChain, transport: http() });
 
+// Smart amount formatter - handles tiny testnet amounts better
+function formatAmount(amount: number, token: 'USDC' | 'EURC' = 'USDC', isCurrency = false): string {
+  if (amount === 0) return isCurrency ? "$0.00" : "0";
+
+  const absAmount = Math.abs(amount);
+  const symbol = token === 'EURC' ? '€' : '$';
+
+  // Very tiny amounts (< 0.000001) - show in scientific notation
+  if (absAmount < 0.000001) {
+    return `${amount.toExponential(2)} ${token}`;
+  }
+
+  // Tiny amounts (< 0.01) - show 6 decimals with token symbol
+  if (absAmount < 0.01) {
+    return `${amount.toFixed(6)} ${token}`;
+  }
+
+  // Small amounts (< 1) - show 4 decimals with currency symbol
+  if (absAmount < 1) {
+    return `${symbol}${amount.toFixed(4)}`;
+  }
+
+  // Normal amounts - show 2 decimals
+  return `${symbol}${amount.toFixed(2)}`;
+}
+
+// Detect if lock position is USDC or EURC by checking Transfer events
+async function detectLockToken(txHash: string): Promise<{ token: 'USDC' | 'EURC'; decimals: number }> {
+  try {
+    const receipt = await publicClient.getTransactionReceipt({ hash: txHash as `0x${string}` });
+
+    // Look for Transfer event to/from vault
+    const eurcAddress = "0x742b2d045d430fe718b57046645ba33295914b69";
+    const eurcTransfer = receipt.logs.find(l =>
+      l.address.toLowerCase() === eurcAddress.toLowerCase() &&
+      l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+    );
+
+    if (eurcTransfer) {
+      return { token: 'EURC', decimals: 6 };
+    }
+
+    return { token: 'USDC', decimals: 18 };
+  } catch (e) {
+    console.error("detectLockToken error:", e);
+    return { token: 'USDC', decimals: 18 }; // fallback
+  }
+}
+
 // Initialize operator wallet for auto-conversion
 function initOperatorWallet(): boolean {
   let operatorKey = process.env.PRIVATE_KEY_OPERATOR;
@@ -765,7 +814,7 @@ async function checkDepositEvents() {
       const message = `💰 *New Flexible Deposit*
 
 User: \`${user}\`
-Amount: *$${amount.toFixed(2)} USDC*
+Amount: *${formatAmount(amount)} USDC*
 
 [View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
@@ -789,7 +838,7 @@ Amount: *$${amount.toFixed(2)} USDC*
       const message = `💶 *New Flexible EURC Deposit*
 
 User: \`${user}\`
-Amount: *€${amount.toFixed(2)} EURC*
+Amount: *€${formatAmount(amount)} EURC*
 
 [View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
@@ -849,24 +898,27 @@ Points Multiplier: *${multiplier}*
       }
 
       const args = log.args as any;
-      const amount = Number(formatUnits(args.amount || 0n, 18)); // USDC 18 decimals
-      const yieldAmount = Number(formatUnits(args.yield || 0n, 18));
       const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
       const lockId = args.lockId?.toString() || "?";
+
+      // Detect token type from transaction
+      const { token, decimals } = await detectLockToken(txHash);
+      const amount = Number(formatUnits(args.amount || 0n, decimals));
+      const yieldAmount = Number(formatUnits(args.yield || 0n, decimals));
 
       const message = `🔓 *Lock Position Withdrawn*
 
 User: \`${user}\`
 Lock ID: #${lockId}
-Principal: *$${amount.toFixed(2)}*
-Yield Earned: *+$${yieldAmount.toFixed(2)}*
-Total: *$${(amount + yieldAmount).toFixed(2)}*
+Principal: *${formatAmount(amount, token)}*
+Yield Earned: *+${formatAmount(yieldAmount, token)}*
+Total: *${formatAmount(amount + yieldAmount, token)}*
 
 [View Tx](https://testnet.arcscan.app/tx/${txHash})`;
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
       await markNotificationSent(txHash, 'unlock');
-      console.log(`[${new Date().toISOString()}] Unlock alert: ${user} withdrew lock #${lockId}`);
+      console.log(`[${new Date().toISOString()}] Unlock alert: ${user} withdrew lock #${lockId} (${token})`);
     }
 
     // Get EarlyWithdrawPenalty events (forced early unlock)
@@ -886,15 +938,18 @@ Total: *$${(amount + yieldAmount).toFixed(2)}*
       }
 
       const args = log.args as any;
-      const penalty = Number(formatUnits(args.penaltyAmount || 0n, 18));
       const user = args.user ? `${args.user.slice(0, 6)}...${args.user.slice(-4)}` : "Unknown";
       const lockId = args.lockId?.toString() || "?";
+
+      // Detect token type from transaction
+      const { token, decimals } = await detectLockToken(txHash);
+      const penalty = Number(formatUnits(args.penaltyAmount || 0n, decimals));
 
       const message = `⚠️ *Early Withdrawal Penalty*
 
 User: \`${user}\`
 Lock ID: #${lockId}
-Penalty Paid: *-$${penalty.toFixed(2)}*
+Penalty Paid: *-${formatAmount(penalty, token)}*
 
 _User broke lock early and paid 10% penalty_
 
@@ -902,7 +957,7 @@ _User broke lock early and paid 10% penalty_
 
       await sendMessage(TELEGRAM_CHAT_ID, message);
       await markNotificationSent(txHash, 'early_withdraw');
-      console.log(`[${new Date().toISOString()}] Early withdrawal: ${user} broke lock #${lockId}, penalty $${penalty.toFixed(2)}`);
+      console.log(`[${new Date().toISOString()}] Early withdrawal: ${user} broke lock #${lockId}, penalty ${formatAmount(penalty, token)} (${token})`);
     }
 
     lastBlockChecked = currentBlock;
