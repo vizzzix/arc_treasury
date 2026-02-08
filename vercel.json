@@ -10,6 +10,14 @@
       "destination": "/api/:path*"
     },
     {
+      "source": "/blog",
+      "destination": "https://blog-theta-one-72.vercel.app/blog"
+    },
+    {
+      "source": "/blog/:path*",
+      "destination": "https://blog-theta-one-72.vercel.app/blog/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+
+  ::selection {
+    background-color: #3b9eff30;
+  }
+}
+
+.prose-blog {
+  @apply prose prose-invert max-w-none;
+  @apply prose-headings:text-foreground prose-headings:font-semibold prose-headings:tracking-tight;
+  @apply prose-h2:text-xl prose-h2:mt-10 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-border;
+  @apply prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3;
+  @apply prose-p:text-muted-foreground prose-p:leading-7;
+  @apply prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-a:font-normal;
+  @apply prose-strong:text-foreground prose-strong:font-medium;
+  @apply prose-code:text-primary prose-code:bg-primary-dim prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[13px] prose-code:font-normal;
+  @apply prose-code:before:content-none prose-code:after:content-none;
+  @apply prose-pre:bg-secondary prose-pre:border prose-pre:border-border prose-pre:rounded-lg;
+  @apply prose-blockquote:border-l-primary prose-blockquote:border-l-2 prose-blockquote:text-muted-foreground prose-blockquote:not-italic prose-blockquote:font-normal;
+  @apply prose-li:text-muted-foreground prose-li:marker:text-border-bright;
+  @apply prose-hr:border-border;
+  @apply prose-img:rounded-lg;
+  @apply prose-th:text-foreground prose-th:text-sm prose-th:font-medium;
+  @apply prose-td:text-muted-foreground prose-td:text-sm;
+  @apply prose-table:text-sm;
+  @apply prose-ol:text-muted-foreground prose-ul:text-muted-foreground;
+}

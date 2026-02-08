@@ -1,0 +1,125 @@
+---
+title: "Earning Yield on Stablecoins: How Arc Treasury Works"
+description: "We built a yield vault on Arc Network where your USDC and EURC earn real yield from US Treasury bills. Here's how it works under the hood."
+date: "2026-02-08"
+author: "Arc Treasury Team"
+tags: ["USDC", "EURC", "Yield", "DeFi", "Arc Network", "Treasury Bills", "USYC"]
+faq:
+  - question: "What is Arc Treasury?"
+    answer: "It's a DeFi yield vault we built on Arc Network. You deposit USDC or EURC, we convert it into USYC tokens backed by US Treasury bills, and you earn yield from actual government securities."
+  - question: "How does the yield work?"
+    answer: "Your stablecoins get converted into USYC tokens via the USYC Teller contract. USYC is issued by Hashnote and represents a share of a US Treasury bill fund. As T-bills accrue interest, the USYC price goes up, and your position grows."
+  - question: "Is my deposit locked?"
+    answer: "No. Standard deposits can be withdrawn at any time. We also have optional locked positions (30, 60, or 90 days) that give you bonus points in the rewards program."
+  - question: "What stablecoins are supported?"
+    answer: "USDC and EURC. On Arc Network, USDC is the native gas token with 18 decimals, EURC is an ERC-20 with 6 decimals. There's a built-in swap if you need to convert between them."
+  - question: "How do I get USDC on Arc Network?"
+    answer: "Use the built-in CCTP V2 bridge to move USDC from Ethereum Sepolia to Arc Testnet. We also support bridging from Solana."
+  - question: "Do I need a crypto wallet?"
+    answer: "Not necessarily. You can connect MetaMask or any Web3 wallet, but we also support Google Sign-In. It creates a managed wallet through Circle, no browser extension needed."
+---
+
+## What we built
+
+We built Arc Treasury as a yield vault on [Arc Network](https://arc.io). The idea is simple: you deposit stablecoins, and they earn real yield backed by US Treasury bills through USYC (US Yield Coin) by Hashnote. No inflationary token rewards, no ponzi mechanics. Just T-bill interest.
+
+The app is live on Arc Testnet (chain ID `5042002`) at [arctreasury.biz](https://arctreasury.biz).
+
+## How the yield works
+
+Under the hood, we have a vault smart contract that does the following:
+
+1. **Deposit** - you send USDC or EURC to the TreasuryVault contract
+2. **Conversion** - the vault converts your stablecoins into USYC tokens via the USYC Teller
+3. **Yield accrual** - USYC represents a share of a US Treasury bill fund managed by Hashnote. As T-bills accrue interest, the USYC price goes up
+4. **Withdraw** - when you pull out, USYC converts back to your stablecoin at the current (higher) rate
+
+The yield comes from actual US Treasury securities. Same instruments that traditional finance uses for capital preservation, just accessible through DeFi.
+
+### Price oracle
+
+We use an on-chain oracle (`USYCOracle`) that fetches the current USYC/USD exchange rate. It gets updated regularly and determines how many shares you receive on deposit and how much you get back on withdrawal.
+
+## Supported stablecoins
+
+We support two stablecoins:
+
+| Token | Type | Decimals | Contract |
+|-------|------|----------|----------|
+| USDC | Native gas token | 18 | `0x360...000` |
+| EURC | ERC-20 | 6 | `0x742b...4b69` |
+
+One thing to note about Arc Network: USDC is the native gas token here (like ETH on Ethereum), so it has 18 decimal places instead of the usual 6. The vault handles all the decimal normalization internally, you don't need to think about it.
+
+### Swapping between USDC and EURC
+
+We also built an [AMM for swapping between USDC and EURC](https://arctreasury.biz/swap). The fee is 0.2% and the pool uses a constant product formula adjusted for the EUR/USD exchange rate.
+
+## Wallet options
+
+This is something we spent a lot of time on. We wanted the app to work for both crypto natives and people who have never touched a wallet before.
+
+### MetaMask
+
+Standard Web3 flow. Connect MetaMask or any compatible wallet, sign transactions yourself, full custody. Nothing new here.
+
+### Google Sign-In
+
+This is where it gets interesting. If you don't have a crypto wallet, just sign in with Google. We use Circle's Developer Controlled Wallets to create a managed wallet for you. Here's what happens:
+
+- A wallet gets created automatically on your first sign-in
+- Same address works on both Ethereum Sepolia and Arc Testnet
+- All transactions go through Circle's API server-side
+- No extensions, no seed phrases, no gas management
+
+We think this is important for onboarding people who aren't crypto users yet.
+
+## Bridging assets
+
+To get USDC onto Arc Network, we built a [cross-chain bridge](https://arctreasury.biz/bridge) using Circle's CCTP V2:
+
+- **Ethereum Sepolia to Arc Testnet** with automated attestation
+- **Solana to Arc Testnet** for Solana users
+- **Arc Testnet to Ethereum Sepolia** when you want to bridge back
+
+The whole process takes a few minutes. Both MetaMask and Circle wallet users can use it.
+
+## Locked positions and points
+
+On top of standard (flexible) deposits, we have locked positions:
+
+- **30 days** - bonus points multiplier
+- **60 days** - higher multiplier
+- **90 days** - highest multiplier
+
+We track points on-chain and show them on the [rewards leaderboard](https://arctreasury.biz/rewards). You can get additional boosts from:
+
+- **Early Supporter Badge** - an NFT that gives 1.2x points multiplier
+- **Twitter verification** - connect your X account for a social boost
+- **Referrals** - invite others and earn bonus points
+
+## Smart contracts
+
+Everything is deployed on Arc Testnet and verified on [Arcscan](https://testnet.arcscan.app):
+
+| Contract | Address |
+|----------|---------|
+| TreasuryVault (UUPS Proxy) | `0x17ca5232415430bC57F646A72fD15634807bF729` |
+| StablecoinSwap (AMM) | `0x3a5964ce5cd8b09e55af9323a894e78bdd7f04bf` |
+| USYC Token | `0xe9185F0c5F296Ed1797AaE4238D26CCaBEadb86C` |
+| USYC Oracle | `0xfe51166b831cd55737a1e1231a811ada0d7b3378` |
+| USYC Teller | `0x9fdF14c5B14173D74C08Af27AebFf39240dC105A` |
+| Early Supporter Badge | `0xb26a5b1d783646a7236ca956f2e954e002bf8d13` |
+
+The TreasuryVault uses an upgradeable UUPS proxy (OpenZeppelin) and we're currently on V14. Over time we've added dynamic fees, oracle integration, EURC support, a points system, and gas optimizations.
+
+## Try it out
+
+1. Go to [arctreasury.biz](https://arctreasury.biz)
+2. Connect MetaMask or sign in with Google
+3. Bridge some USDC from Sepolia (or grab testnet tokens from a faucet)
+4. Deposit into the vault
+5. Lock your position if you want extra points
+6. Check the leaderboard
+
+Everything runs on testnet right now, so all features are free to try. Deposits, withdrawals, swaps, bridges, points. It all works. If you have questions, check our [FAQ](https://arctreasury.biz/faq) or read the [Litepaper](https://arctreasury.biz/litepaper).
