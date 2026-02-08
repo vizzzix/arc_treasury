@@ -7,11 +7,12 @@
  *   /tvl     - Total Value Locked
  *   /help    - Show commands
  *
- * Deploy to Railway:
- *   1. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Railway variables
- *   2. Deploy this folder
+ * Deploy to VPS:
+ *   1. Set environment variables in .env file
+ *   2. Run: tsx telegramBot.ts
  */
 
+import 'dotenv/config';
 import { createPublicClient, createWalletClient, http, formatUnits, parseAbiItem, decodeAbiParameters } from "viem";
 import { defineChain } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -22,7 +23,6 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours for auto-alerts
 const POLL_INTERVAL_MS = 3000; // 3 seconds for command polling
-const FIXER_API_KEY = process.env.FIXER_API_KEY || "80f6690ad5c8e6aafe4373f4a0ce6e96";
 const EXCHANGE_RATE_UPDATE_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours - update exchange rate twice a day
 
 // Supabase for tracking bridge users (anon key is public, protected by RLS)
@@ -1437,19 +1437,30 @@ const SWAP_ABI = [
   { name: "owner", type: "function", inputs: [], outputs: [{ type: "address" }], stateMutability: "view" },
 ] as const;
 
-async function fetchFixerRate(): Promise<number | null> {
+async function fetchExchangeRate(): Promise<number | null> {
+  // Primary: frankfurter.app (ECB data, free, HTTPS, no API key)
   try {
-    const response = await fetch(`https://data.fixer.io/api/latest?access_key=${FIXER_API_KEY}&symbols=USD`);
+    const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD');
     const data = await response.json() as any;
-    if (data.success && data.rates?.USD) {
+    if (data.rates?.USD) {
       return data.rates.USD;
     }
-    console.error("[Fixer] API error:", data.error?.info || "Unknown error");
-    return null;
   } catch (e: any) {
-    console.error("[Fixer] Fetch error:", e.message);
-    return null;
+    console.warn('[ExchangeRate] Failed to fetch from frankfurter.app:', e.message);
   }
+
+  // Fallback: exchangerate.host
+  try {
+    const response = await fetch('https://api.exchangerate.host/latest?base=EUR&symbols=USD');
+    const data = await response.json() as any;
+    if (data.rates?.USD) {
+      return data.rates.USD;
+    }
+  } catch (e: any) {
+    console.error('[ExchangeRate] Failed to fetch from exchangerate.host:', e.message);
+  }
+
+  return null;
 }
 
 async function updateSwapExchangeRate() {
@@ -1458,10 +1469,10 @@ async function updateSwapExchangeRate() {
   }
 
   try {
-    // Fetch current rate from Fixer.io
-    const fixerRate = await fetchFixerRate();
-    if (!fixerRate) {
-      console.log("[ExchangeRate] Failed to fetch Fixer rate");
+    // Fetch current rate from frankfurter.app
+    const exchangeRate = await fetchExchangeRate();
+    if (!exchangeRate) {
+      console.log("[ExchangeRate] Failed to fetch EUR/USD rate");
       return;
     }
 
@@ -1486,16 +1497,16 @@ async function updateSwapExchangeRate() {
     }
 
     // Only update if rate changed by more than 0.1%
-    const drift = Math.abs(fixerRate - currentRateNum) / currentRateNum;
+    const drift = Math.abs(exchangeRate - currentRateNum) / currentRateNum;
     if (drift < 0.001) {
       console.log(`[ExchangeRate] Rate unchanged: ${currentRateNum.toFixed(4)} (drift ${(drift * 100).toFixed(3)}%)`);
       return;
     }
 
     // Convert to 6 decimals (e.g., 1.1595 -> 1159500)
-    const newRateRaw = Math.round(fixerRate * 1e6);
+    const newRateRaw = Math.round(exchangeRate * 1e6);
 
-    console.log(`[ExchangeRate] Updating rate: ${currentRateNum.toFixed(4)} -> ${fixerRate.toFixed(4)}`);
+    console.log(`[ExchangeRate] Updating rate: ${currentRateNum.toFixed(4)} -> ${exchangeRate.toFixed(4)}`);
 
     // Send transaction
     const hash = await operatorWalletClient.writeContract({
@@ -1512,13 +1523,13 @@ async function updateSwapExchangeRate() {
     const message = `💱 *Exchange Rate Updated*
 
 Old: 1 EUR = $${currentRateNum.toFixed(4)}
-New: 1 EUR = $${fixerRate.toFixed(4)}
-Change: ${((fixerRate - currentRateNum) / currentRateNum * 100).toFixed(2)}%
+New: 1 EUR = $${exchangeRate.toFixed(4)}
+Change: ${((exchangeRate - currentRateNum) / currentRateNum * 100).toFixed(2)}%
 
 [View Tx](https://testnet.arcscan.app/tx/${hash})`;
 
     await sendMessage(TELEGRAM_CHAT_ID, message);
-    console.log(`[ExchangeRate] Success! New rate: ${fixerRate.toFixed(4)}`);
+    console.log(`[ExchangeRate] Success! New rate: ${exchangeRate.toFixed(4)}`);
 
   } catch (e: any) {
     console.error("[ExchangeRate] Error:", e.message?.slice(0, 150));
