@@ -139,6 +139,9 @@ async function handleFeedActivity(req: VercelRequest, res: VercelResponse) {
       .limit(limit),
   ]);
 
+  if (swapRes.error) console.error('[FeedActivity] swap query error:', swapRes.error.message);
+  if (lpRes.error) console.error('[FeedActivity] lp query error:', lpRes.error.message);
+
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   return res.status(200).json({
     swaps: swapRes.data || [],

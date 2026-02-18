@@ -72,13 +72,14 @@ export async function insertSwapTx(params: {
   token_in: string;
   token_out: string;
 }): Promise<void> {
-  if (!supabaseAdmin) return;
+  if (!supabaseAdmin) throw new Error('Supabase not initialized');
   const { error } = await supabaseAdmin.from('swap_transactions').upsert({
     ...params,
     created_at: new Date().toISOString(),
   }, { onConflict: 'tx_hash' });
   if (error) {
     console.error('[Supabase] insertSwapTx error:', error.message, error.details);
+    throw new Error(`insertSwapTx failed: ${error.message}`);
   }
 }
 
@@ -88,13 +89,14 @@ export async function insertLiquidityEvent(params: {
   amount_usd: number;
   action: 'add' | 'remove';
 }): Promise<void> {
-  if (!supabaseAdmin) return;
+  if (!supabaseAdmin) throw new Error('Supabase not initialized');
   const { error } = await supabaseAdmin.from('liquidity_events').upsert({
     ...params,
     created_at: new Date().toISOString(),
   }, { onConflict: 'tx_hash' });
   if (error) {
     console.error('[Supabase] insertLiquidityEvent error:', error.message, error.details);
+    throw new Error(`insertLiquidityEvent failed: ${error.message}`);
   }
 }
 
