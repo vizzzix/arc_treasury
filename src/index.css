@@ -92,14 +92,19 @@ All colors MUST be HSL.
 }
 
 /* Calculator Card Animations */
-@property --calc-border-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes calc-border-spin {
-  to { --calc-border-angle: 360deg; }
+@keyframes calc-color-shift {
+  0%, 100% {
+    border-color: hsl(203 100% 62% / 0.3);
+    box-shadow: 0 0 15px hsl(203 100% 62% / 0.08);
+  }
+  33% {
+    border-color: hsl(270 80% 60% / 0.3);
+    box-shadow: 0 0 15px hsl(270 80% 60% / 0.08);
+  }
+  66% {
+    border-color: hsl(180 80% 55% / 0.3);
+    box-shadow: 0 0 15px hsl(180 80% 55% / 0.08);
+  }
 }
 
 @keyframes calc-glow-pulse {
@@ -114,19 +119,9 @@ All colors MUST be HSL.
 }
 
 .calc-card {
-  --calc-border-angle: 0deg;
-  border: 1px solid transparent !important;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)) padding-box,
-    conic-gradient(
-      from var(--calc-border-angle),
-      rgba(255,255,255,0.1),
-      transparent 30%,
-      transparent 60%,
-      hsl(203 100% 62% / 0.5),
-      rgba(255,255,255,0.1)
-    ) border-box;
-  animation: calc-border-spin 6s linear infinite;
+  background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  border: 1px solid hsl(203 100% 62% / 0.3);
+  animation: calc-color-shift 8s ease-in-out infinite;
 }
 
 .calc-glow-bg {
