@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { useUnifiedWallet } from './useUnifiedWallet';
 
 const REFERRAL_STORAGE_KEY = 'arc_treasury_referrer';
 
@@ -17,7 +18,8 @@ function cleanRefFromUrl() {
  */
 export const useReferralDetection = () => {
   const account = useAccount();
-  const address = account?.address;
+  const unifiedWallet = useUnifiedWallet();
+  const address = account?.address || unifiedWallet.address;
   const [referrerResolved, setReferrerResolved] = useState(false);
 
   // Step 1: Resolve ref param from URL into localStorage
