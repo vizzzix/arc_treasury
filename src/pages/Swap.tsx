@@ -139,7 +139,7 @@ const Swap = () => {
   };
 
   const handleAddLiquidity = async () => {
-    if (!addUsdcAmount || !addEurcAmount) return;
+    if (!addUsdcAmount || !addEurcAmount || parseFloat(addUsdcAmount) <= 0 || parseFloat(addEurcAmount) <= 0) return;
     const success = await addLiquidity(addUsdcAmount, addEurcAmount);
     if (success) {
       setAddUsdcAmount('');
@@ -149,7 +149,7 @@ const Swap = () => {
   };
 
   const handleRemoveLiquidity = async () => {
-    if (!lpAmount) return;
+    if (!lpAmount || parseFloat(lpAmount) <= 0) return;
     const success = await removeLiquidity(lpAmount);
     if (success) {
       setLpAmount('');
@@ -159,7 +159,7 @@ const Swap = () => {
 
   const handleMaxFrom = () => {
     if (fromToken === 'USDC') {
-      const max = Math.max(0, parseFloat(usdcBalance) - 1).toFixed(2); // Leave 1 USDC for gas
+      const max = Math.max(0, parseFloat(usdcBalance) - 0.01).toFixed(2); // Leave 0.01 USDC for gas
       setAmount(max);
     } else {
       setAmount(parseFloat(userEurcBalance).toFixed(2));
@@ -171,7 +171,7 @@ const Swap = () => {
     if (!lpAmount || parseFloat(lpAmount) <= 0 || parseFloat(poolStats.userLpTokens) <= 0) {
       return { usdc: '0', eurc: '0' };
     }
-    const ratio = parseFloat(lpAmount) / parseFloat(poolStats.userLpTokens);
+    const ratio = Math.min(parseFloat(lpAmount) / parseFloat(poolStats.userLpTokens), 1.0);
     return {
       usdc: (parseFloat(poolStats.userUsdcShare) * ratio).toFixed(2),
       eurc: (parseFloat(poolStats.userEurcShare) * ratio).toFixed(2),
@@ -423,7 +423,7 @@ const Swap = () => {
                   value={slippage}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value);
-                    if (!isNaN(val) && val >= 0 && val <= 50) setSlippage(val);
+                    if (!isNaN(val) && val >= 0.01 && val <= 50) setSlippage(val);
                   }}
                   className="h-12 text-center text-lg font-medium bg-white/5 border-white/10 pr-10"
                   step="0.1"
@@ -896,7 +896,7 @@ const Swap = () => {
                         className="pr-16 h-12 bg-white/5 border-white/10"
                       />
                       <button
-                        onClick={() => setLpAmount(parseFloat(poolStats.userLpTokens).toFixed(2))}
+                        onClick={() => setLpAmount(poolStats.userLpTokens)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-primary hover:underline"
                       >
                         MAX

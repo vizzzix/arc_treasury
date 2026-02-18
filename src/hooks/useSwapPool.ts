@@ -2,7 +2,7 @@
  * useSwapPool - Hook for interacting with StablecoinSwap contract
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { formatEther, formatUnits, parseEther, parseUnits } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
@@ -184,6 +184,8 @@ export function useSwapPool() {
   const publicClient = usePublicClient({ chainId: arcTestnet.id });
   const { data: walletClient } = useWalletClient();
   const { eurToUsd: liveRate } = useExchangeRate();
+  const liveRateRef = useRef(liveRate);
+  liveRateRef.current = liveRate;
 
   const [poolStats, setPoolStats] = useState<PoolStats>({
     usdcReserve: '0',
@@ -233,7 +235,7 @@ export function useSwapPool() {
 
       // Calculate total liquidity in USD using live EUR/USD rate
       const usdcVal = Number(formatEther(usdcReserve));
-      const eurcVal = Number(formatUnits(eurcReserve, 6)) * liveRate; // Use live rate from Fixer.io
+      const eurcVal = Number(formatUnits(eurcReserve, 6)) * liveRateRef.current;
       const totalUsd = usdcVal + eurcVal;
 
       let userStats = {
@@ -292,7 +294,7 @@ export function useSwapPool() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [publicClient, address, swapAddress, eurcAddress, liveRate]);
+  }, [publicClient, address, swapAddress, eurcAddress]);
 
   // Get swap quote
   const getSwapQuote = useCallback(async (
@@ -348,7 +350,11 @@ export function useSwapPool() {
     setLastSwap(null);
 
     try {
-      const minOutputAdjusted = (parseFloat(minOutput) * (1 - slippagePercent / 100)).toFixed(6);
+      // BigInt slippage: avoid floating-point precision loss
+      const outputUnits = parseUnits(minOutput, 6);
+      const slippageBps = BigInt(Math.round(slippagePercent * 100));
+      const minOutputWei = outputUnits - (outputUnits * slippageBps / 10000n);
+      const minOutputAdjusted = formatUnits(minOutputWei, 6);
 
       // Circle wallet path — server-side execution
       if (isCircle) {
@@ -377,7 +383,6 @@ export function useSwapPool() {
       }
 
       const amountWei = parseEther(amount);
-      const minOutputWei = parseUnits(minOutputAdjusted, 6);
 
       toast.info('Swapping USDC for EURC...');
 
@@ -432,7 +437,11 @@ export function useSwapPool() {
     setLastSwap(null);
 
     try {
-      const minOutputAdjusted = (parseFloat(minOutput) * (1 - slippagePercent / 100)).toFixed(18);
+      // BigInt slippage: avoid floating-point precision loss
+      const outputWei = parseEther(minOutput);
+      const slippageBps = BigInt(Math.round(slippagePercent * 100));
+      const minOutputWei = outputWei - (outputWei * slippageBps / 10000n);
+      const minOutputAdjusted = formatEther(minOutputWei);
 
       // Circle wallet path — server-side execution (approve + swap handled on server)
       if (isCircle) {
@@ -461,7 +470,6 @@ export function useSwapPool() {
       }
 
       const amountWei = parseUnits(amount, 6);
-      const minOutputWei = parseEther(minOutputAdjusted);
 
       // Check allowance
       const allowance = await publicClient.readContract({
@@ -477,7 +485,7 @@ export function useSwapPool() {
           address: eurcAddress,
           abi: EURC_ABI,
           functionName: 'approve',
-          args: [swapAddress, amountWei],
+          args: [swapAddress, amountWei * 10n],
         });
         await publicClient.waitForTransactionReceipt({ hash: approveHash });
       }
@@ -574,7 +582,7 @@ export function useSwapPool() {
           address: eurcAddress,
           abi: EURC_ABI,
           functionName: 'approve',
-          args: [swapAddress, eurcWei],
+          args: [swapAddress, eurcWei * 10n],
         });
         await publicClient.waitForTransactionReceipt({ hash: approveHash });
       }
@@ -628,6 +636,14 @@ export function useSwapPool() {
 
     setIsLoading(true);
     try {
+      // Calculate min outputs with 1% slippage protection
+      const userLp = parseFloat(poolStats.userLpTokens);
+      const ratio = userLp > 0 ? Math.min(parseFloat(lpAmount) / userLp, 1.0) : 0;
+      const expectedUsdc = parseFloat(poolStats.userUsdcShare) * ratio;
+      const expectedEurc = parseFloat(poolStats.userEurcShare) * ratio;
+      const minUsdcOut = parseEther((expectedUsdc * 0.99).toFixed(18));
+      const minEurcOut = parseUnits((expectedEurc * 0.99).toFixed(6), 6);
+
       // Circle wallet path — server-side execution
       if (isCircle) {
         const arcWalletId = circleWallet.arcWalletId;
@@ -662,7 +678,7 @@ export function useSwapPool() {
         address: swapAddress,
         abi: SWAP_ABI,
         functionName: 'removeLiquidity',
-        args: [lpWei, 0n, 0n],
+        args: [lpWei, minUsdcOut, minEurcOut],
       });
 
       // Set pending transaction
@@ -693,7 +709,7 @@ export function useSwapPool() {
     } finally {
       setIsLoading(false);
     }
-  }, [walletClient, address, publicClient, swapAddress, fetchPoolStats, isCircle, circleWallet.arcWalletId, serverVault, isConnected]);
+  }, [walletClient, address, publicClient, swapAddress, fetchPoolStats, isCircle, circleWallet.arcWalletId, serverVault, isConnected, poolStats.userLpTokens, poolStats.userUsdcShare, poolStats.userEurcShare]);
 
   // Fetch stats on mount and when address changes
   useEffect(() => {

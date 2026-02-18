@@ -50,6 +50,13 @@ async function getEurcBalance(walletAddress: string): Promise<bigint> {
   return BigInt(data.result);
 }
 
+// Safe amount→wei conversion without floating-point overflow
+function toWei(amount: string, decimals: number): string {
+  const [whole = '0', frac = ''] = amount.replace(/,/g, '').split('.');
+  const paddedFrac = frac.padEnd(decimals, '0').slice(0, decimals);
+  return BigInt(whole + paddedFrac).toString();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -116,7 +123,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
   }
 
   // USDC is native on Arc (18 decimals) — convert to wei string
-  const amountWei = BigInt(Math.round(parsedAmount * 1e18)).toString();
+  const amountWei = toWei(amount, 18);
 
   console.log(`[Vault] Deposit USDC: wallet=${walletId}, amount=${amount}, wei=${amountWei}`);
 
@@ -155,7 +162,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   }
 
   // EURC uses 6 decimals
-  const amountMicro = BigInt(Math.round(parsedAmount * 1e6)).toString();
+  const amountMicro = toWei(amount, 6);
   // Approve 10x for future deposits
   const approveAmount = (BigInt(amountMicro) * 10n).toString();
 
@@ -280,7 +287,7 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
 
   // minOutput in EURC 6 decimals
   const minOutputMicro = minOutput
-    ? BigInt(Math.round(parseFloat(minOutput) * 1e6)).toString()
+    ? toWei(minOutput, 6)
     : '0';
 
   console.log(`[Vault] Swap USDC→EURC: wallet=${walletId}, amount=${amount}, minOutput=${minOutputMicro}`);
@@ -320,12 +327,12 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
   }
 
   // EURC in 6 decimals
-  const amountMicro = BigInt(Math.round(parsedAmount * 1e6)).toString();
+  const amountMicro = toWei(amount, 6);
   const approveAmount = (BigInt(amountMicro) * 10n).toString();
 
   // minOutput in USDC 18 decimals
   const minOutputWei = minOutput
-    ? BigInt(Math.round(parseFloat(minOutput) * 1e18)).toString()
+    ? toWei(minOutput, 18)
     : '0';
 
   console.log(`[Vault] Swap EURC→USDC: wallet=${walletId}, amount=${amount}, minOutput=${minOutputWei}`);
@@ -395,7 +402,7 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
     return res.status(400).json({ error: 'lockPeriodMonths must be 1, 3, or 12' });
   }
 
-  const amountWei = BigInt(Math.round(parsedAmount * 1e18)).toString();
+  const amountWei = toWei(amount, 18);
 
   console.log(`[Vault] Deposit Locked USDC: wallet=${walletId}, amount=${amount}, months=${months}`);
 
@@ -439,7 +446,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
     return res.status(400).json({ error: 'lockPeriodMonths must be 1, 3, or 12' });
   }
 
-  const amountMicro = BigInt(Math.round(parsedAmount * 1e6)).toString();
+  const amountMicro = toWei(amount, 6);
   const approveAmount = (BigInt(amountMicro) * 10n).toString();
 
   console.log(`[Vault] Deposit Locked EURC: wallet=${walletId}, amount=${amount}, months=${months}`);
@@ -505,7 +512,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid amounts' });
   }
 
-  const eurcMicro = BigInt(Math.round(parsedEurc * 1e6)).toString();
+  const eurcMicro = toWei(eurcAmount, 6);
   const approveAmount = (BigInt(eurcMicro) * 10n).toString();
 
   console.log(`[Vault] Add Liquidity: wallet=${walletId}, usdc=${usdcAmount}, eurc=${eurcAmount}`);
@@ -572,7 +579,7 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
   }
 
   // LP tokens use 18 decimals
-  const lpWei = BigInt(Math.round(parsedLp * 1e18)).toString();
+  const lpWei = toWei(lpAmount, 18);
 
   console.log(`[Vault] Remove Liquidity: wallet=${walletId}, lp=${lpAmount}`);
 
