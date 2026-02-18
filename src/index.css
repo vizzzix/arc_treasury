@@ -124,6 +124,10 @@ All colors MUST be HSL.
   animation: calc-color-shift 8s ease-in-out infinite;
 }
 
+.color-shift-border {
+  animation: calc-color-shift 8s ease-in-out infinite;
+}
+
 .calc-glow-bg {
   animation: calc-glow-pulse 4s ease-in-out infinite;
 }

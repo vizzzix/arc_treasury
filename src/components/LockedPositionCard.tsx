@@ -107,7 +107,7 @@ export const LockedPositionCard = ({
         "relative overflow-hidden rounded-xl border transition-all duration-300",
         isUnlocked
           ? "border-green-500/50 bg-green-500/5 hover:shadow-glow-lg"
-          : "border-border/50 bg-card/50 hover:border-primary/30"
+          : "border-border/50 bg-card/50 hover:border-primary/30 color-shift-border"
       )}
     >
       <div className="p-6">
@@ -131,7 +131,7 @@ export const LockedPositionCard = ({
         </div>
 
         {/* Amount */}
-        <div className="mb-4 p-4 rounded-lg bg-background/60 border border-border/40">
+        <div className="mb-4 p-4 rounded-lg bg-background/60 border border-border/40 calc-result-card">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm text-muted-foreground">Locked Amount</span>
             <span className="text-2xl font-bold text-foreground">
@@ -147,7 +147,7 @@ export const LockedPositionCard = ({
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           {/* APY */}
-          <div className="p-3 rounded-lg bg-background/40 border border-border/30">
+          <div className="p-3 rounded-lg bg-background/40 border border-border/30 calc-result-card">
             <div className="flex items-center gap-1.5 mb-1">
               <TrendingUp className="w-3.5 h-3.5 text-green-500" />
               <span className="text-xs text-muted-foreground">APY</span>
@@ -158,7 +158,7 @@ export const LockedPositionCard = ({
           </div>
 
           {/* Earned Yield */}
-          <div className="p-3 rounded-lg bg-background/40 border border-border/30">
+          <div className="p-3 rounded-lg bg-background/40 border border-border/30 calc-result-card">
             <div className="flex items-center gap-1.5 mb-1">
               <span className="text-xs text-muted-foreground">Earned</span>
             </div>
