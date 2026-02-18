@@ -25,18 +25,16 @@ interface UseLeaderboardReturn {
 let cachedData: { leaderboard: LeaderboardEntry[]; totalUsers: number; timestamp: number } | null = null;
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
-// Count distinct site users (wallets that interacted via the site)
+// Count users who interacted with Arc Treasury contracts (vault/swap/liquidity)
 async function getSiteUsersCount(): Promise<number> {
   if (!supabase) return 0;
   try {
-    const [txResult, bridgeResult] = await Promise.all([
-      supabase.from('circle_transactions').select('wallet_address').limit(50000),
-      supabase.from('site_bridges').select('wallet_address').limit(50000),
-    ]);
-    const wallets = new Set<string>();
-    txResult.data?.forEach(r => { if (r.wallet_address) wallets.add(r.wallet_address.toLowerCase()); });
-    bridgeResult.data?.forEach(r => { if (r.wallet_address) wallets.add(r.wallet_address.toLowerCase()); });
-    return wallets.size;
+    const { count, error } = await supabase
+      .from('user_points')
+      .select('*', { count: 'exact', head: true })
+      .or('vault_volume.gt.0,swap_volume.gt.0,liquidity_volume.gt.0');
+    if (error) throw error;
+    return count || 0;
   } catch {
     return 0;
   }
@@ -146,11 +144,12 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
           return;
         }
 
-        // Get user's rank by counting users with more points
+        // Get user's rank by counting site users with more points
         const { count, error: countError } = await supabase
           .from('user_points')
           .select('*', { count: 'exact', head: true })
-          .gt('total_points', userData.total_points);
+          .gt('total_points', userData.total_points)
+          .or('vault_volume.gt.0,swap_volume.gt.0,liquidity_volume.gt.0');
 
         if (countError) {
           console.error('Error counting rank:', countError);
