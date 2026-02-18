@@ -25,10 +25,10 @@ const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours for auto-alerts
 const POLL_INTERVAL_MS = 3000; // 3 seconds for command polling
 const EXCHANGE_RATE_UPDATE_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours - update exchange rate twice a day
 
-// Supabase for tracking bridge users (anon key is public, protected by RLS)
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://tclvgmhluhayiflwvkfq.supabase.co";
-const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY || "***REDACTED_SUPABASE_ANON_KEY***";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing SUPABASE_URL or SUPABASE_KEY');
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const arcTestnet = defineChain({
   id: 5042002,

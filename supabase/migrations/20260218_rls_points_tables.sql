@@ -58,3 +58,10 @@ CREATE POLICY "Allow select from anon" ON referral_codes
 
 CREATE POLICY "Allow select from authenticated" ON referral_codes
   FOR SELECT TO authenticated USING (true);
+
+-- 7. circle_transactions — harden existing RLS
+-- Remove dangerous UPDATE policies (anon should not change tx status)
+DROP POLICY IF EXISTS "Allow update from anon" ON circle_transactions;
+DROP POLICY IF EXISTS "Allow update from authenticated" ON circle_transactions;
+-- INSERT kept for anon (MetaMask tx tracking from frontend via trackTransaction.ts)
+-- TODO: move MetaMask tracking to server-side API and remove INSERT for anon

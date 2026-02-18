@@ -10,8 +10,9 @@
 const { createClient } = require('@supabase/supabase-js');
 
 // Supabase config
-const SUPABASE_URL = 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_KEY = '***REDACTED_SUPABASE_ANON_KEY***';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing SUPABASE_URL or SUPABASE_KEY');
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 

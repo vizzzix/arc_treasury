@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
+import { handleCors } from './_lib/cors';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -34,10 +35,7 @@ function toWei(amount: string, decimals: number): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (handleCors(req, res)) return;
 
   const { action } = req.query;
 
@@ -80,7 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error: any) {
     console.error('[Vault API] Error:', error.message || error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 

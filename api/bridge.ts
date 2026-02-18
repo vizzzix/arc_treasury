@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, getClient } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
+import { handleCors } from './_lib/cors';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -16,11 +17,15 @@ const ARC_DESTINATION_DOMAIN = 26;
 
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages';
 
+// Safe amount→micro conversion without floating-point precision loss
+function toMicro(amount: string): string {
+  const [whole = '0', frac = ''] = amount.replace(/,/g, '').split('.');
+  const paddedFrac = frac.padEnd(6, '0').slice(0, 6);
+  return BigInt(whole + paddedFrac).toString();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (handleCors(req, res)) return;
 
   const { action } = req.query;
 
@@ -44,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error: any) {
     console.error('[Bridge API] Error:', error.message || error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -63,7 +68,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
   const isArcToSepolia = direction === 'arc-to-sepolia';
-  const amountMicro = BigInt(Math.round(parseFloat(amount) * 1_000_000));
+  const amountMicro = BigInt(toMicro(amount));
   const approveAmount = (amountMicro * 10n).toString();
 
   const contractAddress = isArcToSepolia ? USDC_ARC : USDC_SEPOLIA;
@@ -99,7 +104,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
   }
 
   const isArcToSepolia = direction === 'arc-to-sepolia';
-  const amountMicro = BigInt(Math.round(parseFloat(amount) * 1_000_000));
+  const amountMicro = BigInt(toMicro(amount));
   // maxFee is the MAXIMUM Circle relay can deduct (actual fee is lower)
   const MAX_FEE_CAP = 5_000_000n; // 5 USDC cap
   const MIN_FEE = 100_000n;       // 0.1 USDC floor

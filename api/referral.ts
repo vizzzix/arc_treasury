@@ -182,7 +182,7 @@ async function handleList(request: any, response: any) {
     }
 
     const lowerAddress = address.toLowerCase();
-    const limitNum = parseInt(limit as string, 10) || 10;
+    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 10, 1), 100);
 
     const { data: referrals, error } = await supabase
       .from('referrals')
