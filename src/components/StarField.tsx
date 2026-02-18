@@ -193,13 +193,23 @@ export const StarField = ({ count = 150 }: { count?: number }) => {
       animationId = requestAnimationFrame(render);
     };
 
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animationId);
+      } else {
+        animationId = requestAnimationFrame(render);
+      }
+    };
+
     resize();
     window.addEventListener('resize', resize);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     if (!mobile) window.addEventListener('mousemove', onMouseMove);
     animationId = requestAnimationFrame(render);
 
     return () => {
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (!mobile) window.removeEventListener('mousemove', onMouseMove);
       cancelAnimationFrame(animationId);
     };

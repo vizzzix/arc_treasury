@@ -38,22 +38,31 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Vite internal preload helper — force into its own tiny chunk
-          // so it doesn't land in solana-vendor and pull 800KB into entry
           if (id.includes('vite/preload-helper')) {
             return 'preload';
           }
-          // Buffer polyfill — keep separate from solana-vendor
           if (id.includes('node_modules/buffer/') || id.includes('node_modules/base64-js/') || id.includes('node_modules/ieee754/')) {
             return 'buffer-polyfill';
           }
           if (id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router') || id.includes('node_modules/react/')) {
             return 'react-vendor';
           }
-          if (id.includes('node_modules/viem/') || id.includes('node_modules/wagmi/') || id.includes('node_modules/@tanstack/react-query')) {
+          if (id.includes('node_modules/@tanstack/react-query')) {
+            return 'query-vendor';
+          }
+          if (id.includes('node_modules/viem/') || id.includes('node_modules/wagmi/')) {
             return 'web3-vendor';
           }
-          if (id.includes('node_modules/lucide-react/') || id.includes('node_modules/@radix-ui/')) {
+          if (id.includes('node_modules/@supabase/')) {
+            return 'supabase-vendor';
+          }
+          if (id.includes('node_modules/@circle-fin/')) {
+            return 'circle-vendor';
+          }
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'icons-vendor';
+          }
+          if (id.includes('node_modules/@radix-ui/')) {
             return 'ui-vendor';
           }
           if (id.includes('node_modules/@solana/') || id.includes('node_modules/@solflare-wallet/') || id.includes('node_modules/@wallet-standard/')) {

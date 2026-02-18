@@ -64,7 +64,14 @@ const BridgeSolana = lazy(async () => {
   }
 });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // AppRoutes component with referral detection
 const AppRoutes = () => {
