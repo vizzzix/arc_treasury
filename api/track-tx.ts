@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { insertCircleTx, updateCircleTxStatus } from './_lib/supabase';
+import { insertCircleTx, updateCircleTxStatus, insertSwapTx, insertLiquidityEvent } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 
 const VALID_TX_TYPES = new Set([
@@ -28,8 +28,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleTrack(req, res);
       case 'update-status':
         return await handleUpdateStatus(req, res);
+      case 'track-swap':
+        return await handleTrackSwap(req, res);
+      case 'track-liquidity':
+        return await handleTrackLiquidity(req, res);
       default:
-        return res.status(400).json({ error: 'Invalid action. Use: track, update-status' });
+        return res.status(400).json({ error: 'Invalid action. Use: track, update-status, track-swap, track-liquidity' });
     }
   } catch (error: any) {
     console.error('[TrackTx API] Error:', error.message || error);
@@ -61,6 +65,54 @@ async function handleTrack(req: VercelRequest, res: VercelResponse) {
     tx_hash: txHash.toLowerCase(),
     amount,
     currency,
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleTrackSwap(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { txHash, walletAddress, amountUsd, tokenIn, tokenOut } = req.body;
+
+  if (!txHash || !TX_HASH_REGEX.test(txHash)) {
+    return res.status(400).json({ error: 'Valid txHash required' });
+  }
+  if (!walletAddress || !ADDRESS_REGEX.test(walletAddress)) {
+    return res.status(400).json({ error: 'Valid walletAddress required' });
+  }
+
+  await insertSwapTx({
+    tx_hash: txHash.toLowerCase(),
+    wallet_address: walletAddress.toLowerCase(),
+    amount_usd: Number(amountUsd) || 0,
+    token_in: tokenIn || 'USDC',
+    token_out: tokenOut || 'EURC',
+  });
+
+  return res.status(200).json({ ok: true });
+}
+
+async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
+
+  const { txHash, walletAddress, amountUsd, action } = req.body;
+
+  if (!txHash || !TX_HASH_REGEX.test(txHash)) {
+    return res.status(400).json({ error: 'Valid txHash required' });
+  }
+  if (!walletAddress || !ADDRESS_REGEX.test(walletAddress)) {
+    return res.status(400).json({ error: 'Valid walletAddress required' });
+  }
+  if (!action || !['add', 'remove'].includes(action)) {
+    return res.status(400).json({ error: 'action must be add or remove' });
+  }
+
+  await insertLiquidityEvent({
+    tx_hash: txHash.toLowerCase(),
+    wallet_address: walletAddress.toLowerCase(),
+    amount_usd: Number(amountUsd) || 0,
+    action,
   });
 
   return res.status(200).json({ ok: true });

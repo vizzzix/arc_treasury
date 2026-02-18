@@ -65,6 +65,39 @@ export async function updateCircleTxStatus(
   }
 }
 
+export async function insertSwapTx(params: {
+  tx_hash: string;
+  wallet_address: string;
+  amount_usd: number;
+  token_in: string;
+  token_out: string;
+}): Promise<void> {
+  if (!supabaseAdmin) return;
+  const { error } = await supabaseAdmin.from('swap_transactions').upsert({
+    ...params,
+    created_at: new Date().toISOString(),
+  }, { onConflict: 'tx_hash' });
+  if (error) {
+    console.error('[Supabase] insertSwapTx error:', error.message, error.details);
+  }
+}
+
+export async function insertLiquidityEvent(params: {
+  tx_hash: string;
+  wallet_address: string;
+  amount_usd: number;
+  action: 'add' | 'remove';
+}): Promise<void> {
+  if (!supabaseAdmin) return;
+  const { error } = await supabaseAdmin.from('liquidity_events').upsert({
+    ...params,
+    created_at: new Date().toISOString(),
+  }, { onConflict: 'tx_hash' });
+  if (error) {
+    console.error('[Supabase] insertLiquidityEvent error:', error.message, error.details);
+  }
+}
+
 export async function trackTx(
   result: any,
   txType: string,

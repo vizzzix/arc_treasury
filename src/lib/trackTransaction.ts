@@ -1,5 +1,3 @@
-import { supabase } from '@/lib/supabase';
-
 interface TrackParams {
   txHash: string;
   txType: string;
@@ -51,16 +49,12 @@ export async function trackSiteSwap(
   tokenIn: string,
   tokenOut: string,
 ): Promise<void> {
-  if (!supabase) return;
   try {
-    await supabase.from('swap_transactions').upsert({
-      wallet_address: walletAddress.toLowerCase(),
-      amount_usd: amountUsd,
-      token_in: tokenIn,
-      token_out: tokenOut,
-      tx_hash: txHash.toLowerCase(),
-      created_at: new Date().toISOString(),
-    }, { onConflict: 'tx_hash' });
+    await fetch('/api/track-tx?action=track-swap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txHash, walletAddress, amountUsd, tokenIn, tokenOut }),
+    });
   } catch (e) {
     console.error('[trackSiteSwap] Failed:', e);
   }
@@ -72,15 +66,12 @@ export async function trackSiteLiquidity(
   amountUsd: number,
   action: 'add' | 'remove',
 ): Promise<void> {
-  if (!supabase) return;
   try {
-    await supabase.from('liquidity_events').upsert({
-      wallet_address: walletAddress.toLowerCase(),
-      amount_usd: amountUsd,
-      action,
-      tx_hash: txHash.toLowerCase(),
-      created_at: new Date().toISOString(),
-    }, { onConflict: 'tx_hash' });
+    await fetch('/api/track-tx?action=track-liquidity', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txHash, walletAddress, amountUsd, action }),
+    });
   } catch (e) {
     console.error('[trackSiteLiquidity] Failed:', e);
   }
