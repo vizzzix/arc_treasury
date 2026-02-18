@@ -81,35 +81,27 @@ export const UserMenu = () => {
           </button>
         </div>
 
-        {/* Balances (only for external wallets on Arc Testnet) */}
-        {!isCircle && (
-          <div className="px-3 py-3 mx-2 my-1 rounded-lg bg-white/5 border border-white/10">
-            <div className="flex items-center gap-2 mb-2">
-              <Coins className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Balances</span>
+        {/* Balances */}
+        <div className="px-3 py-3 mx-2 my-1 rounded-lg bg-white/5 border border-white/10">
+          <div className="flex items-center gap-2 mb-2">
+            <Coins className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Balances</span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">USDC</span>
+              <span className="text-sm font-medium">
+                {isLoadingUSDC ? "..." : usdcBalance}
+              </span>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">USDC</span>
-                <span className="text-sm font-medium">
-                  {isLoadingUSDC ? "..." : usdcBalance}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">EURC</span>
-                <span className="text-sm font-medium">
-                  {isLoadingEURC ? "..." : eurcBalance}
-                </span>
-              </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">EURC</span>
+              <span className="text-sm font-medium">
+                {isLoadingEURC ? "..." : eurcBalance}
+              </span>
             </div>
           </div>
-        )}
-
-        {isCircle && (
-          <div className="px-3 py-2 mx-2 text-xs text-muted-foreground">
-            Network: Ethereum Sepolia
-          </div>
-        )}
+        </div>
 
         <DropdownMenuSeparator className="bg-white/10 my-2" />
         <DropdownMenuItem onClick={() => navigate("/dashboard")} className="cursor-pointer mx-2 rounded-lg hover:bg-white/5 focus:bg-white/5">
