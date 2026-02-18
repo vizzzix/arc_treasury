@@ -36,7 +36,7 @@ export const useSwapFeed = (limit: number = 10) => {
 
   const fetchActivity = async () => {
     try {
-      const res = await fetch(`/api/swap-feed?action=activity&limit=${limit}`);
+      const res = await fetch(`/api/track-tx?action=feed-activity&limit=${limit}`);
       if (!res.ok) return;
       const { swaps, lpEvents } = await res.json();
 
@@ -77,7 +77,7 @@ export const useSwapFeed = (limit: number = 10) => {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/swap-feed?action=stats');
+      const res = await fetch('/api/track-tx?action=feed-stats');
       if (!res.ok) return;
       const data = await res.json();
       setStats({
@@ -93,7 +93,7 @@ export const useSwapFeed = (limit: number = 10) => {
 
   const fetchTopSwappers = async () => {
     try {
-      const res = await fetch('/api/swap-feed?action=top');
+      const res = await fetch('/api/track-tx?action=feed-top');
       if (!res.ok) return;
       const { ranked } = await res.json();
 
