@@ -123,8 +123,11 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
 
   const isArcToSepolia = direction === 'arc-to-sepolia';
   const amountMicro = BigInt(Math.round(parseFloat(amount) * 1_000_000));
-  const calculatedFee = amountMicro / 10000n;
-  const maxFee = calculatedFee > 1000n ? calculatedFee : 1000n;
+  // maxFee is the MAXIMUM Circle relay can deduct (actual fee is lower)
+  const MAX_FEE_CAP = 5_000_000n; // 5 USDC cap
+  const MIN_FEE = 100_000n;       // 0.1 USDC floor
+  const calculatedFee = (amountMicro * 50n) / 10_000n; // 0.5% of amount
+  const maxFee = calculatedFee < MIN_FEE ? MIN_FEE : calculatedFee > MAX_FEE_CAP ? MAX_FEE_CAP : calculatedFee;
   const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
   console.log(`[Bridge] Burn: wallet=${walletId}, amount=${amount}, recipient=${recipientAddress}, direction=${direction || 'sepolia-to-arc'}`);
