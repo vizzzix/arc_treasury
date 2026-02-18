@@ -752,9 +752,11 @@ const Swap = () => {
                         onChange={(e) => {
                           const usdc = e.target.value;
                           setAddUsdcAmount(usdc);
-                          // Auto-calculate EURC based on live EUR/USD rate from Fixer.io
-                          if (usdc && parseFloat(usdc) > 0 && liveRate > 0) {
-                            const eurc = parseFloat(usdc) / liveRate;
+                          // Auto-calculate EURC based on pool reserve ratio
+                          const usdcRes = parseFloat(poolStats.usdcReserve);
+                          const eurcRes = parseFloat(poolStats.eurcReserve);
+                          if (usdc && parseFloat(usdc) > 0 && usdcRes > 0 && eurcRes > 0) {
+                            const eurc = (parseFloat(usdc) * eurcRes) / usdcRes;
                             setAddEurcAmount(eurc.toFixed(2));
                           } else {
                             setAddEurcAmount('');
@@ -765,10 +767,12 @@ const Swap = () => {
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                         <button
                           onClick={() => {
-                            const max = Math.max(0, parseFloat(usdcBalance) - 1).toFixed(2);
+                            const max = Math.max(0, parseFloat(usdcBalance) - 0.01).toFixed(2);
                             setAddUsdcAmount(max);
-                            if (liveRate > 0) {
-                              const eurc = parseFloat(max) / liveRate;
+                            const usdcRes = parseFloat(poolStats.usdcReserve);
+                            const eurcRes = parseFloat(poolStats.eurcReserve);
+                            if (usdcRes > 0 && eurcRes > 0) {
+                              const eurc = (parseFloat(max) * eurcRes) / usdcRes;
                               setAddEurcAmount(eurc.toFixed(2));
                             }
                           }}
@@ -795,9 +799,11 @@ const Swap = () => {
                         onChange={(e) => {
                           const eurc = e.target.value;
                           setAddEurcAmount(eurc);
-                          // Auto-calculate USDC based on live EUR/USD rate from Fixer.io
-                          if (eurc && parseFloat(eurc) > 0 && liveRate > 0) {
-                            const usdc = parseFloat(eurc) * liveRate;
+                          // Auto-calculate USDC based on pool reserve ratio
+                          const usdcRes = parseFloat(poolStats.usdcReserve);
+                          const eurcRes = parseFloat(poolStats.eurcReserve);
+                          if (eurc && parseFloat(eurc) > 0 && usdcRes > 0 && eurcRes > 0) {
+                            const usdc = (parseFloat(eurc) * usdcRes) / eurcRes;
                             setAddUsdcAmount(usdc.toFixed(2));
                           } else {
                             setAddUsdcAmount('');
