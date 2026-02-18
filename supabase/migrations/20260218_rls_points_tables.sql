@@ -60,8 +60,8 @@ CREATE POLICY "Allow select from authenticated" ON referral_codes
   FOR SELECT TO authenticated USING (true);
 
 -- 7. circle_transactions — harden existing RLS
--- Remove dangerous UPDATE policies (anon should not change tx status)
+-- Remove INSERT/UPDATE for anon — all writes go through server-side API (service_role)
+DROP POLICY IF EXISTS "Allow insert from anon" ON circle_transactions;
+DROP POLICY IF EXISTS "Allow insert from authenticated" ON circle_transactions;
 DROP POLICY IF EXISTS "Allow update from anon" ON circle_transactions;
 DROP POLICY IF EXISTS "Allow update from authenticated" ON circle_transactions;
--- INSERT kept for anon (MetaMask tx tracking from frontend via trackTransaction.ts)
--- TODO: move MetaMask tracking to server-side API and remove INSERT for anon

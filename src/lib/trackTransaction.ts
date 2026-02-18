@@ -1,5 +1,3 @@
-import { supabase } from './supabase';
-
 interface TrackParams {
   txHash: string;
   txType: string;
@@ -17,23 +15,12 @@ export async function trackTransaction({
   currency,
   status = 'SENT',
 }: TrackParams): Promise<void> {
-  if (!supabase) return;
   try {
-    await supabase.from('circle_transactions').upsert(
-      {
-        circle_tx_id: txHash.toLowerCase(),
-        tx_type: txType,
-        status,
-        wallet_address: walletAddress.toLowerCase(),
-        wallet_id: 'metamask',
-        tx_hash: txHash.toLowerCase(),
-        amount,
-        currency,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'circle_tx_id' }
-    );
+    await fetch('/api/track-tx?action=track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txHash, txType, walletAddress, amount, currency, status }),
+    });
   } catch (e) {
     console.error('[trackTransaction] Failed:', e);
   }
@@ -44,18 +31,12 @@ export async function updateTransactionStatus(
   status: 'COMPLETE' | 'FAILED',
   errorReason?: string
 ): Promise<void> {
-  if (!supabase) return;
   try {
-    const update: Record<string, unknown> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-    if (errorReason) update.error_reason = errorReason;
-
-    await supabase
-      .from('circle_transactions')
-      .update(update)
-      .eq('circle_tx_id', txHash.toLowerCase());
+    await fetch('/api/track-tx?action=update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ txHash, status, errorReason }),
+    });
   } catch (e) {
     console.error('[updateTransactionStatus] Failed:', e);
   }
