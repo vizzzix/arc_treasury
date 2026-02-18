@@ -25,7 +25,11 @@ export default defineConfig({
     modulePreload: {
       // Keep modulePreload for initial chunks but filter out solana
       resolveDependencies: (_filename, deps) =>
-        deps.filter(dep => !dep.includes('solana') && !dep.includes('BridgeSolana') && !dep.includes('useBridgeSolana')),
+        deps.filter(dep =>
+          !dep.includes('solana') &&
+          !dep.includes('BridgeSolana') &&
+          !dep.includes('useBridgeSolana')
+        ),
     },
     // Optimize production bundle
     minify: 'terser',
@@ -55,6 +59,9 @@ export default defineConfig({
           }
           if (id.includes('node_modules/@supabase/')) {
             return 'supabase-vendor';
+          }
+          if (id.includes('node_modules/@circle-fin/adapter-solana')) {
+            return 'solana-vendor';
           }
           if (id.includes('node_modules/@circle-fin/')) {
             return 'circle-vendor';
