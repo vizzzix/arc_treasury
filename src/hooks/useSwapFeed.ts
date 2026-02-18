@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export type ActivityItem = {
   id: string;
@@ -104,9 +104,9 @@ export const useSwapFeed = (limit: number = 10) => {
     }
   };
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await Promise.all([fetchActivity(), fetchStats(), fetchTopSwappers()]);
-  };
+  }, [limit]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -114,7 +114,16 @@ export const useSwapFeed = (limit: number = 10) => {
 
     const interval = setInterval(refresh, 15000);
     return () => clearInterval(interval);
-  }, [limit]);
+  }, [refresh]);
+
+  // Listen for swap/liquidity write events and refresh immediately
+  useEffect(() => {
+    const onFeedUpdate = () => {
+      setTimeout(refresh, 1500);
+    };
+    window.addEventListener('swap-feed-update', onFeedUpdate);
+    return () => window.removeEventListener('swap-feed-update', onFeedUpdate);
+  }, [refresh]);
 
   const getUserRank = (address: string | undefined): TopSwapper | null => {
     if (!address) return null;

@@ -50,11 +50,14 @@ export async function trackSiteSwap(
   tokenOut: string,
 ): Promise<void> {
   try {
-    await fetch('/api/track-tx?action=track-swap', {
+    const res = await fetch('/api/track-tx?action=track-swap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ txHash, walletAddress, amountUsd, tokenIn, tokenOut }),
     });
+    if (res.ok) {
+      window.dispatchEvent(new CustomEvent('swap-feed-update'));
+    }
   } catch (e) {
     console.error('[trackSiteSwap] Failed:', e);
   }
@@ -67,11 +70,14 @@ export async function trackSiteLiquidity(
   action: 'add' | 'remove',
 ): Promise<void> {
   try {
-    await fetch('/api/track-tx?action=track-liquidity', {
+    const res = await fetch('/api/track-tx?action=track-liquidity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ txHash, walletAddress, amountUsd, action }),
     });
+    if (res.ok) {
+      window.dispatchEvent(new CustomEvent('swap-feed-update'));
+    }
   } catch (e) {
     console.error('[trackSiteLiquidity] Failed:', e);
   }
