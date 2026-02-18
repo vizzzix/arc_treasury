@@ -25,16 +25,18 @@ interface UseLeaderboardReturn {
 let cachedData: { leaderboard: LeaderboardEntry[]; totalUsers: number; timestamp: number } | null = null;
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
-// Get total users count from user_points
-async function getTotalUsersCount(): Promise<number> {
+// Count distinct site users (wallets that interacted via the site)
+async function getSiteUsersCount(): Promise<number> {
   if (!supabase) return 0;
   try {
-    const { count, error } = await supabase
-      .from('user_points')
-      .select('*', { count: 'exact', head: true })
-      .gt('total_points', 0);
-    if (error) throw error;
-    return count || 0;
+    const [txResult, bridgeResult] = await Promise.all([
+      supabase.from('circle_transactions').select('wallet_address').limit(50000),
+      supabase.from('site_bridges').select('wallet_address').limit(50000),
+    ]);
+    const wallets = new Set<string>();
+    txResult.data?.forEach(r => { if (r.wallet_address) wallets.add(r.wallet_address.toLowerCase()); });
+    bridgeResult.data?.forEach(r => { if (r.wallet_address) wallets.add(r.wallet_address.toLowerCase()); });
+    return wallets.size;
   } catch {
     return 0;
   }
@@ -76,7 +78,7 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
             .gt('total_points', 0)
             .order('total_points', { ascending: false })
             .limit(50),
-          getTotalUsersCount()
+          getSiteUsersCount()
         ]);
 
         if (leaderboardResult.error) throw leaderboardResult.error;
