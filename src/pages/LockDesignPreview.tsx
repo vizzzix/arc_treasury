@@ -4,6 +4,7 @@ import { LockedPositionCard } from "@/components/LockedPositionCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { WalletHeader } from "@/components/WalletHeader";
 
 const LockDesignPreview = () => {
   const navigate = useNavigate();
@@ -49,21 +50,18 @@ const LockDesignPreview = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-lg">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                onClick={() => navigate("/")}
-                variant="ghost"
-                size="sm"
-                className="gap-2"
-              >
+              <Button onClick={() => navigate("/")} variant="ghost" size="sm" className="gap-2 hover:bg-white/5">
                 <ArrowLeft className="w-4 h-4" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <h1 className="text-xl font-bold">Lock Feature Design Preview</h1>
+              <div className="h-4 w-px bg-border/30" />
+              <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Lock Preview</h1>
             </div>
+            <WalletHeader />
           </div>
         </div>
       </nav>

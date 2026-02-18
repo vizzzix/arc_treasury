@@ -5,7 +5,6 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { TREASURY_CONTRACTS, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
-import arcLogo from "@/assets/arc-logo.webp";
 
 const FAQ = () => {
   const navigate = useNavigate();
@@ -76,30 +75,24 @@ const FAQ = () => {
       </div>
 
       {/* Header */}
-      <header className="border-b border-border/20 sticky top-0 bg-background/60 backdrop-blur-xl z-50">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/")}
-                className="hover:bg-white/10"
-              >
-                <ArrowLeft className="w-5 h-5" />
+              <Button onClick={() => navigate("/")} variant="ghost" size="sm" className="gap-2 hover:bg-white/5">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <img src={arcLogo} alt="Arc Treasury" className="w-8 h-8" />
-              <h1 className="text-2xl font-bold">FAQ</h1>
+              <div className="h-4 w-px bg-border/30" />
+              <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">FAQ</h1>
             </div>
-            <div className="flex items-center gap-3">
-              <WalletHeader />
-            </div>
+            <WalletHeader />
           </div>
         </div>
-      </header>
+      </nav>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 sm:px-6 py-12">
+      <main className="pt-24 pb-20 container mx-auto px-4 sm:px-6">
         <div className="max-w-3xl mx-auto">
           {faqs.map((section, sectionIndex) => (
             <div key={sectionIndex} className="mb-10">

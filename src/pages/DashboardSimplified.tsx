@@ -20,7 +20,6 @@ import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useTVL } from "@/hooks/useTVL";
 import { TOKEN_ADDRESSES, TOKEN_DECIMALS, MIGRATION_IN_PROGRESS, SHOW_MIGRATION_SUCCESS, USYC_WHITELIST_PENDING, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
-import arcLogo from "@/assets/arc-logo.webp";
 
 const DashboardSimplified = () => {
   const navigate = useNavigate();
@@ -263,21 +262,17 @@ const DashboardSimplified = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header with Profile button */}
-      <header className="border-b border-border/30 sticky top-0 bg-background/80 backdrop-blur-lg z-50">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo & Title */}
-            <div className="flex items-center gap-2 sm:gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => navigate("/")}
-                className="hover:bg-card"
-              >
-                <ArrowLeft className="w-5 h-5" />
+            <div className="flex items-center gap-4">
+              <Button onClick={() => navigate("/")} variant="ghost" size="sm" className="gap-2 hover:bg-white/5">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <img src={arcLogo} alt="Arc Treasury" className="w-7 h-7 sm:w-8 sm:h-8" />
-              <h1 className="text-lg sm:text-2xl font-bold">Dashboard</h1>
+              <div className="h-4 w-px bg-border/30" />
+              <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Dashboard</h1>
             </div>
 
             {/* Right: Navigation & Wallet */}
@@ -304,7 +299,7 @@ const DashboardSimplified = () => {
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
       {/* Migration Success Banner */}
       {SHOW_MIGRATION_SUCCESS && (
@@ -345,7 +340,7 @@ const DashboardSimplified = () => {
       )}
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 sm:px-6 py-12">
+      <main className="pt-24 pb-20 container mx-auto px-4 sm:px-6">
         {/* Wrong Network Warning */}
         {!isArcTestnet && isExternalWallet && (
           <div className="max-w-7xl mx-auto mb-8">
