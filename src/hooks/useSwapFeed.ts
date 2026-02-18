@@ -81,7 +81,7 @@ export const useSwapFeed = (limit: number = 10) => {
             type: 'swap',
             wallet_address: s.wallet_address,
             amount_usd: s.amount_usd,
-            details: s.from_token && s.to_token ? `${s.from_token}→${s.to_token}` : 'Swap',
+            details: s.token_in && s.token_out ? `${s.token_in}→${s.token_out}` : 'Swap',
             created_at: s.created_at,
           });
         });

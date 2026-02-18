@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase';
+
 interface TrackParams {
   txHash: string;
   txType: string;
@@ -39,5 +41,47 @@ export async function updateTransactionStatus(
     });
   } catch (e) {
     console.error('[updateTransactionStatus] Failed:', e);
+  }
+}
+
+export async function trackSiteSwap(
+  txHash: string,
+  walletAddress: string,
+  amountUsd: number,
+  tokenIn: string,
+  tokenOut: string,
+): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase.from('swap_transactions').upsert({
+      wallet_address: walletAddress.toLowerCase(),
+      amount_usd: amountUsd,
+      token_in: tokenIn,
+      token_out: tokenOut,
+      tx_hash: txHash.toLowerCase(),
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'tx_hash' });
+  } catch (e) {
+    console.error('[trackSiteSwap] Failed:', e);
+  }
+}
+
+export async function trackSiteLiquidity(
+  txHash: string,
+  walletAddress: string,
+  amountUsd: number,
+  action: 'add' | 'remove',
+): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase.from('liquidity_events').upsert({
+      wallet_address: walletAddress.toLowerCase(),
+      amount_usd: amountUsd,
+      action,
+      tx_hash: txHash.toLowerCase(),
+      created_at: new Date().toISOString(),
+    }, { onConflict: 'tx_hash' });
+  } catch (e) {
+    console.error('[trackSiteLiquidity] Failed:', e);
   }
 }

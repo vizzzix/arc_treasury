@@ -9,7 +9,7 @@ import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
 import { toast } from 'sonner';
 import { useExchangeRate } from './useExchangeRate';
-import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
+import { trackTransaction, updateTransactionStatus, trackSiteSwap, trackSiteLiquidity } from '@/lib/trackTransaction';
 import { useUnifiedWallet } from './useUnifiedWallet';
 import { useCircleWallet } from '@/providers/CircleWalletProvider';
 import { useServerVault } from './useServerVault';
@@ -363,6 +363,7 @@ export function useSwapPool() {
         if (!arcWalletId) throw new Error('Arc wallet not found');
         const txHash = await serverVault.swapUsdcForEurc(arcWalletId, amount, minOutputAdjusted, address);
         if (!txHash) throw new Error('Swap failed');
+        trackSiteSwap(txHash, address, parseFloat(amount), 'USDC', 'EURC');
         setLastSwap({
           hash: txHash,
           status: 'success',
@@ -412,6 +413,7 @@ export function useSwapPool() {
       await publicClient?.waitForTransactionReceipt({ hash });
 
       updateTransactionStatus(hash, 'COMPLETE');
+      trackSiteSwap(hash, address, parseFloat(amount), 'USDC', 'EURC');
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Swap completed!');
       await fetchPoolStats();
@@ -453,6 +455,7 @@ export function useSwapPool() {
         if (!arcWalletId) throw new Error('Arc wallet not found');
         const txHash = await serverVault.swapEurcForUsdc(arcWalletId, amount, minOutputAdjusted, address);
         if (!txHash) throw new Error('Swap failed');
+        trackSiteSwap(txHash, address, parseFloat(amount) * liveRateRef.current, 'EURC', 'USDC');
         setLastSwap({
           hash: txHash,
           status: 'success',
@@ -520,6 +523,7 @@ export function useSwapPool() {
       await publicClient.waitForTransactionReceipt({ hash });
 
       updateTransactionStatus(hash, 'COMPLETE');
+      trackSiteSwap(hash, address, parseFloat(amount) * liveRateRef.current, 'EURC', 'USDC');
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Swap completed!');
       await fetchPoolStats();
@@ -552,6 +556,7 @@ export function useSwapPool() {
         if (!arcWalletId) throw new Error('Arc wallet not found');
         const txHash = await serverVault.addLiquidity(arcWalletId, usdcAmount, eurcAmount, address);
         if (!txHash) throw new Error('Add liquidity failed');
+        trackSiteLiquidity(txHash, address, parseFloat(usdcAmount) + parseFloat(eurcAmount) * liveRateRef.current, 'add');
         setLastSwap({
           hash: txHash,
           status: 'success',
@@ -622,6 +627,7 @@ export function useSwapPool() {
       await publicClient.waitForTransactionReceipt({ hash });
 
       updateTransactionStatus(hash, 'COMPLETE');
+      trackSiteLiquidity(hash, address, parseFloat(usdcAmount) + parseFloat(eurcAmount) * liveRateRef.current, 'add');
       // Update to success
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Liquidity added!');
@@ -660,6 +666,7 @@ export function useSwapPool() {
         if (!arcWalletId) throw new Error('Arc wallet not found');
         const txHash = await serverVault.removeLiquidity(arcWalletId, lpAmount, address);
         if (!txHash) throw new Error('Remove liquidity failed');
+        trackSiteLiquidity(txHash, address, expectedUsdc + expectedEurc * liveRateRef.current, 'remove');
         setLastSwap({
           hash: txHash,
           status: 'success',
@@ -709,6 +716,7 @@ export function useSwapPool() {
       await publicClient.waitForTransactionReceipt({ hash });
 
       updateTransactionStatus(hash, 'COMPLETE');
+      trackSiteLiquidity(hash, address, expectedUsdc + expectedEurc * liveRateRef.current, 'remove');
       // Update to success
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Liquidity removed!');
