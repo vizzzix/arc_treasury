@@ -110,17 +110,23 @@ const History = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-background/80 backdrop-blur-xl">
-        <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-bold">Transaction History</h1>
-          <WalletHeader />
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button onClick={() => navigate("/dashboard")} variant="ghost" size="sm" className="gap-2 hover:bg-white/5">
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              <div className="h-4 w-px bg-border/30" />
+              <h1 className="text-lg font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">History</h1>
+            </div>
+            <WalletHeader />
+          </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="max-w-md mx-auto px-4 py-6 space-y-4">
+      <main className="pt-24 pb-20 container mx-auto px-4 sm:px-6 max-w-2xl space-y-4">
         {!isConnected ? (
           <div className="text-center py-12 space-y-4">
             <p className="text-muted-foreground">Connect your wallet to view transaction history</p>
