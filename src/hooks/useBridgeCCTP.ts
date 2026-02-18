@@ -133,10 +133,6 @@ export const useBridgeCCTP = () => {
               if (!messageData.attestation || messageData.attestation === 'PENDING') {
                 debug(' Attestation still pending');
                 setAttestationStatus('pending');
-                toast.info('Bridge in progress...', {
-                  description: 'Waiting for Circle attestation.',
-                  duration: 5000,
-                });
               } else {
                 // Has attestation, ready to claim - try auto-claim
                 setAttestationStatus('pending_mint');
@@ -426,19 +422,8 @@ export const useBridgeCCTP = () => {
           // We'll track again after mint to ensure it's recorded even if user closes browser
           trackSiteBridge(burnHash, address!, amount, 'to_arc');
 
-          // Wait for attestation and relay
+          // Wait for attestation and relay (inline AttestationCounter shows progress)
           setAttestationStatus('pending');
-          
-          // Show initial toast with counter
-          let toastId: string | number | undefined;
-          const updateToast = (seconds: number) => {
-            if (toastId) {
-              toast.loading(`Waiting for attestation... (${seconds}s)`, { id: toastId });
-            } else {
-              toastId = toast.loading(`Waiting for attestation... (${seconds}s)`, { duration: Infinity });
-            }
-          };
-          updateToast(0);
 
           // Poll Circle API for attestation (up to 5 minutes)
           let attempts = 0;
@@ -450,28 +435,23 @@ export const useBridgeCCTP = () => {
           while (attempts < MAX_ATTEMPTS) {
             await new Promise(r => setTimeout(r, 2000));
             attempts++;
-            const seconds = attempts * 2;
-            updateToast(seconds);
-            
+
             try {
               const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=0&transactionHash=${burnHash}`;
               const response = await fetch(attestationUrl);
-              
+
               if (!response.ok) {
                 console.log(`[useBridgeCCTP] Attestation API error: ${response.status}, attempt ${attempts}`);
                 continue;
               }
-              
+
               const data = await response.json();
               console.log(`[useBridgeCCTP] Attestation check ${attempts}:`, data.messages?.[0]?.status || 'no status');
-              
+
               if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
                 debug(' Attestation received!');
                 messageBytes = data.messages[0].message as `0x${string}`;
                 attestationBytes = data.messages[0].attestation as `0x${string}`;
-                if (toastId) {
-                  toast.dismiss(toastId);
-                }
                 break;
               }
             } catch (e) {
@@ -483,9 +463,6 @@ export const useBridgeCCTP = () => {
           if (!messageBytes || !attestationBytes) {
             // Timeout - save as pending burn so user can claim manually
             debug(' Attestation timeout after', attempts * 2, 'seconds');
-            if (toastId) {
-              toast.dismiss(toastId);
-            }
             toast.warning('Attestation taking longer than expected', { 
               description: 'Your funds are safe. Click Claim when ready.',
               duration: 15000,
@@ -716,18 +693,8 @@ export const useBridgeCCTP = () => {
 
         trackSiteBridge(burnHash, address!, amount, 'to_sepolia');
 
-        // Step 3: Wait for attestation
+        // Step 3: Wait for attestation (inline AttestationCounter shows progress)
         setAttestationStatus('pending');
-
-        let toastId: string | number | undefined;
-        const updateToast = (seconds: number) => {
-          if (toastId) {
-            toast.loading(`Waiting for attestation... (${seconds}s)`, { id: toastId });
-          } else {
-            toastId = toast.loading(`Waiting for attestation... (${seconds}s)`, { duration: Infinity });
-          }
-        };
-        updateToast(0);
 
         let attempts = 0;
         let messageBytes: `0x${string}` | null = null;
@@ -738,8 +705,6 @@ export const useBridgeCCTP = () => {
         while (attempts < MAX_ATTEMPTS) {
           await new Promise(r => setTimeout(r, 2000));
           attempts++;
-          const seconds = attempts * 2;
-          updateToast(seconds);
 
           try {
             const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${CCTP_DOMAINS.arcTestnet}&transactionHash=${burnHash}`;
@@ -753,7 +718,6 @@ export const useBridgeCCTP = () => {
               debug(' Attestation received!');
               messageBytes = data.messages[0].message as `0x${string}`;
               attestationBytes = data.messages[0].attestation as `0x${string}`;
-              if (toastId) toast.dismiss(toastId);
               break;
             }
           } catch (e) {
@@ -762,7 +726,6 @@ export const useBridgeCCTP = () => {
         }
 
         if (!messageBytes || !attestationBytes) {
-          if (toastId) toast.dismiss(toastId);
           toast.warning('Attestation taking longer than expected', {
             description: 'Your funds are safe. Click Claim when ready.',
             duration: 15000,
