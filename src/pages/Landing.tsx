@@ -10,6 +10,42 @@ import arcLogo from "@/assets/arc-logo.webp";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
+function useCountUp(target: number, duration = 800): number {
+  const displayRef = useRef(0);
+  const [display, setDisplay] = useState(0);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    const start = displayRef.current;
+    const diff = target - start;
+    if (Math.abs(diff) < 1) {
+      displayRef.current = target;
+      setDisplay(target);
+      return;
+    }
+
+    const startTime = performance.now();
+    cancelAnimationFrame(frameRef.current);
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const val = start + diff * eased;
+      displayRef.current = val;
+      setDisplay(val);
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [target, duration]);
+
+  return Math.round(display);
+}
+
 const Landing = () => {
   const navigate = useNavigate();
   const { isConnected } = useUnifiedWallet();
@@ -87,6 +123,10 @@ const Landing = () => {
       total: totalUsd + annual
     };
   }, [usdcAmount, eurcAmount, eurToUsd, apy]);
+
+  const monthlyCount = useCountUp(Math.round(earnings.monthly));
+  const annualCount = useCountUp(Math.round(earnings.annual));
+  const totalCount = useCountUp(Math.round(earnings.total));
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -220,8 +260,8 @@ const Landing = () => {
 
             {/* Right: Compact Calculator */}
             <div className="relative">
-              <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-3xl" />
-              <div className="relative p-6 rounded-3xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+              <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-3xl calc-glow-bg" />
+              <div className="relative p-6 rounded-3xl backdrop-blur-sm calc-card">
                 <h3 className="text-lg font-semibold mb-4">Calculate Earnings</h3>
 
                 <div className="space-y-4">
@@ -257,22 +297,22 @@ const Landing = () => {
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 pt-2">
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center calc-result-card">
                       <p className="text-xs text-muted-foreground mb-1">Monthly</p>
                       <p className="text-lg font-bold text-green-400">
-                        +${earnings.monthly.toFixed(0)}
+                        +${monthlyCount}
                       </p>
                     </div>
-                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+                    <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center calc-result-card">
                       <p className="text-xs text-muted-foreground mb-1">Annual</p>
                       <p className="text-lg font-bold text-green-400">
-                        +${earnings.annual.toFixed(0)}
+                        +${annualCount}
                       </p>
                     </div>
-                    <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-center">
+                    <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 text-center calc-result-card">
                       <p className="text-xs text-muted-foreground mb-1">Total</p>
                       <p className="text-lg font-bold text-primary">
-                        ${earnings.total.toFixed(0)}
+                        ${totalCount}
                       </p>
                     </div>
                   </div>
