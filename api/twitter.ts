@@ -250,31 +250,41 @@ async function handleVerifyRepost(request: any, response: any) {
       }).eq('wallet_address', walletAddress.toLowerCase());
     }
 
-    const retweetersResponse = await fetch(
-      `https://api.twitter.com/2/tweets/${REQUIRED_TWEET_ID}/retweeted_by?max_results=100`,
-      {
+    let hasReposted = false;
+    let paginationToken: string | undefined;
+
+    // Paginate through all retweeters (API returns max 100 per page)
+    do {
+      const url = new URL(`https://api.twitter.com/2/tweets/${REQUIRED_TWEET_ID}/retweeted_by`);
+      url.searchParams.set('max_results', '100');
+      if (paginationToken) {
+        url.searchParams.set('pagination_token', paginationToken);
+      }
+
+      const retweetersResponse = await fetch(url.toString(), {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
         },
-      }
-    );
-
-    const retweetersData = await retweetersResponse.json();
-
-    console.log('Retweeters API response:', JSON.stringify(retweetersData));
-
-    if (retweetersData.errors) {
-      console.error('Twitter API error:', retweetersData.errors);
-      return response.status(200).json({
-        verified: false,
-        multiplier: 1.0,
-        message: 'Could not verify repost. Please try again later.',
       });
-    }
 
-    const hasReposted = retweetersData.data?.some((user: any) =>
-      user.id === connection.twitter_id
-    ) || false;
+      const retweetersData = await retweetersResponse.json();
+
+      if (retweetersData.errors) {
+        console.error('Twitter API error:', retweetersData.errors);
+        return response.status(200).json({
+          verified: false,
+          multiplier: 1.0,
+          message: 'Could not verify repost. Please try again later.',
+        });
+      }
+
+      if (retweetersData.data?.some((user: any) => user.id === connection.twitter_id)) {
+        hasReposted = true;
+        break;
+      }
+
+      paginationToken = retweetersData.meta?.next_token;
+    } while (paginationToken);
 
     if (hasReposted) {
       await supabase.from('twitter_connections').update({

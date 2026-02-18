@@ -50,6 +50,7 @@ DECLARE
 
   v_total_points DECIMAL := 0;
   v_snapshot_count INT := 0;
+  v_multiplier DECIMAL := 1.0;
 BEGIN
   -- Bridge volume (одноразовые действия - считаем как раньше)
   SELECT COALESCE(SUM(amount_usd), 0) INTO v_bridge_volume
@@ -110,6 +111,16 @@ BEGIN
     (v_referral_count * 25) +                      -- 25 pts signup bonus per referral
     v_referral_points;                             -- + 10% of referrals' points
 
+  -- Twitter Boost: 1.5x multiplier for verified reposters
+  SELECT COALESCE(tc.multiplier, 1.0) INTO v_multiplier
+  FROM twitter_connections tc
+  WHERE tc.wallet_address = p_wallet
+    AND tc.repost_verified = true;
+
+  IF v_multiplier > 1.0 THEN
+    v_total_points := v_total_points * v_multiplier;
+  END IF;
+
   -- Upsert into user_points
   INSERT INTO user_points (
     wallet_address,
@@ -119,6 +130,7 @@ BEGIN
     liquidity_volume,  -- Now stores TW average
     referral_count,
     total_points,
+    points_multiplier,
     updated_at
   )
   VALUES (
@@ -129,6 +141,7 @@ BEGIN
     v_tw_lp,                   -- LP TW
     v_referral_count,
     v_total_points,
+    v_multiplier,
     NOW()
   )
   ON CONFLICT (wallet_address) DO UPDATE SET
@@ -138,6 +151,7 @@ BEGIN
     liquidity_volume = EXCLUDED.liquidity_volume,
     referral_count = EXCLUDED.referral_count,
     total_points = EXCLUDED.total_points,
+    points_multiplier = EXCLUDED.points_multiplier,
     updated_at = NOW();
 
   RETURN v_total_points;
