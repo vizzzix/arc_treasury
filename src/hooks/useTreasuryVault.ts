@@ -7,6 +7,7 @@ import { formatUnits, parseUnits, maxUint256, createPublicClient, http } from 'v
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
+import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
 
 // TreasuryVault ABI (simplified for main functions)
 const TREASURY_VAULT_ABI = [
@@ -508,17 +509,19 @@ export const useTreasuryVault = () => {
         chainId: arcTestnet.id,
       });
 
+      trackTransaction({ txHash: depositHash, txType: 'deposit-eurc', walletAddress: address, amount, currency: 'EURC' });
+
       const receipt = await client.waitForTransactionReceipt({
         hash: depositHash,
         timeout: 120000,
       });
 
       if (receipt.status === 'reverted') {
+        updateTransactionStatus(depositHash, 'FAILED', 'Transaction reverted');
         throw new Error('Transaction failed on blockchain');
       }
 
-      // Trigger immediate refetch of balances after confirmed transaction
-
+      updateTransactionStatus(depositHash, 'COMPLETE');
       return depositHash;
     }
 
@@ -576,6 +579,8 @@ export const useTreasuryVault = () => {
       chainId: arcTestnet.id,
     });
 
+    trackTransaction({ txHash: depositHash, txType: 'deposit-usdc', walletAddress: address, amount, currency: 'USDC' });
+
     // Wait for transaction receipt and check status
     const receipt = await client.waitForTransactionReceipt({
       hash: depositHash,
@@ -583,9 +588,11 @@ export const useTreasuryVault = () => {
     });
 
     if (receipt.status === 'reverted') {
+      updateTransactionStatus(depositHash, 'FAILED', 'Transaction reverted');
       throw new Error('Transaction failed on blockchain');
     }
 
+    updateTransactionStatus(depositHash, 'COMPLETE');
     return depositHash;
   };
 
@@ -649,6 +656,9 @@ export const useTreasuryVault = () => {
       });
     }
 
+    const txType = currency === "EURC" ? 'withdraw-eurc' : 'withdraw-usdc';
+    trackTransaction({ txHash, txType, walletAddress: address, currency });
+
     // Wait for transaction receipt and check status
     if (!client) {
       throw new Error('Public client not available');
@@ -660,9 +670,11 @@ export const useTreasuryVault = () => {
     });
 
     if (receipt.status === 'reverted') {
+      updateTransactionStatus(txHash, 'FAILED', 'Transaction reverted');
       throw new Error('Transaction failed on blockchain');
     }
 
+    updateTransactionStatus(txHash, 'COMPLETE');
     return txHash;
   };
 

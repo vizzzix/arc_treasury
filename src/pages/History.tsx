@@ -105,7 +105,7 @@ function TransactionRow({ tx }: { tx: TransactionRecord }) {
 
 const History = () => {
   const navigate = useNavigate();
-  const { isConnected, walletType } = useUnifiedWallet();
+  const { isConnected } = useUnifiedWallet();
   const { transactions, isLoading, error, hasMore, loadMore, refetch } = useTransactionHistory();
 
   return (
@@ -125,24 +125,6 @@ const History = () => {
           <div className="text-center py-12 space-y-4">
             <p className="text-muted-foreground">Connect your wallet to view transaction history</p>
             <WalletConnect />
-          </div>
-        ) : walletType !== "circle" ? (
-          <div className="text-center py-12 space-y-3">
-            <ArrowLeftRight className="w-10 h-10 mx-auto text-muted-foreground/50" />
-            <p className="text-muted-foreground text-sm">
-              Transaction history is available for Circle (Google) wallets.
-            </p>
-            <p className="text-xs text-muted-foreground/60">
-              For MetaMask transactions, check{" "}
-              <a
-                href={ARC_EXPLORER}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Arc Explorer
-              </a>
-            </p>
           </div>
         ) : (
           <>

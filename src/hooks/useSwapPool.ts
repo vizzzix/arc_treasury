@@ -9,6 +9,7 @@ import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
 import { toast } from 'sonner';
 import { useExchangeRate } from './useExchangeRate';
+import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
 import { useUnifiedWallet } from './useUnifiedWallet';
 import { useCircleWallet } from '@/providers/CircleWalletProvider';
 import { useServerVault } from './useServerVault';
@@ -394,6 +395,8 @@ export function useSwapPool() {
         value: amountWei,
       });
 
+      trackTransaction({ txHash: hash, txType: 'swap-usdc-eurc', walletAddress: address, amount, currency: 'USDC' });
+
       setLastSwap({
         hash,
         status: 'pending',
@@ -408,6 +411,7 @@ export function useSwapPool() {
       toast.info('Waiting for confirmation...');
       await publicClient?.waitForTransactionReceipt({ hash });
 
+      updateTransactionStatus(hash, 'COMPLETE');
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Swap completed!');
       await fetchPoolStats();
@@ -499,6 +503,8 @@ export function useSwapPool() {
         args: [amountWei, minOutputWei],
       });
 
+      trackTransaction({ txHash: hash, txType: 'swap-eurc-usdc', walletAddress: address, amount, currency: 'EURC' });
+
       setLastSwap({
         hash,
         status: 'pending',
@@ -513,6 +519,7 @@ export function useSwapPool() {
       toast.info('Waiting for confirmation...');
       await publicClient.waitForTransactionReceipt({ hash });
 
+      updateTransactionStatus(hash, 'COMPLETE');
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Swap completed!');
       await fetchPoolStats();
@@ -597,6 +604,8 @@ export function useSwapPool() {
         value: usdcWei,
       });
 
+      trackTransaction({ txHash: hash, txType: 'add-liquidity', walletAddress: address, amount: usdcAmount, currency: 'USDC' });
+
       // Set pending transaction
       setLastSwap({
         hash,
@@ -612,6 +621,7 @@ export function useSwapPool() {
       toast.info('Waiting for confirmation...');
       await publicClient.waitForTransactionReceipt({ hash });
 
+      updateTransactionStatus(hash, 'COMPLETE');
       // Update to success
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Liquidity added!');
@@ -681,6 +691,8 @@ export function useSwapPool() {
         args: [lpWei, minUsdcOut, minEurcOut],
       });
 
+      trackTransaction({ txHash: hash, txType: 'remove-liquidity', walletAddress: address, amount: lpAmount, currency: 'LP' });
+
       // Set pending transaction
       setLastSwap({
         hash,
@@ -696,6 +708,7 @@ export function useSwapPool() {
       toast.info('Waiting for confirmation...');
       await publicClient.waitForTransactionReceipt({ hash });
 
+      updateTransactionStatus(hash, 'COMPLETE');
       // Update to success
       setLastSwap(prev => prev ? { ...prev, status: 'success' } : null);
       toast.success('Liquidity removed!');

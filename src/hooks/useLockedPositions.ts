@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits, formatUnits, createPublicClient, http } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
@@ -7,6 +7,7 @@ import { useUSYCPrice } from './useUSYCPrice';
 import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 import { useUnifiedWallet } from './useUnifiedWallet';
+import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
 import { useCircleWallet } from '@/providers/CircleWalletProvider';
 import { useServerVault } from './useServerVault';
 
@@ -173,6 +174,7 @@ export function useDepositLocked() {
       value: amountWei,
     });
 
+    if (address) trackTransaction({ txHash, txType: 'deposit-locked-usdc', walletAddress: address, amount, currency: 'USDC' });
     return txHash;
   };
 
@@ -229,8 +231,15 @@ export function useDepositLocked() {
       chainId: arcTestnet.id,
     });
 
+    if (address) trackTransaction({ txHash, txType: 'deposit-locked-eurc', walletAddress: address, amount, currency: 'EURC' });
     return txHash;
   };
+
+  useEffect(() => {
+    if (isSuccess && hash && !isCircle) {
+      updateTransactionStatus(hash, 'COMPLETE');
+    }
+  }, [isSuccess, hash, isCircle]);
 
   return {
     depositLockedUSDC,
@@ -272,8 +281,15 @@ export function useWithdrawLocked() {
       functionName: 'withdrawLocked',
       args: [BigInt(positionIndex)],
     });
+    if (unifiedWallet.address) trackTransaction({ txHash, txType: 'withdraw-locked', walletAddress: unifiedWallet.address });
     return txHash;
   };
+
+  useEffect(() => {
+    if (isSuccess && hash && !isCircle) {
+      updateTransactionStatus(hash, 'COMPLETE');
+    }
+  }, [isSuccess, hash, isCircle]);
 
   return {
     withdrawLocked,
@@ -314,8 +330,15 @@ export function useEarlyWithdrawLocked() {
       functionName: 'earlyWithdrawLocked',
       args: [BigInt(positionIndex)],
     });
+    if (unifiedWallet.address) trackTransaction({ txHash, txType: 'early-withdraw-locked', walletAddress: unifiedWallet.address });
     return txHash;
   };
+
+  useEffect(() => {
+    if (isSuccess && hash && !isCircle) {
+      updateTransactionStatus(hash, 'COMPLETE');
+    }
+  }, [isSuccess, hash, isCircle]);
 
   return {
     earlyWithdrawLocked,
@@ -357,6 +380,18 @@ export function useClaimLockedYield() {
       args: [BigInt(positionIndex)],
     });
   };
+
+  useEffect(() => {
+    if (hash && !isCircle && unifiedWallet.address) {
+      trackTransaction({ txHash: hash, txType: 'claim-locked-yield', walletAddress: unifiedWallet.address });
+    }
+  }, [hash, isCircle, unifiedWallet.address]);
+
+  useEffect(() => {
+    if (isSuccess && hash && !isCircle) {
+      updateTransactionStatus(hash, 'COMPLETE');
+    }
+  }, [isSuccess, hash, isCircle]);
 
   return {
     claimYield,

@@ -25,6 +25,7 @@ import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { MESSAGE_TRANSMITTER_ABI } from '@/lib/abis/cctp';
 import { debug, safeStringify, trackSiteBridge } from './bridge/utils';
+import { trackTransaction } from '@/lib/trackTransaction';
 import { savePendingBurn, loadPendingBurn } from './bridge/storage';
 import type { BridgeNetwork, BridgeParams, BridgeEstimate, BridgeStep, BridgeState, LastBridgeResult, PendingBurn } from './bridge/types';
 
@@ -421,6 +422,7 @@ export const useBridgeCCTP = () => {
           // Track bridge immediately after successful burn (for Live Activity)
           // We'll track again after mint to ensure it's recorded even if user closes browser
           trackSiteBridge(burnHash, address!, amount, 'to_arc');
+          trackTransaction({ txHash: burnHash, txType: 'bridge-burn', walletAddress: address!, amount, currency: 'USDC' });
 
           // Wait for attestation and relay (inline AttestationCounter shows progress)
           setAttestationStatus('pending');
@@ -692,6 +694,7 @@ export const useBridgeCCTP = () => {
         }
 
         trackSiteBridge(burnHash, address!, amount, 'to_sepolia');
+        trackTransaction({ txHash: burnHash, txType: 'bridge-burn', walletAddress: address!, amount, currency: 'USDC' });
 
         // Step 3: Wait for attestation (inline AttestationCounter shows progress)
         setAttestationStatus('pending');
