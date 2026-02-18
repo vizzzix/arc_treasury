@@ -82,21 +82,25 @@ async function handleTrackSwap(req: VercelRequest, res: VercelResponse) {
   const { txHash, walletAddress, amountUsd, tokenIn, tokenOut } = req.body;
 
   if (!txHash || !TX_HASH_REGEX.test(txHash)) {
-    return res.status(400).json({ error: 'Valid txHash required' });
+    return res.status(400).json({ error: 'Valid txHash required', received: { txHash } });
   }
   if (!walletAddress || !ADDRESS_REGEX.test(walletAddress)) {
-    return res.status(400).json({ error: 'Valid walletAddress required' });
+    return res.status(400).json({ error: 'Valid walletAddress required', received: { walletAddress } });
   }
 
-  await insertSwapTx({
-    tx_hash: txHash.toLowerCase(),
-    wallet_address: walletAddress.toLowerCase(),
-    amount_usd: Number(amountUsd) || 0,
-    token_in: tokenIn || 'USDC',
-    token_out: tokenOut || 'EURC',
-  });
-
-  return res.status(200).json({ ok: true });
+  try {
+    await insertSwapTx({
+      tx_hash: txHash.toLowerCase(),
+      wallet_address: walletAddress.toLowerCase(),
+      amount_usd: Number(amountUsd) || 0,
+      token_in: tokenIn || 'USDC',
+      token_out: tokenOut || 'EURC',
+    });
+    return res.status(200).json({ ok: true });
+  } catch (err: any) {
+    console.error('[handleTrackSwap] Insert failed:', err.message);
+    return res.status(500).json({ error: err.message, action: 'track-swap' });
+  }
 }
 
 async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
@@ -105,23 +109,27 @@ async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
   const { txHash, walletAddress, amountUsd, action } = req.body;
 
   if (!txHash || !TX_HASH_REGEX.test(txHash)) {
-    return res.status(400).json({ error: 'Valid txHash required' });
+    return res.status(400).json({ error: 'Valid txHash required', received: { txHash } });
   }
   if (!walletAddress || !ADDRESS_REGEX.test(walletAddress)) {
-    return res.status(400).json({ error: 'Valid walletAddress required' });
+    return res.status(400).json({ error: 'Valid walletAddress required', received: { walletAddress } });
   }
   if (!action || !['add', 'remove'].includes(action)) {
     return res.status(400).json({ error: 'action must be add or remove' });
   }
 
-  await insertLiquidityEvent({
-    tx_hash: txHash.toLowerCase(),
-    wallet_address: walletAddress.toLowerCase(),
-    amount_usd: Number(amountUsd) || 0,
-    action,
-  });
-
-  return res.status(200).json({ ok: true });
+  try {
+    await insertLiquidityEvent({
+      tx_hash: txHash.toLowerCase(),
+      wallet_address: walletAddress.toLowerCase(),
+      amount_usd: Number(amountUsd) || 0,
+      action,
+    });
+    return res.status(200).json({ ok: true });
+  } catch (err: any) {
+    console.error('[handleTrackLiquidity] Insert failed:', err.message);
+    return res.status(500).json({ error: err.message, action: 'track-liquidity' });
+  }
 }
 
 async function handleFeedActivity(req: VercelRequest, res: VercelResponse) {
