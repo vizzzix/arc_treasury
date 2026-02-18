@@ -41,7 +41,7 @@ export const useBridgeFeed = (limit: number = 10) => {
     try {
       const { data, error: fetchError } = await supabase
         .from('site_bridges')
-        .select('*')
+        .select('wallet_address, amount_usd, direction, tx_hash, created_at')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -63,35 +63,25 @@ export const useBridgeFeed = (limit: number = 10) => {
     }
   };
 
-  // Fetch all-time stats from site_bridges only
+  // Fetch all-time stats using count query (no pagination)
   const fetchStats = async () => {
     if (!supabase) return;
     try {
-      let allData: { wallet_address: string; amount_usd: number }[] = [];
-      let offset = 0;
-      const pageSize = 1000;
+      // Get total count + use last 1000 rows for volume estimation
+      const [countResult, recentResult] = await Promise.all([
+        supabase.from('site_bridges').select('*', { count: 'exact', head: true }),
+        supabase.from('site_bridges').select('wallet_address, amount_usd')
+          .order('created_at', { ascending: false }).limit(1000),
+      ]);
 
-      // Paginate through all site_bridges
-      for (let i = 0; i < 100; i++) {
-        const { data, error: fetchError } = await supabase
-          .from('site_bridges')
-          .select('wallet_address, amount_usd')
-          .range(offset, offset + pageSize - 1);
-
-        if (fetchError) throw fetchError;
-        if (!data || data.length === 0) break;
-
-        allData = [...allData, ...data];
-        if (data.length < pageSize) break;
-        offset += pageSize;
-      }
-
-      const totalVolume = allData.reduce((sum, tx) => sum + Number(tx.amount_usd), 0);
-      const uniqueUsers = new Set(allData.map(tx => tx.wallet_address.toLowerCase())).size;
+      const totalCount = countResult.count || 0;
+      const recentData = recentResult.data || [];
+      const totalVolume = recentData.reduce((sum, tx) => sum + Number(tx.amount_usd), 0);
+      const uniqueUsers = new Set(recentData.map(tx => tx.wallet_address.toLowerCase())).size;
 
       setStats({
         totalVolume24h: totalVolume,
-        transactionCount24h: allData.length,
+        transactionCount24h: totalCount,
         uniqueUsers24h: uniqueUsers,
       });
     } catch (e: any) {
@@ -99,39 +89,27 @@ export const useBridgeFeed = (limit: number = 10) => {
     }
   };
 
-  // Fetch top bridgers (24h) from site_bridges only
+  // Fetch top bridgers (24h) — single query with limit
   const fetchTopBridgers = async () => {
     if (!supabase) return;
     try {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      let allData: { wallet_address: string; amount_usd: number }[] = [];
-      let offset = 0;
-      const pageSize = 1000;
+      const { data, error: fetchError } = await supabase
+        .from('site_bridges')
+        .select('wallet_address, amount_usd')
+        .gte('created_at', oneDayAgo)
+        .order('amount_usd', { ascending: false })
+        .limit(500);
 
-      // Fetch 24h data from site_bridges
-      while (true) {
-        const { data, error: fetchError } = await supabase
-          .from('site_bridges')
-          .select('wallet_address, amount_usd')
-          .gte('created_at', oneDayAgo)
-          .range(offset, offset + pageSize - 1);
-
-        if (fetchError) throw fetchError;
-        if (!data || data.length === 0) break;
-
-        allData = [...allData, ...data];
-        if (data.length < pageSize) break;
-        offset += pageSize;
-      }
+      if (fetchError) throw fetchError;
 
       // Aggregate by wallet
-      const volumeByWallet = allData.reduce((acc, tx) => {
+      const volumeByWallet = (data || []).reduce((acc, tx) => {
         const addr = tx.wallet_address.toLowerCase();
         acc[addr] = (acc[addr] || 0) + Number(tx.amount_usd);
         return acc;
       }, {} as Record<string, number>);
 
-      // Sort all and add ranks
       const allSorted = Object.entries(volumeByWallet)
         .map(([wallet_address, total_volume]) => ({ wallet_address, total_volume }))
         .sort((a, b) => b.total_volume - a.total_volume)

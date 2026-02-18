@@ -72,7 +72,7 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
         const [leaderboardResult, siteUsersCount] = await Promise.all([
           supabase
             .from('user_points')
-            .select('*')
+            .select('wallet_address, total_points, bridge_volume, vault_volume, swap_volume, liquidity_volume')
             .gt('total_points', 0)
             .order('total_points', { ascending: false })
             .limit(50),
@@ -130,7 +130,7 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
         // Fetch user's data
         const { data: userData, error: userError } = await supabase
           .from('user_points')
-          .select('*')
+          .select('wallet_address, total_points, bridge_volume, vault_volume, swap_volume, liquidity_volume')
           .eq('wallet_address', userAddress.toLowerCase())
           .single();
 

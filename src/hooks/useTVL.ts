@@ -1,4 +1,4 @@
-import { useReadContract } from 'wagmi';
+import { useReadContracts } from 'wagmi';
 import { formatUnits } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
 import { arcTestnet } from '@/lib/wagmi';
@@ -20,44 +20,33 @@ interface UseTVLReturn {
   isLoading: boolean;
 }
 
+const vaultContract = {
+  address: TREASURY_CONTRACTS.TreasuryVault,
+  abi: VAULT_ABI,
+  chainId: arcTestnet.id,
+} as const;
+
 export function useTVL(): UseTVLReturn {
-  const vaultAddress = TREASURY_CONTRACTS.TreasuryVault;
   const { eurToUsd } = useExchangeRate();
 
-  const { data: totalUSDC, isLoading: isLoadingUSDC } = useReadContract({
-    address: vaultAddress,
-    abi: VAULT_ABI,
-    functionName: 'totalUSDC',
-    chainId: arcTestnet.id,
+  const { data, isLoading } = useReadContracts({
+    contracts: [
+      { ...vaultContract, functionName: 'totalUSDC' },
+      { ...vaultContract, functionName: 'totalEURC' },
+      { ...vaultContract, functionName: 'totalLockedUSDC' },
+      { ...vaultContract, functionName: 'totalLockedEURC' },
+    ],
   });
 
-  const { data: totalEURC, isLoading: isLoadingEURC } = useReadContract({
-    address: vaultAddress,
-    abi: VAULT_ABI,
-    functionName: 'totalEURC',
-    chainId: arcTestnet.id,
-  });
-
-  const { data: totalLockedUSDC, isLoading: isLoadingLockedUSDC } = useReadContract({
-    address: vaultAddress,
-    abi: VAULT_ABI,
-    functionName: 'totalLockedUSDC',
-    chainId: arcTestnet.id,
-  });
-
-  const { data: totalLockedEURC, isLoading: isLoadingLockedEURC } = useReadContract({
-    address: vaultAddress,
-    abi: VAULT_ABI,
-    functionName: 'totalLockedEURC',
-    chainId: arcTestnet.id,
-  });
+  const totalUSDCRaw = data?.[0]?.result as bigint | undefined;
+  const totalEURCRaw = data?.[1]?.result as bigint | undefined;
+  const totalLockedUSDCRaw = data?.[2]?.result as bigint | undefined;
 
   // USDC on Arc is 18 decimals, EURC is 6 decimals
-  const usdcAmount = totalUSDC ? parseFloat(formatUnits(totalUSDC, 18)) : 0;
-  const eurcAmount = totalEURC ? parseFloat(formatUnits(totalEURC, 6)) : 0;
-  const lockedUsdcAmount = totalLockedUSDC ? parseFloat(formatUnits(totalLockedUSDC, 18)) : 0;
+  const usdcAmount = totalUSDCRaw ? parseFloat(formatUnits(totalUSDCRaw, 18)) : 0;
+  const eurcAmount = totalEURCRaw ? parseFloat(formatUnits(totalEURCRaw, 6)) : 0;
+  const lockedUsdcAmount = totalLockedUSDCRaw ? parseFloat(formatUnits(totalLockedUSDCRaw, 18)) : 0;
   // Note: totalLockedEURC returns corrupted data from contract storage - skip it for now
-  // const lockedEurcAmount = totalLockedEURC ? parseFloat(formatUnits(totalLockedEURC, 6)) : 0;
   const lockedEurcAmount = 0;
 
   // Convert EURC to USD using live exchange rate
@@ -70,6 +59,6 @@ export function useTVL(): UseTVLReturn {
     totalEURC: eurcAmount + lockedEurcAmount,
     totalLockedUSDC: lockedUsdcAmount,
     totalLockedEURC: lockedEurcAmount,
-    isLoading: isLoadingUSDC || isLoadingEURC || isLoadingLockedUSDC || isLoadingLockedEURC,
+    isLoading,
   };
 }

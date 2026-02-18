@@ -48,7 +48,7 @@ export const useUserPoints = () => {
         // Fetch user points - total_points is PERMANENT and CUMULATIVE
         const { data, error: fetchError } = await supabase
           .from('user_points')
-          .select('*')
+          .select('wallet_address, bridge_volume, swap_volume, liquidity_volume, vault_volume, referral_count, total_points')
           .eq('wallet_address', address.toLowerCase())
           .single();
 

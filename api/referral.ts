@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { randomBytes } from 'crypto';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -16,9 +17,10 @@ const TIER_CONFIG = [
 
 function generateReferralCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = randomBytes(8);
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars.charAt(bytes[i] % chars.length);
   }
   return code;
 }

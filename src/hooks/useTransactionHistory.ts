@@ -93,7 +93,7 @@ export function useTransactionHistory(): UseTransactionHistoryReturn {
 
       const { data, error: queryError } = await supabase
         .from('circle_transactions')
-        .select('*')
+        .select('id, circle_tx_id, tx_type, status, wallet_address, wallet_id, tx_hash, amount, currency, error_reason, created_at, updated_at')
         .eq('wallet_address', address.toLowerCase())
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -123,7 +123,7 @@ export function useTransactionHistory(): UseTransactionHistoryReturn {
     if (!supabase || !address) return;
 
     const channel = supabase
-      .channel('tx-history')
+      .channel(`tx-history-${address.toLowerCase()}`)
       .on(
         'postgres_changes',
         {

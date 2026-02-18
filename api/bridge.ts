@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, getClient } from './_lib/circle';
-import { insertCircleTx, updateCircleTxStatus } from './_lib/supabase';
+import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -15,29 +15,6 @@ const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275';
 const ARC_DESTINATION_DOMAIN = 26;
 
 const ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages';
-
-async function trackTx(
-  result: any, txType: string, walletId: string,
-  walletAddress?: string, amount?: string, currency?: string,
-  metadata?: Record<string, unknown>,
-) {
-  try {
-    const txId = result?.id || result?.transactionId;
-    if (!txId) return;
-    await insertCircleTx({
-      circle_tx_id: txId,
-      tx_type: txType,
-      status: result?.state || 'PENDING',
-      wallet_address: (walletAddress || '').toLowerCase(),
-      wallet_id: walletId,
-      amount,
-      currency,
-      metadata,
-    });
-  } catch (e: any) {
-    console.warn('[Bridge] trackTx failed:', e.message);
-  }
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*');

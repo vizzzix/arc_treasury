@@ -1,5 +1,5 @@
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
-import { useMemo, useRef, useEffect } from 'react';
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useMemo, useRef, useEffect, useCallback } from 'react';
 import { useUnifiedWallet } from './useUnifiedWallet';
 import { useCircleWallet } from '@/providers/CircleWalletProvider';
 import { useServerVault } from './useServerVault';
@@ -9,7 +9,8 @@ import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
 
-// TreasuryVault ABI (simplified for main functions)
+// Inline ABI subset — only functions used by this hook
+// Full ABI is in TreasuryVault.json (122KB Hardhat artifact with bytecode)
 const TREASURY_VAULT_ABI = [
   {
     inputs: [],
@@ -175,141 +176,55 @@ export const useTreasuryVault = () => {
     retryDelay: 10000,
   };
 
-  const { data: totalPoolValue, refetch: refetchTotalValue } = useReadContract({
+  // Multicall: pool-global reads (6 calls → 1 RPC)
+  const vaultContract = {
     address: TREASURY_CONTRACTS.TreasuryVault,
     abi: TREASURY_VAULT_ABI,
-    functionName: 'getTotalPoolValue',
     chainId: arcTestnet.id,
+  } as const;
+
+  const { data: poolData, refetch: refetchPool } = useReadContracts({
+    contracts: [
+      { ...vaultContract, functionName: 'getTotalPoolValue' },
+      { ...vaultContract, functionName: 'getPricePerShare' },
+      { ...vaultContract, functionName: 'totalShares' },
+      { ...vaultContract, functionName: 'totalUSDC' },
+      { ...vaultContract, functionName: 'totalUSYC' },
+      { ...vaultContract, functionName: 'totalEURC' },
+      { ...vaultContract, functionName: 'totalEURCShares' },
+    ],
     query: {
       enabled: isArcTestnet,
       ...commonQueryOptions,
     },
   });
 
-  // Read price per share
-  const { data: pricePerShare, refetch: refetchPricePerShare } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'getPricePerShare',
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isArcTestnet,
-      ...commonQueryOptions,
-    },
-  });
+  const totalPoolValue = poolData?.[0]?.result as bigint | undefined;
+  const pricePerShare = poolData?.[1]?.result as bigint | undefined;
+  const totalShares = poolData?.[2]?.result as bigint | undefined;
+  const totalUSDC = poolData?.[3]?.result as bigint | undefined;
+  const totalUSYC = poolData?.[4]?.result as bigint | undefined;
+  const totalEURC = poolData?.[5]?.result as bigint | undefined;
+  const totalEURCShares = poolData?.[6]?.result as bigint | undefined;
 
-  // Read user shares
-  const { data: userShares, refetch: refetchUserShares, error: userSharesError } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'userShares',
-    args: address ? [address] : undefined,
-    chainId: arcTestnet.id,
+  // Multicall: user-specific reads (4 calls → 1 RPC)
+  const { data: userData, refetch: refetchUserData } = useReadContracts({
+    contracts: [
+      { ...vaultContract, functionName: 'userShares', args: address ? [address] : undefined },
+      { ...vaultContract, functionName: 'getUserShareValue', args: address ? [address] : undefined },
+      { ...vaultContract, functionName: 'userEURCShares', args: address ? [address] : undefined },
+      { ...vaultContract, functionName: 'userInfo', args: address ? [address] : undefined },
+    ],
     query: {
       enabled: isConnected && isArcTestnet && !!address,
       ...commonQueryOptions,
     },
   });
 
-  // Read user share value
-  const { data: userShareValue, refetch: refetchUserShareValue } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'getUserShareValue',
-    args: address ? [address] : undefined,
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isConnected && isArcTestnet && !!address,
-      ...commonQueryOptions,
-    },
-  });
-
-  // Read total shares
-  const { data: totalShares } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'totalShares',
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isArcTestnet,
-      ...commonQueryOptions,
-    },
-  });
-
-  // Read total USDC
-  const { data: totalUSDC, refetch: refetchTotalUSDC, error: totalUSDCError } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'totalUSDC',
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isArcTestnet,
-      ...commonQueryOptions,
-    },
-  });
-
-
-  // Read total USYC
-  const { data: totalUSYC, refetch: refetchTotalUSYC } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'totalUSYC',
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isArcTestnet,
-      ...commonQueryOptions,
-    },
-  });
-
-  // Read total EURC
-  const { data: totalEURC, refetch: refetchTotalEURC, error: totalEURCError } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'totalEURC',
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isArcTestnet,
-      ...commonQueryOptions,
-    },
-  });
-
-  // Read total EURC shares (needed for calculating EURC price per share)
-  const { data: totalEURCShares, refetch: refetchTotalEURCShares } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'totalEURCShares',
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isArcTestnet,
-      ...commonQueryOptions,
-    },
-  });
-
-  // Read user EURC shares
-  const { data: userEURCShares, refetch: refetchUserEURCShares } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'userEURCShares',
-    args: address ? [address] : undefined,
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isConnected && isArcTestnet && !!address,
-      ...commonQueryOptions,
-    },
-  });
-
-  // Read user info (for totalDeposited to calculate flexible yield)
-  const { data: userInfoData, refetch: refetchUserInfo } = useReadContract({
-    address: TREASURY_CONTRACTS.TreasuryVault,
-    abi: TREASURY_VAULT_ABI,
-    functionName: 'userInfo',
-    args: address ? [address] : undefined,
-    chainId: arcTestnet.id,
-    query: {
-      enabled: isConnected && isArcTestnet && !!address,
-      ...commonQueryOptions,
-    },
-  });
+  const userShares = userData?.[0]?.result as bigint | undefined;
+  const userShareValue = userData?.[1]?.result as bigint | undefined;
+  const userEURCShares = userData?.[2]?.result as bigint | undefined;
+  const userInfoData = userData?.[3]?.result as readonly [bigint, bigint, bigint, `0x${string}`, bigint] | undefined;
 
   // Formatted values
   const formattedTotalPoolValue = useMemo(() => {
@@ -678,37 +593,17 @@ export const useTreasuryVault = () => {
     return txHash;
   };
 
-  // Refetch all data with debouncing to avoid rate limiting
-  const refetchAll = () => {
-    // Clear any pending refetch
+  // Refetch all data (2 multicall RPCs instead of 10+ individual calls)
+  const refetchAll = useCallback(() => {
     if (refetchTimeoutRef.current) {
       clearTimeout(refetchTimeoutRef.current);
     }
-
-    // Start refetch immediately, stagger subsequent calls to avoid rate limiting
     refetchTimeoutRef.current = setTimeout(() => {
-      // Stagger the refetch calls to avoid overwhelming the RPC
-      refetchTotalValue();
-      refetchTotalUSDC();
-      refetchTotalUSYC();
-      setTimeout(() => refetchPricePerShare(), 200);
-      setTimeout(() => refetchUserShares(), 400);
-      setTimeout(() => refetchUserShareValue(), 600);
-      if (refetchTotalEURC) {
-        setTimeout(() => refetchTotalEURC(), 800);
-      }
-      if (refetchTotalEURCShares) {
-        setTimeout(() => refetchTotalEURCShares(), 1000);
-      }
-      if (refetchUserEURCShares) {
-        setTimeout(() => refetchUserEURCShares(), 1200);
-      }
-      if (refetchUserInfo) {
-        setTimeout(() => refetchUserInfo(), 1400);
-      }
+      refetchPool();
+      refetchUserData();
       refetchTimeoutRef.current = null;
-    }, 500); // Reduced to 500ms for faster update after transaction
-  };
+    }, 500);
+  }, [refetchPool, refetchUserData]);
 
   // Read fresh user shares directly from contract (bypasses cache)
   // Use this before MAX withdrawal to avoid race conditions

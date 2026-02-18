@@ -64,3 +64,30 @@ export async function updateCircleTxStatus(
     console.error('[Supabase] updateCircleTxStatus error:', error.message, error.details, error.hint);
   }
 }
+
+export async function trackTx(
+  result: any,
+  txType: string,
+  walletId: string,
+  walletAddress?: string,
+  amount?: string,
+  currency?: string,
+  metadata?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const txId = result?.id || result?.transactionId;
+    if (!txId) return;
+    await insertCircleTx({
+      circle_tx_id: txId,
+      tx_type: txType,
+      status: result?.state || 'PENDING',
+      wallet_address: (walletAddress || '').toLowerCase(),
+      wallet_id: walletId,
+      amount,
+      currency,
+      metadata,
+    });
+  } catch (e: any) {
+    console.warn('[Supabase] trackTx failed:', e.message);
+  }
+}

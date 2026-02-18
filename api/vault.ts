@@ -1,30 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
-import { insertCircleTx, updateCircleTxStatus } from './_lib/supabase';
-
-// Helper: persist Circle tx to Supabase for history + Realtime
-async function trackTx(
-  result: any,
-  txType: string,
-  walletId: string,
-  walletAddress?: string,
-  amount?: string,
-  currency?: string,
-  metadata?: Record<string, unknown>
-) {
-  const txId = result?.id || result?.transactionId;
-  if (!txId) return;
-  await insertCircleTx({
-    circle_tx_id: txId,
-    tx_type: txType,
-    status: result?.state || 'PENDING',
-    wallet_address: (walletAddress || '').toLowerCase(),
-    wallet_id: walletId,
-    amount,
-    currency,
-    metadata,
-  });
-}
+import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
