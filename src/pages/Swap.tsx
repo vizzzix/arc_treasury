@@ -17,11 +17,7 @@ import { LiveSwapFeed } from "@/components/LiveSwapFeed";
 const formatBalance = (balance: string | number) => {
   const num = typeof balance === 'string' ? parseFloat(balance) : balance;
   if (isNaN(num)) return String(balance);
-  // Show decimals for small amounts (< $100), hide for large
-  if (num < 100) {
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  return Math.floor(num).toLocaleString('en-US');
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 type TabType = 'swap' | 'pool';
