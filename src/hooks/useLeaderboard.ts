@@ -25,16 +25,16 @@ interface UseLeaderboardReturn {
 let cachedData: { leaderboard: LeaderboardEntry[]; totalUsers: number; timestamp: number } | null = null;
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
-// Get unique site users count from site_bridges
-async function getSiteUsersCount(): Promise<number> {
+// Get total users count from user_points
+async function getTotalUsersCount(): Promise<number> {
   if (!supabase) return 0;
   try {
-    const { data, error } = await supabase
-      .from('site_bridges')
-      .select('wallet_address');
+    const { count, error } = await supabase
+      .from('user_points')
+      .select('*', { count: 'exact', head: true })
+      .gt('total_points', 0);
     if (error) throw error;
-    const uniqueAddresses = new Set((data || []).map(d => d.wallet_address.toLowerCase()));
-    return uniqueAddresses.size;
+    return count || 0;
   } catch {
     return 0;
   }
@@ -76,7 +76,7 @@ export function useLeaderboard(userAddress?: string): UseLeaderboardReturn {
             .gt('total_points', 0)
             .order('total_points', { ascending: false })
             .limit(50),
-          getSiteUsersCount()
+          getTotalUsersCount()
         ]);
 
         if (leaderboardResult.error) throw leaderboardResult.error;
