@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, type ComponentType } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,34 +14,54 @@ import { CircleWalletProvider } from './providers/CircleWalletProvider';
 // Eagerly load landing page for fast initial render
 import Landing from "./pages/Landing";
 
+// Retry dynamic import on failure (handles stale chunks after deploy)
+function lazyRetry(factory: () => Promise<{ default: ComponentType<any> }>) {
+  return lazy(() =>
+    factory().catch(() => {
+      window.location.reload();
+      return new Promise(() => {}); // never resolves — page will reload
+    })
+  );
+}
+
 // Lazy load all other pages for code splitting
-const DashboardSimplified = lazy(() => import("./pages/DashboardSimplified"));
-const FAQ = lazy(() => import("./pages/FAQ"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Rewards = lazy(() => import("./pages/Rewards"));
-const Support = lazy(() => import("./pages/Support"));
-const Litepaper = lazy(() => import("./pages/Litepaper"));
-const LockDesignPreview = lazy(() => import("./pages/LockDesignPreview"));
-const Swap = lazy(() => import("./pages/Swap"));
-const PitchDeck = lazy(() => import("./pages/PitchDeck"));
-const History = lazy(() => import("./pages/History"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+const DashboardSimplified = lazyRetry(() => import("./pages/DashboardSimplified"));
+const FAQ = lazyRetry(() => import("./pages/FAQ"));
+const Profile = lazyRetry(() => import("./pages/Profile"));
+const Rewards = lazyRetry(() => import("./pages/Rewards"));
+const Support = lazyRetry(() => import("./pages/Support"));
+const Litepaper = lazyRetry(() => import("./pages/Litepaper"));
+const LockDesignPreview = lazyRetry(() => import("./pages/LockDesignPreview"));
+const Swap = lazyRetry(() => import("./pages/Swap"));
+const PitchDeck = lazyRetry(() => import("./pages/PitchDeck"));
+const History = lazyRetry(() => import("./pages/History"));
+const NotFound = lazyRetry(() => import("./pages/NotFound"));
 
 // Bridge pages: lazy-load WITH SolanaWalletProvider to defer ~2MB of Solana deps
 const Bridge = lazy(async () => {
-  const [{ default: BridgePage }, { SolanaWalletProvider }] = await Promise.all([
-    import("./pages/Bridge"),
-    import("./providers/SolanaWalletProvider"),
-  ]);
-  return { default: () => <SolanaWalletProvider><BridgePage /></SolanaWalletProvider> };
+  try {
+    const [{ default: BridgePage }, { SolanaWalletProvider }] = await Promise.all([
+      import("./pages/Bridge"),
+      import("./providers/SolanaWalletProvider"),
+    ]);
+    return { default: () => <SolanaWalletProvider><BridgePage /></SolanaWalletProvider> };
+  } catch {
+    window.location.reload();
+    return new Promise(() => {});
+  }
 });
 
 const BridgeSolana = lazy(async () => {
-  const [{ default: BridgeSolanaPage }, { SolanaWalletProvider }] = await Promise.all([
-    import("./pages/BridgeSolana"),
-    import("./providers/SolanaWalletProvider"),
-  ]);
-  return { default: () => <SolanaWalletProvider><BridgeSolanaPage /></SolanaWalletProvider> };
+  try {
+    const [{ default: BridgeSolanaPage }, { SolanaWalletProvider }] = await Promise.all([
+      import("./pages/BridgeSolana"),
+      import("./providers/SolanaWalletProvider"),
+    ]);
+    return { default: () => <SolanaWalletProvider><BridgeSolanaPage /></SolanaWalletProvider> };
+  } catch {
+    window.location.reload();
+    return new Promise(() => {});
+  }
 });
 
 const queryClient = new QueryClient();
