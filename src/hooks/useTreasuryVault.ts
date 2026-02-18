@@ -5,7 +5,7 @@ import { useCircleWallet } from '@/providers/CircleWalletProvider';
 import { useServerVault } from './useServerVault';
 import { formatUnits, parseUnits, maxUint256, createPublicClient, http } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
-import { arcTestnet } from '@/lib/wagmi';
+import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 
 // TreasuryVault ABI (simplified for main functions)
@@ -436,7 +436,7 @@ export const useTreasuryVault = () => {
     // Get public client from hook or create fallback
     const client = publicClient || createPublicClient({
       chain: arcTestnet,
-      transport: http('https://rpc.testnet.arc.network'),
+      transport: http(ARC_RPC_URL),
     });
 
     if (!client) {
@@ -614,7 +614,7 @@ export const useTreasuryVault = () => {
     // Get public client from hook or create fallback
     const client = publicClient || createPublicClient({
       chain: arcTestnet,
-      transport: http('https://rpc.testnet.arc.network'),
+      transport: http(ARC_RPC_URL),
     });
 
     // Accept either string (formatted) or bigint (raw) shares
@@ -709,7 +709,7 @@ export const useTreasuryVault = () => {
       // Create a fresh client to bypass any caching
       const freshClient = createPublicClient({
         chain: arcTestnet,
-        transport: http('https://rpc.testnet.arc.network'),
+        transport: http(ARC_RPC_URL),
       });
 
       const shares = await freshClient.readContract({

@@ -7,26 +7,19 @@ const WALLETCONNECT_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID |
 // Re-export official Arc Testnet chain from viem/chains
 export const arcTestnet = arcTestnetChain
 
-// Fallback HTTP transport for Arc Testnet with multiple RPC endpoints
-// Automatically switches to next endpoint on rate limit errors (429)
-const arcTestnetHttp = fallback([
-  http('https://rpc.testnet.arc.network', {
-    retryCount: 1,
-    timeout: 30000,
-  }),
-  http('https://rpc.blockdaemon.testnet.arc.network', {
-    retryCount: 1,
-    timeout: 30000,
-  }),
-  http('https://rpc.drpc.testnet.arc.network', {
-    retryCount: 1,
-    timeout: 30000,
-  }),
-  http('https://rpc.quicknode.testnet.arc.network', {
-    retryCount: 1,
-    timeout: 30000,
-  }),
-]);
+// Centralized Arc Testnet RPC URL: Alchemy primary, public fallback
+const ALCHEMY_ARC_RPC = import.meta.env.VITE_ALCHEMY_ARC_RPC || ''
+const PUBLIC_ARC_RPC = 'https://rpc.testnet.arc.network'
+export const ARC_RPC_URL = ALCHEMY_ARC_RPC || PUBLIC_ARC_RPC
+
+// Fallback HTTP transport for Arc Testnet
+// Alchemy primary → public RPC fallback
+const arcTestnetHttp = ALCHEMY_ARC_RPC
+  ? fallback([
+      http(ALCHEMY_ARC_RPC, { retryCount: 1, timeout: 30000 }),
+      http(PUBLIC_ARC_RPC, { retryCount: 1, timeout: 30000 }),
+    ])
+  : http(PUBLIC_ARC_RPC, { retryCount: 1, timeout: 30000 });
 
 export const config = createConfig({
   chains: [mainnet, sepolia, base, baseSepolia, arcTestnetChain],

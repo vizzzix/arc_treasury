@@ -4,7 +4,7 @@ import { formatUnits, createPublicClient, http } from 'viem';
 import { SUPPORTED_NETWORKS } from '@/lib/constants';
 import { sepolia } from 'viem/chains';
 import { ERC20_ABI } from '@/lib/abis/erc20';
-import { arcTestnet } from '@/lib/wagmi';
+import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { useUnifiedWallet } from './useUnifiedWallet';
 
 const USDC_ADDRESSES: Record<string, `0x${string}`> = {
@@ -107,12 +107,11 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
           case arcTestnet.id:
             publicClient = createPublicClient({ 
               chain: arcTestnet, 
-              transport: http('https://rpc.testnet.arc.network', {
+              transport: http(ARC_RPC_URL, {
                 timeout: 5000,
                 retryCount: 1,
-              }) 
+              })
             });
-            console.log(`[useUSDCBalance] Created Arc Testnet client with RPC: https://rpc.testnet.arc.network`);
             break;
           default:
             // Fallback for other chains

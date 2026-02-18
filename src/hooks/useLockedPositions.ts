@@ -4,7 +4,7 @@ import { parseUnits, formatUnits, createPublicClient, http } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import TreasuryVaultABI from '@/lib/abis/TreasuryVault.json';
 import { useUSYCPrice } from './useUSYCPrice';
-import { arcTestnet } from '@/lib/wagmi';
+import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 import { useUnifiedWallet } from './useUnifiedWallet';
 import { useCircleWallet } from '@/providers/CircleWalletProvider';
@@ -13,7 +13,7 @@ import { useServerVault } from './useServerVault';
 // Create public client for waiting on receipts
 const client = createPublicClient({
   chain: arcTestnet,
-  transport: http('https://rpc.testnet.arc.network'),
+  transport: http(ARC_RPC_URL),
 });
 
 export interface LockedPosition {

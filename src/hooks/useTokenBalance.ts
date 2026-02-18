@@ -3,7 +3,7 @@ import { useMemo, useEffect, useState, useRef } from 'react';
 import { formatUnits, createPublicClient, http } from 'viem';
 import { rpcRateLimiter } from '@/lib/rpcRateLimiter';
 import { ERC20_ABI } from '@/lib/abis/erc20';
-import { arcTestnet } from '@/lib/wagmi';
+import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { useUnifiedWallet } from './useUnifiedWallet';
 
 interface UseTokenBalanceParams {
@@ -76,7 +76,7 @@ export const useTokenBalance = ({
       try {
         const publicClient = createPublicClient({
           chain: arcTestnet,
-          transport: http('https://rpc.testnet.arc.network', {
+          transport: http(ARC_RPC_URL, {
             timeout: 5000,
             retryCount: 1,
           })
