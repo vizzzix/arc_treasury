@@ -57,6 +57,7 @@ All colors MUST be HSL.
   }
 
   html {
+    overflow-y: scroll;
     scrollbar-gutter: stable;
   }
 
