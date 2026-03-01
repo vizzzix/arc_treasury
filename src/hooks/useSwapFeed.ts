@@ -36,7 +36,7 @@ export const useSwapFeed = (limit: number = 10) => {
 
   const fetchActivity = async () => {
     try {
-      const res = await fetch(`/api/track-tx?action=feed-activity&limit=${limit}&_t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/track-tx?action=feed-activity&limit=${limit}`);
       if (!res.ok) return;
       const { swaps, lpEvents } = await res.json();
 
@@ -77,7 +77,7 @@ export const useSwapFeed = (limit: number = 10) => {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch(`/api/track-tx?action=feed-stats&_t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/track-tx?action=feed-stats`);
       if (!res.ok) return;
       const data = await res.json();
       setStats({
@@ -93,7 +93,7 @@ export const useSwapFeed = (limit: number = 10) => {
 
   const fetchTopSwappers = async () => {
     try {
-      const res = await fetch(`/api/track-tx?action=feed-top&_t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/track-tx?action=feed-top`);
       if (!res.ok) return;
       const { ranked } = await res.json();
 
@@ -112,7 +112,7 @@ export const useSwapFeed = (limit: number = 10) => {
     setIsLoading(true);
     refresh().finally(() => setIsLoading(false));
 
-    const interval = setInterval(refresh, 30000);
+    const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
   }, [refresh]);
 

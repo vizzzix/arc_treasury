@@ -159,7 +159,7 @@ async function handleFeedActivity(req: VercelRequest, res: VercelResponse) {
   if (swapRes.error) console.error('[FeedActivity] swap query error:', swapRes.error.message);
   if (lpRes.error) console.error('[FeedActivity] lp query error:', lpRes.error.message);
 
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=30');
   return res.status(200).json({
     swaps: swapRes.data || [],
     lpEvents: lpRes.data || [],
@@ -178,7 +178,7 @@ async function handleFeedStats(_req: VercelRequest, res: VercelResponse) {
   const swapVolume = swapRes.data?.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0) || 0;
   const lpVolume = lpRes.data?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
 
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
   return res.status(200).json({
     totalSwapVolume: swapVolume,
     swapCount: swapRes.data?.length || 0,
@@ -191,7 +191,7 @@ async function handleFeedTop(_req: VercelRequest, res: VercelResponse) {
   if (!supabaseAdmin) return res.status(500).json({ error: 'DB not configured' });
 
   if (feedTopCache && Date.now() - feedTopCache.ts < FEED_TOP_TTL) {
-    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     return res.status(200).json(feedTopCache.data);
   }
 
@@ -244,7 +244,7 @@ async function handleFeedTop(_req: VercelRequest, res: VercelResponse) {
   const result = { ranked, total: Object.keys(volumeByWallet).length };
   feedTopCache = { data: result, ts: Date.now() };
 
-  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
   return res.status(200).json(result);
 }
 
