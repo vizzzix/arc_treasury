@@ -112,7 +112,7 @@ export const useSwapFeed = (limit: number = 10) => {
     setIsLoading(true);
     refresh().finally(() => setIsLoading(false));
 
-    const interval = setInterval(refresh, 15000);
+    const interval = setInterval(refresh, 30000);
     return () => clearInterval(interval);
   }, [refresh]);
 
