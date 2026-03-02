@@ -33,7 +33,7 @@
       ]
     },
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!assets/|api/).*)",
       "headers": [
         {
           "key": "Cache-Control",
