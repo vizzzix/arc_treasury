@@ -37,6 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return await handleTrackSwap(req, res);
       case 'track-liquidity':
         return await handleTrackLiquidity(req, res);
+      case 'feed-all':
+        return await handleFeedAll(req, res);
       case 'feed-activity':
         return await handleFeedActivity(req, res);
       case 'feed-stats':
@@ -139,6 +141,113 @@ async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+async function handleFeedAll(req: VercelRequest, res: VercelResponse) {
+  if (!supabaseAdmin) return res.status(500).json({ error: 'DB not configured' });
+  const limit = Math.min(Number(req.query.limit) || 10, 50);
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const useTopCache = feedTopCache && Date.now() - feedTopCache.ts < FEED_TOP_TTL;
+
+  const [swapActivityRes, lpActivityRes, swapStatsRes, lpStatsRes] = await Promise.all([
+    supabaseAdmin.from('swap_transactions')
+      .select('id, wallet_address, amount_usd, token_in, token_out, created_at')
+      .gte('amount_usd', MIN_AMOUNT_USD)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabaseAdmin.from('liquidity_events')
+      .select('id, wallet_address, amount_usd, action, created_at')
+      .gte('amount_usd', MIN_AMOUNT_USD)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabaseAdmin.from('swap_transactions')
+      .select('amount_usd')
+      .gte('created_at', oneDayAgo)
+      .gte('amount_usd', MIN_AMOUNT_USD),
+    supabaseAdmin.from('liquidity_events')
+      .select('amount_usd')
+      .gte('created_at', oneDayAgo)
+      .gte('amount_usd', MIN_AMOUNT_USD),
+  ]);
+
+  const swapVolume = swapStatsRes.data?.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0) || 0;
+  const lpVolume = lpStatsRes.data?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
+
+  let topData: unknown;
+  if (useTopCache) {
+    topData = feedTopCache!.data;
+  } else {
+    topData = await computeFeedTop();
+  }
+
+  res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+  return res.status(200).json({
+    activity: {
+      swaps: swapActivityRes.data || [],
+      lpEvents: lpActivityRes.data || [],
+    },
+    stats: {
+      totalSwapVolume: swapVolume,
+      swapCount: swapStatsRes.data?.length || 0,
+      totalLpVolume: lpVolume,
+      lpCount: lpStatsRes.data?.length || 0,
+    },
+    top: topData,
+  });
+}
+
+async function computeFeedTop() {
+  if (!supabaseAdmin) return { ranked: [], total: 0 };
+
+  const TOP_LIMIT = 50;
+  let allSwaps: { wallet_address: string; amount_usd: number }[] = [];
+  let allLp: { wallet_address: string; amount_usd: number }[] = [];
+  let offset = 0;
+  const pageSize = 1000;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.from('swap_transactions')
+      .select('wallet_address, amount_usd')
+      .gte('amount_usd', MIN_AMOUNT_USD)
+      .range(offset, offset + pageSize - 1);
+    if (error || !data || data.length === 0) break;
+    allSwaps = [...allSwaps, ...data];
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  offset = 0;
+  while (true) {
+    const { data, error } = await supabaseAdmin.from('liquidity_events')
+      .select('wallet_address, amount_usd')
+      .gte('amount_usd', MIN_AMOUNT_USD)
+      .range(offset, offset + pageSize - 1);
+    if (error || !data || data.length === 0) break;
+    allLp = [...allLp, ...data];
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  const volumeByWallet: Record<string, number> = {};
+  for (const tx of allSwaps) {
+    const addr = tx.wallet_address.toLowerCase();
+    volumeByWallet[addr] = (volumeByWallet[addr] || 0) + Number(tx.amount_usd || 0);
+  }
+  for (const tx of allLp) {
+    const addr = tx.wallet_address.toLowerCase();
+    volumeByWallet[addr] = (volumeByWallet[addr] || 0) + Number(tx.amount_usd || 0);
+  }
+
+  const ranked = Object.entries(volumeByWallet)
+    .map(([wallet_address, total_volume]) => ({ wallet_address, total_volume }))
+    .sort((a, b) => b.total_volume - a.total_volume)
+    .slice(0, TOP_LIMIT)
+    .map((s, i) => ({ ...s, rank: i + 1 }));
+
+  const result = { ranked, total: Object.keys(volumeByWallet).length };
+  feedTopCache = { data: result, ts: Date.now() };
+  return result;
+}
+
 async function handleFeedActivity(req: VercelRequest, res: VercelResponse) {
   if (!supabaseAdmin) return res.status(500).json({ error: 'DB not configured' });
   const limit = Math.min(Number(req.query.limit) || 10, 50);
@@ -190,59 +299,8 @@ async function handleFeedStats(_req: VercelRequest, res: VercelResponse) {
 async function handleFeedTop(_req: VercelRequest, res: VercelResponse) {
   if (!supabaseAdmin) return res.status(500).json({ error: 'DB not configured' });
 
-  if (feedTopCache && Date.now() - feedTopCache.ts < FEED_TOP_TTL) {
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    return res.status(200).json(feedTopCache.data);
-  }
-
-  const TOP_LIMIT = 50;
-
-  let allSwaps: { wallet_address: string; amount_usd: number }[] = [];
-  let allLp: { wallet_address: string; amount_usd: number }[] = [];
-  let offset = 0;
-  const pageSize = 1000;
-
-  while (true) {
-    const { data, error } = await supabaseAdmin.from('swap_transactions')
-      .select('wallet_address, amount_usd')
-      .gte('amount_usd', MIN_AMOUNT_USD)
-      .range(offset, offset + pageSize - 1);
-    if (error || !data || data.length === 0) break;
-    allSwaps = [...allSwaps, ...data];
-    if (data.length < pageSize) break;
-    offset += pageSize;
-  }
-
-  offset = 0;
-  while (true) {
-    const { data, error } = await supabaseAdmin.from('liquidity_events')
-      .select('wallet_address, amount_usd')
-      .gte('amount_usd', MIN_AMOUNT_USD)
-      .range(offset, offset + pageSize - 1);
-    if (error || !data || data.length === 0) break;
-    allLp = [...allLp, ...data];
-    if (data.length < pageSize) break;
-    offset += pageSize;
-  }
-
-  const volumeByWallet: Record<string, number> = {};
-  for (const tx of allSwaps) {
-    const addr = tx.wallet_address.toLowerCase();
-    volumeByWallet[addr] = (volumeByWallet[addr] || 0) + Number(tx.amount_usd || 0);
-  }
-  for (const tx of allLp) {
-    const addr = tx.wallet_address.toLowerCase();
-    volumeByWallet[addr] = (volumeByWallet[addr] || 0) + Number(tx.amount_usd || 0);
-  }
-
-  const ranked = Object.entries(volumeByWallet)
-    .map(([wallet_address, total_volume]) => ({ wallet_address, total_volume }))
-    .sort((a, b) => b.total_volume - a.total_volume)
-    .slice(0, TOP_LIMIT)
-    .map((s, i) => ({ ...s, rank: i + 1 }));
-
-  const result = { ranked, total: Object.keys(volumeByWallet).length };
-  feedTopCache = { data: result, ts: Date.now() };
+  const useCache = feedTopCache && Date.now() - feedTopCache.ts < FEED_TOP_TTL;
+  const result = useCache ? feedTopCache!.data : await computeFeedTop();
 
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
   return res.status(200).json(result);
