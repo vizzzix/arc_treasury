@@ -20,7 +20,7 @@ const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 const MIN_AMOUNT_USD = 1.0;
 
 let feedTopCache: { data: unknown; ts: number } | null = null;
-const FEED_TOP_TTL = 5 * 60 * 1000;
+const FEED_TOP_TTL = 30 * 60 * 1000;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -144,11 +144,10 @@ async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
 async function handleFeedAll(req: VercelRequest, res: VercelResponse) {
   if (!supabaseAdmin) return res.status(500).json({ error: 'DB not configured' });
   const limit = Math.min(Number(req.query.limit) || 10, 50);
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const useTopCache = feedTopCache && Date.now() - feedTopCache.ts < FEED_TOP_TTL;
 
-  const [swapActivityRes, lpActivityRes, swapStatsRes, lpStatsRes] = await Promise.all([
+  const [swapActivityRes, lpActivityRes, statsRes, topRes, topCountRes] = await Promise.all([
     supabaseAdmin.from('swap_transactions')
       .select('id, wallet_address, amount_usd, token_in, token_out, created_at')
       .gte('amount_usd', MIN_AMOUNT_USD)
@@ -159,37 +158,38 @@ async function handleFeedAll(req: VercelRequest, res: VercelResponse) {
       .gte('amount_usd', MIN_AMOUNT_USD)
       .order('created_at', { ascending: false })
       .limit(limit),
-    supabaseAdmin.from('swap_transactions')
-      .select('amount_usd')
-      .gte('created_at', oneDayAgo)
-      .gte('amount_usd', MIN_AMOUNT_USD),
-    supabaseAdmin.from('liquidity_events')
-      .select('amount_usd')
-      .gte('created_at', oneDayAgo)
-      .gte('amount_usd', MIN_AMOUNT_USD),
+    supabaseAdmin.rpc('get_feed_stats_24h', { min_amount: MIN_AMOUNT_USD }),
+    useTopCache ? Promise.resolve(null) : supabaseAdmin.rpc('get_feed_top', { min_amount: MIN_AMOUNT_USD, top_limit: 50 }),
+    useTopCache ? Promise.resolve(null) : supabaseAdmin.rpc('get_feed_top_count', { min_amount: MIN_AMOUNT_USD }),
   ]);
 
-  const swapVolume = swapStatsRes.data?.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0) || 0;
-  const lpVolume = lpStatsRes.data?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
+  const statsRow = statsRes.data?.[0] || { swap_volume: 0, swap_count: 0, lp_volume: 0, lp_count: 0 };
 
   let topData: unknown;
   if (useTopCache) {
     topData = feedTopCache!.data;
   } else {
-    topData = await computeFeedTop();
+    const ranked = (topRes?.data || []).map((r: any, i: number) => ({
+      wallet_address: r.wallet_address,
+      total_volume: Number(r.total_volume),
+      rank: i + 1,
+    }));
+    const total = topCountRes?.data ?? ranked.length;
+    topData = { ranked, total };
+    feedTopCache = { data: topData, ts: Date.now() };
   }
 
-  res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
+  res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
   return res.status(200).json({
     activity: {
       swaps: swapActivityRes.data || [],
       lpEvents: lpActivityRes.data || [],
     },
     stats: {
-      totalSwapVolume: swapVolume,
-      swapCount: swapStatsRes.data?.length || 0,
-      totalLpVolume: lpVolume,
-      lpCount: lpStatsRes.data?.length || 0,
+      totalSwapVolume: Number(statsRow.swap_volume),
+      swapCount: Number(statsRow.swap_count),
+      totalLpVolume: Number(statsRow.lp_volume),
+      lpCount: Number(statsRow.lp_count),
     },
     top: topData,
   });
@@ -198,52 +198,19 @@ async function handleFeedAll(req: VercelRequest, res: VercelResponse) {
 async function computeFeedTop() {
   if (!supabaseAdmin) return { ranked: [], total: 0 };
 
-  const TOP_LIMIT = 50;
-  let allSwaps: { wallet_address: string; amount_usd: number }[] = [];
-  let allLp: { wallet_address: string; amount_usd: number }[] = [];
-  let offset = 0;
-  const pageSize = 1000;
+  const [topRes, countRes] = await Promise.all([
+    supabaseAdmin.rpc('get_feed_top', { min_amount: MIN_AMOUNT_USD, top_limit: 50 }),
+    supabaseAdmin.rpc('get_feed_top_count', { min_amount: MIN_AMOUNT_USD }),
+  ]);
 
-  while (true) {
-    const { data, error } = await supabaseAdmin.from('swap_transactions')
-      .select('wallet_address, amount_usd')
-      .gte('amount_usd', MIN_AMOUNT_USD)
-      .range(offset, offset + pageSize - 1);
-    if (error || !data || data.length === 0) break;
-    allSwaps = [...allSwaps, ...data];
-    if (data.length < pageSize) break;
-    offset += pageSize;
-  }
+  const ranked = (topRes.data || []).map((r: any, i: number) => ({
+    wallet_address: r.wallet_address,
+    total_volume: Number(r.total_volume),
+    rank: i + 1,
+  }));
+  const total = countRes.data ?? ranked.length;
 
-  offset = 0;
-  while (true) {
-    const { data, error } = await supabaseAdmin.from('liquidity_events')
-      .select('wallet_address, amount_usd')
-      .gte('amount_usd', MIN_AMOUNT_USD)
-      .range(offset, offset + pageSize - 1);
-    if (error || !data || data.length === 0) break;
-    allLp = [...allLp, ...data];
-    if (data.length < pageSize) break;
-    offset += pageSize;
-  }
-
-  const volumeByWallet: Record<string, number> = {};
-  for (const tx of allSwaps) {
-    const addr = tx.wallet_address.toLowerCase();
-    volumeByWallet[addr] = (volumeByWallet[addr] || 0) + Number(tx.amount_usd || 0);
-  }
-  for (const tx of allLp) {
-    const addr = tx.wallet_address.toLowerCase();
-    volumeByWallet[addr] = (volumeByWallet[addr] || 0) + Number(tx.amount_usd || 0);
-  }
-
-  const ranked = Object.entries(volumeByWallet)
-    .map(([wallet_address, total_volume]) => ({ wallet_address, total_volume }))
-    .sort((a, b) => b.total_volume - a.total_volume)
-    .slice(0, TOP_LIMIT)
-    .map((s, i) => ({ ...s, rank: i + 1 }));
-
-  const result = { ranked, total: Object.keys(volumeByWallet).length };
+  const result = { ranked, total };
   feedTopCache = { data: result, ts: Date.now() };
   return result;
 }
@@ -277,22 +244,18 @@ async function handleFeedActivity(req: VercelRequest, res: VercelResponse) {
 
 async function handleFeedStats(_req: VercelRequest, res: VercelResponse) {
   if (!supabaseAdmin) return res.status(500).json({ error: 'DB not configured' });
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  const [swapRes, lpRes] = await Promise.all([
-    supabaseAdmin.from('swap_transactions').select('amount_usd').gte('created_at', oneDayAgo).gte('amount_usd', MIN_AMOUNT_USD),
-    supabaseAdmin.from('liquidity_events').select('amount_usd').gte('created_at', oneDayAgo).gte('amount_usd', MIN_AMOUNT_USD),
-  ]);
+  const { data, error } = await supabaseAdmin.rpc('get_feed_stats_24h', { min_amount: MIN_AMOUNT_USD });
+  if (error) console.error('[FeedStats] RPC error:', error.message);
 
-  const swapVolume = swapRes.data?.reduce((sum, s) => sum + Number(s.amount_usd || 0), 0) || 0;
-  const lpVolume = lpRes.data?.reduce((sum, e) => sum + Number(e.amount_usd || 0), 0) || 0;
+  const row = data?.[0] || { swap_volume: 0, swap_count: 0, lp_volume: 0, lp_count: 0 };
 
   res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
   return res.status(200).json({
-    totalSwapVolume: swapVolume,
-    swapCount: swapRes.data?.length || 0,
-    totalLpVolume: lpVolume,
-    lpCount: lpRes.data?.length || 0,
+    totalSwapVolume: Number(row.swap_volume),
+    swapCount: Number(row.swap_count),
+    totalLpVolume: Number(row.lp_volume),
+    lpCount: Number(row.lp_count),
   });
 }
 
