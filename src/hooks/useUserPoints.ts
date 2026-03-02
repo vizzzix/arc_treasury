@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { supabase } from '@/lib/supabase';
 import { useUnifiedWallet } from './useUnifiedWallet';
@@ -22,6 +22,8 @@ export interface UserPointsData {
   total_points: number;
 }
 
+const POLL_INTERVAL = 300_000;
+
 export const useUserPoints = () => {
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
@@ -31,6 +33,27 @@ export const useUserPoints = () => {
   const [pointsData, setPointsData] = useState<UserPointsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchPoints = useCallback(async () => {
+    if (!supabase || !address) return;
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('user_points')
+        .select('wallet_address, bridge_volume, swap_volume, liquidity_volume, vault_volume, referral_count, total_points')
+        .eq('wallet_address', address.toLowerCase())
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+      setPointsData(data || null);
+    } catch (e: any) {
+      console.error('Failed to fetch user points:', e);
+      setError(e.message);
+    }
+  }, [address]);
 
   useEffect(() => {
     if (!isConnected || !address) {
@@ -39,47 +62,47 @@ export const useUserPoints = () => {
       return;
     }
 
-    const fetchPoints = async () => {
-      if (!supabase) return;
-      setIsLoading(true);
-      setError(null);
+    setIsLoading(true);
+    setError(null);
+    fetchPoints().finally(() => setIsLoading(false));
 
-      try {
-        // Fetch user points - total_points is PERMANENT and CUMULATIVE
-        const { data, error: fetchError } = await supabase
-          .from('user_points')
-          .select('wallet_address, bridge_volume, swap_volume, liquidity_volume, vault_volume, referral_count, total_points')
-          .eq('wallet_address', address.toLowerCase())
-          .single();
+    const startPolling = () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(fetchPoints, POLL_INTERVAL);
+    };
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
-        }
-        setPointsData(data || null);
-
-      } catch (e: any) {
-        console.error('Failed to fetch user points:', e);
-        setError(e.message);
-      } finally {
-        setIsLoading(false);
+    const stopPolling = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
 
-    fetchPoints();
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        fetchPoints();
+        startPolling();
+      }
+    };
 
-    const interval = setInterval(fetchPoints, 60000);
-    return () => clearInterval(interval);
-  }, [address, isConnected]);
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
-  // Points breakdown from permanent points_earned (no dynamic boost)
-  // total_points from DB is already the sum of all points_earned
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [address, isConnected, fetchPoints]);
+
   const pointsBreakdown: PointsBreakdown | null = pointsData ? {
     bridgePoints: (pointsData.bridge_volume / 100) * 1.0,
     swapPoints: (pointsData.swap_volume / 100) * 0.5,
     liquidityPoints: (pointsData.liquidity_volume / 100) * 2.0,
     vaultPoints: (pointsData.vault_volume / 100) * 1.0,
     referralPoints: pointsData.referral_count * 50,
-    totalPoints: pointsData.total_points, // Use DB total directly - permanent!
+    totalPoints: pointsData.total_points,
   } : null;
 
   const pointsValue = pointsData?.total_points || 0;
