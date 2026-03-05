@@ -129,7 +129,7 @@ async function getWalletBalances(wallet) {
       if (!pos.withdrawn) {
         // Native USDC (0x3600...) uses 18 decimals, EURC uses 6 decimals
         const isNativeUSDC = pos.token && pos.token.toLowerCase() === '0x3600000000000000000000000000000000000000';
-        const isEURC = pos.token && pos.token.toLowerCase() === '0xf88ac22c2c276fb6f345d5f3a63f7b50cd1cf991';
+        const isEURC = pos.token && pos.token.toLowerCase() === '0x742b2d045d430fe718b57046645ba33295914b69';
         const decimals = isNativeUSDC ? 18 : 6;
         const amount = Number(formatUnits(pos.amount, decimals));
         if (isEURC) {

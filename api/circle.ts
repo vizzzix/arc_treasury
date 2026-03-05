@@ -150,18 +150,23 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
 
   if (clientIp && !CIRCLE_IPS.has(clientIp)) {
     console.warn(`[Webhook] Request from non-Circle IP: ${clientIp}`);
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   // Signature verification
   const signature = req.headers['x-circle-signature'] as string | undefined;
   const keyId = req.headers['x-circle-key-id'] as string | undefined;
 
-  if (signature && keyId) {
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-    const valid = await verifyWebhookSignature(rawBody, signature, keyId);
-    if (!valid) {
-      console.warn('[Webhook] Signature verification failed — continuing anyway');
-    }
+  if (!signature || !keyId) {
+    console.warn('[Webhook] Missing signature headers');
+    return res.status(401).json({ error: 'Missing signature' });
+  }
+
+  const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+  const valid = await verifyWebhookSignature(rawBody, signature, keyId);
+  if (!valid) {
+    console.warn('[Webhook] Signature verification failed');
+    return res.status(401).json({ error: 'Invalid signature' });
   }
 
   try {
@@ -193,6 +198,6 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ status: 'ok' });
   } catch (error: any) {
     console.error('[Webhook] Error processing:', error);
-    return res.status(200).json({ status: 'error', message: error.message });
+    return res.status(500).json({ error: 'Processing failed' });
   }
 }

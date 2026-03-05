@@ -41,6 +41,19 @@ async function handleAuth(request: any, response: any) {
       return response.status(400).json({ error: 'Wallet address required' });
     }
 
+    // Prevent overwriting an existing verified Twitter connection
+    const { data: existing } = await supabase
+      .from('twitter_connections')
+      .select('twitter_username, repost_verified')
+      .eq('wallet_address', walletAddress.toLowerCase())
+      .single();
+
+    if (existing?.repost_verified) {
+      return response.status(400).json({
+        error: 'Twitter already connected and verified for this wallet. Disconnect first to reconnect.',
+      });
+    }
+
     const codeVerifier = crypto.randomBytes(32).toString('base64url');
     const codeChallenge = crypto
       .createHash('sha256')
