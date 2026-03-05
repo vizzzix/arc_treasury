@@ -1,6 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin, insertCircleTx, updateCircleTxStatus, insertSwapTx, insertLiquidityEvent } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
+
+const ALLOWED_ORIGINS = new Set([
+  'https://arctreasury.biz',
+  'https://www.arctreasury.biz',
+  'http://localhost:5173',
+  'http://localhost:3000',
+]);
+
+// Rate limit: 30 POST requests per IP per 60 seconds
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW = 60_000;
+
+// Minimum amount for swap/liquidity tracking (filter dust/spam)
+const MIN_TRACK_AMOUNT_USD = 0.01;
 
 const VALID_TX_TYPES = new Set([
   'deposit-usdc', 'deposit-eurc',
@@ -22,10 +37,38 @@ const MIN_AMOUNT_USD = 1.0;
 let feedTopCache: { data: unknown; ts: number } | null = null;
 const FEED_TOP_TTL = 30 * 60 * 1000;
 
+function getClientIp(req: VercelRequest): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  if (Array.isArray(forwarded)) return forwarded[0];
+  return req.socket?.remoteAddress || 'unknown';
+}
+
+function isOriginAllowed(req: VercelRequest): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true; // Allow non-browser requests only if they pass other checks
+  return ALLOWED_ORIGINS.has(origin);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const { action } = req.query;
+
+  // Rate limit and origin check for POST endpoints
+  if (req.method === 'POST') {
+    if (!isOriginAllowed(req)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const ip = getClientIp(req);
+    const rateLimitKey = `post:${ip}`;
+    if (!checkRateLimit(rateLimitKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW)) {
+      const headers = getRateLimitHeaders(rateLimitKey, RATE_LIMIT_MAX);
+      for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+      return res.status(429).json({ error: 'Too many requests. Try again later.' });
+    }
+  }
 
   try {
     switch (action) {
@@ -96,6 +139,9 @@ async function handleTrackSwap(req: VercelRequest, res: VercelResponse) {
   if (!walletAddress || !ADDRESS_REGEX.test(walletAddress)) {
     return res.status(400).json({ error: 'Valid walletAddress required', received: { walletAddress } });
   }
+  if (!amountUsd || Number(amountUsd) < MIN_TRACK_AMOUNT_USD) {
+    return res.status(400).json({ error: `amountUsd must be >= ${MIN_TRACK_AMOUNT_USD}` });
+  }
 
   try {
     await insertSwapTx({
@@ -125,6 +171,9 @@ async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
   }
   if (!action || !['add', 'remove'].includes(action)) {
     return res.status(400).json({ error: 'action must be add or remove' });
+  }
+  if (!amountUsd || Number(amountUsd) < MIN_TRACK_AMOUNT_USD) {
+    return res.status(400).json({ error: `amountUsd must be >= ${MIN_TRACK_AMOUNT_USD}` });
   }
 
   try {
