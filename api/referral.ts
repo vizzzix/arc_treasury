@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
 if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing SUPABASE_URL or SUPABASE_KEY');
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('[Referral] SUPABASE_SERVICE_ROLE_KEY not set, using SUPABASE_KEY (writes may fail with RLS)');
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
