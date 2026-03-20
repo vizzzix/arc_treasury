@@ -34,6 +34,7 @@ const Litepaper = lazyRetry(() => import("./pages/Litepaper"));
 const LockDesignPreview = lazyRetry(() => import("./pages/LockDesignPreview"));
 const Swap = lazyRetry(() => import("./pages/Swap"));
 const PitchDeck = lazyRetry(() => import("./pages/PitchDeck"));
+const Metrics = lazyRetry(() => import("./pages/Metrics"));
 const History = lazyRetry(() => import("./pages/History"));
 const NotFound = lazyRetry(() => import("./pages/NotFound"));
 
@@ -95,6 +96,7 @@ const AppRoutes = () => {
           <Route path="/swap" element={<Swap />} />
           <Route path="/bridge-solana" element={<BridgeSolana />} />
           <Route path="/pitch/:token" element={<PitchDeck />} />
+          <Route path="/metrics/:token" element={<Metrics />} />
           <Route path="/history" element={<History />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
