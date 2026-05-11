@@ -54,6 +54,9 @@ export default defineConfig({
           if (id.includes('node_modules/@tanstack/react-query')) {
             return 'query-vendor';
           }
+          if (id.includes('node_modules/@walletconnect/') || id.includes('node_modules/@web3modal/')) {
+            return 'walletconnect-vendor';
+          }
           if (id.includes('node_modules/viem/') || id.includes('node_modules/wagmi/')) {
             return 'web3-vendor';
           }
@@ -63,8 +66,17 @@ export default defineConfig({
           if (id.includes('node_modules/@circle-fin/adapter-solana')) {
             return 'solana-vendor';
           }
+          if (id.includes('node_modules/@circle-fin/bridge-kit') || id.includes('node_modules/@circle-fin/provider-cctp-v2') || id.includes('node_modules/@circle-fin/adapter-viem-v2')) {
+            return 'circle-bridge-vendor';
+          }
           if (id.includes('node_modules/@circle-fin/')) {
             return 'circle-vendor';
+          }
+          if (id.includes('node_modules/@sentry/')) {
+            return 'sentry-vendor';
+          }
+          if (id.includes('node_modules/date-fns/')) {
+            return 'date-vendor';
           }
           if (id.includes('node_modules/lucide-react/')) {
             return 'icons-vendor';
