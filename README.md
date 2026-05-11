@@ -8,6 +8,7 @@
     <img src="https://img.shields.io/badge/TypeScript-5.6-3178c6?logo=typescript&logoColor=white" alt="TypeScript">
     <img src="https://img.shields.io/badge/Solidity-0.8.20-363636?logo=solidity&logoColor=white" alt="Solidity">
     <img src="https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white" alt="React">
+    <a href="https://github.com/vizzzix/arc_treasury/actions"><img src="https://github.com/vizzzix/arc_treasury/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://arctreasury.biz"><img src="https://img.shields.io/badge/Website-Live-00d4aa" alt="Website"></a>
     <img src="https://img.shields.io/badge/License-MIT-green" alt="License">
   </p>
@@ -195,15 +196,72 @@ arc_treasury/
 └── supabase/               # Database migrations
 ```
 
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+
+### Installation
+
+```bash
+git clone https://github.com/vizzzix/arc_treasury.git
+cd arc_treasury
+npm install
+```
+
+### Environment Variables
+
+Copy `.env.example` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` — Supabase project
+- `CIRCLE_API_KEY` — Circle Developer Controlled Wallets
+- `SUPABASE_SERVICE_ROLE_KEY` — server-side Supabase access
+
+### Development
+
+```bash
+npm run dev        # Start dev server on http://localhost:8080
+npm run build      # Production build
+npm run preview    # Preview production build
+```
+
+## Testing
+
+```bash
+npm test           # Run 203 unit tests (vitest)
+npm run test:e2e   # Run 29 E2E tests (Playwright)
+npm run test:e2e:ui # E2E with interactive UI
+```
+
+Tests cover:
+- Bridge API endpoints (approve, burn, claim, tx-status)
+- Vault logic (deposit, withdraw, swap, liquidity)
+- Swap pool calculations (slippage, min output)
+- Locked positions (yield, mapping, early withdraw)
+- E2E smoke tests for all pages
+
 ## Security
 
+- **JWT authentication** on all financial API endpoints (vault, bridge, wallet)
+- **Wallet ownership verification** — users can only operate on their own wallets
+- **Rate limiting** with Upstash Redis (sliding window) on all endpoints
+- **Input validation** — UUID, address, txHash format checks
+- **CORS whitelist** — only allowed origins
+- **Security headers** — X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- **Sentry error monitoring** with source map upload
 - Non-custodial for MetaMask users
 - Circle wallet keys managed by Circle's HSM infrastructure
 - Server-side transaction execution for Circle wallets (no private keys in browser)
 - Vault whitelisted by Circle/Hashnote for USYC operations
 - Real USYC integration (not simulated)
 - On-chain NAV oracle for price feeds
-- EURC balance pre-checks to prevent failed transactions
 
 **Testnet Notice**: This is a testnet deployment. Use only test tokens.
 
@@ -218,4 +276,4 @@ arc_treasury/
 
 ## License
 
-MIT License - Arc Treasury 2025
+MIT License - Arc Treasury 2025-2026
