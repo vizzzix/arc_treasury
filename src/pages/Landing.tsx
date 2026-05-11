@@ -180,6 +180,7 @@ const Landing = () => {
                 size="icon"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="hover:bg-white/10"
+                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               >
                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </Button>
@@ -262,7 +263,7 @@ const Landing = () => {
             <div className="relative">
               <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-3xl calc-glow-bg" />
               <div className="relative p-6 rounded-3xl backdrop-blur-sm calc-card">
-                <h3 className="text-lg font-semibold mb-4">Calculate Earnings</h3>
+                <h2 className="text-lg font-semibold mb-4">Calculate Earnings</h2>
 
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -455,6 +456,7 @@ const Landing = () => {
                 className="p-2 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
               >
                 <Github className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+                <span className="sr-only">GitHub</span>
               </a>
               <a
                 href="https://x.com/arctreasury"
@@ -463,6 +465,7 @@ const Landing = () => {
                 className="p-2 rounded-xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all"
               >
                 <Twitter className="w-5 h-5 text-muted-foreground hover:text-primary transition-colors" />
+                <span className="sr-only">Twitter</span>
               </a>
             </div>
           </div>
