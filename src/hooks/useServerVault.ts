@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 type VaultPhase = 'idle' | 'executing' | 'polling' | 'complete' | 'error';
 
@@ -128,9 +129,10 @@ export const useServerVault = () => {
     toast.info(`${label}...`);
 
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(`/api/vault?action=${action}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body),
       });
       const data = await res.json();

@@ -25,6 +25,11 @@ vi.mock('../_lib/rateLimit', () => ({
   getRateLimitHeaders: vi.fn().mockReturnValue({}),
 }));
 
+vi.mock('../_lib/auth', () => ({
+  authenticateUser: vi.fn().mockResolvedValue({ userId: 'test-user-id' }),
+  verifyWalletOwnership: vi.fn().mockResolvedValue(true),
+}));
+
 // Must set env vars before import
 process.env.CircleAPI = 'test-api-key';
 process.env.CIRCLE_ENTITY_SECRET = 'test-secret';

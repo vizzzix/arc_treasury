@@ -4,6 +4,7 @@ import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 import { isValidUUID, isValidAmount, isValidAddress } from './_lib/validate';
+import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -55,6 +56,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method === 'POST' && req.body?.walletAddress && !isValidAddress(req.body.walletAddress)) {
     return res.status(400).json({ error: 'Invalid walletAddress format' });
+  }
+
+  // JWT auth + wallet ownership verification for financial operations
+  if (req.method === 'POST' && req.body?.walletId) {
+    const authUser = await authenticateUser(req);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const ownsWallet = await verifyWalletOwnership(authUser.userId, req.body.walletId);
+    if (!ownsWallet) {
+      return res.status(403).json({ error: 'Wallet does not belong to authenticated user' });
+    }
   }
 
   try {

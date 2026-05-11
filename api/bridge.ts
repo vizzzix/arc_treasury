@@ -4,6 +4,7 @@ import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 import { isValidUUID, isValidAddress, isValidTxHash } from './_lib/validate';
+import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -50,6 +51,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method === 'POST' && req.body?.burnTxHash && !isValidTxHash(req.body.burnTxHash)) {
     return res.status(400).json({ error: 'Invalid burnTxHash format' });
+  }
+
+  // JWT auth + wallet ownership verification for financial operations
+  if (req.method === 'POST' && req.body?.walletId) {
+    const authUser = await authenticateUser(req);
+    if (!authUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const ownsWallet = await verifyWalletOwnership(authUser.userId, req.body.walletId);
+    if (!ownsWallet) {
+      return res.status(403).json({ error: 'Wallet does not belong to authenticated user' });
+    }
   }
 
   try {

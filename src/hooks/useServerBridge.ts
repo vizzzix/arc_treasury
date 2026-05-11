@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { trackSiteBridge } from './bridge/utils';
+import { getAuthHeaders } from '@/lib/authHeaders';
 
 type BridgePhase = 'idle' | 'approving' | 'waiting-approve' | 'burning' | 'waiting-burn' | 'attestation' | 'claiming' | 'complete' | 'error';
 type BridgeDirection = 'sepolia-to-arc' | 'arc-to-sepolia';
@@ -95,10 +96,12 @@ export const useServerBridge = () => {
     const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
 
     try {
+      const headers = await getAuthHeaders();
+
       toast.info('Approving USDC...');
       const approveRes = await fetch('/api/bridge?action=approve', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ walletId, amount, direction, walletAddress }),
       });
       const approveData = await approveRes.json();
@@ -112,7 +115,7 @@ export const useServerBridge = () => {
       toast.info(`Bridging USDC to ${destName}...`);
       const burnRes = await fetch('/api/bridge?action=burn', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ walletId, amount, recipientAddress, direction, walletAddress }),
       });
       const burnData = await burnRes.json();
@@ -134,17 +137,16 @@ export const useServerBridge = () => {
       toast.info(`Claiming USDC on ${destName}...`);
       const claimRes = await fetch('/api/bridge?action=claim', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ burnTxHash, direction, destWalletId, walletAddress }),
       });
       const claimData = await claimRes.json();
 
       if (claimData.status === 'pending') {
-        // Attestation not ready yet — retry after delay
         await new Promise(r => setTimeout(r, 3000));
         const retryRes = await fetch('/api/bridge?action=claim', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ burnTxHash, direction, destWalletId, walletAddress }),
         });
         const retryData = await retryRes.json();

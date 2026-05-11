@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/authHeaders';
 import type { User } from '@supabase/supabase-js';
 
 interface CircleWalletState {
@@ -84,11 +85,11 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      // Create Circle wallet via our API
+      const headers = await getAuthHeaders();
       const res = await fetch('/api/wallet?action=create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
+        headers,
+        body: JSON.stringify({}),
       });
 
       if (!res.ok) throw new Error('Failed to create wallet');

@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, circleGet } from './_lib/circle';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
+import { authenticateUser, upsertUserWallet } from './_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -40,9 +41,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
 
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'userId required' });
+  const authUser = await authenticateUser(req);
+  if (!authUser) return res.status(401).json({ error: 'Authentication required' });
 
+  const userId = authUser.userId;
   const walletSetName = `user-${userId}`;
 
   // 1. Check for existing wallet set for this user
@@ -67,6 +69,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
         accountType: 'EOA',
       });
       const newArcWallet = arcData?.wallets?.[0];
+      await upsertUserWallet(userId, sepoliaWallet.id, newArcWallet?.id || null, sepoliaWallet.address);
       return res.status(200).json({
         walletId: sepoliaWallet.id,
         arcWalletId: newArcWallet?.id || null,
@@ -77,6 +80,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     }
 
     if (sepoliaWallet) {
+      await upsertUserWallet(userId, sepoliaWallet.id, arcWallet?.id || null, sepoliaWallet.address);
       return res.status(200).json({
         walletId: sepoliaWallet.id,
         arcWalletId: arcWallet?.id || null,
@@ -103,6 +107,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   const arcWallet = wallets.find((w: any) => w.blockchain === 'ARC-TESTNET');
   if (!sepoliaWallet) throw new Error('Failed to create wallet');
 
+  await upsertUserWallet(userId, sepoliaWallet.id, arcWallet?.id || null, sepoliaWallet.address);
   return res.status(200).json({
     walletId: sepoliaWallet.id,
     arcWalletId: arcWallet?.id || null,
