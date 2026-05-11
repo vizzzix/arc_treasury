@@ -1,0 +1,4 @@
+api/__tests__
+src/test
+src/**/__tests__
+vitest.config.ts
