@@ -2,7 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, circleGet } from './_lib/circle';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
-import { authenticateUser, upsertUserWallet } from './_lib/auth';
+import { isValidUUID } from './_lib/validate';
+import { authenticateUser, upsertUserWallet, verifyWalletOwnership } from './_lib/auth';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -122,6 +123,13 @@ async function handleBalance(req: VercelRequest, res: VercelResponse) {
 
   const { walletId } = req.query;
   if (!walletId || typeof walletId !== 'string') return res.status(400).json({ error: 'walletId required' });
+  if (!isValidUUID(walletId)) return res.status(400).json({ error: 'Invalid walletId format' });
+
+  // Verify authenticated user owns this wallet
+  const authUser = await authenticateUser(req);
+  if (!authUser) return res.status(401).json({ error: 'Authentication required' });
+  const ownsWallet = await verifyWalletOwnership(authUser.userId, walletId);
+  if (!ownsWallet) return res.status(403).json({ error: 'Wallet does not belong to authenticated user' });
 
   const data = await circleGet(`/wallets/${walletId}/balances`);
   return res.status(200).json({ balances: data?.tokenBalances || [] });
@@ -132,10 +140,17 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
 
   const { walletId } = req.query;
   if (!walletId || typeof walletId !== 'string') return res.status(400).json({ error: 'walletId required' });
+  if (!isValidUUID(walletId)) return res.status(400).json({ error: 'Invalid walletId format' });
+
+  // Verify authenticated user owns this wallet
+  const authUser = await authenticateUser(req);
+  if (!authUser) return res.status(401).json({ error: 'Authentication required' });
+  const ownsWallet = await verifyWalletOwnership(authUser.userId, walletId);
+  if (!ownsWallet) return res.status(403).json({ error: 'Wallet does not belong to authenticated user' });
 
   const data = await circleGet(`/wallets/${walletId}`);
   const wallet = data?.wallet;
-  if (!wallet) throw new Error('Wallet not found');
+  if (!wallet) return res.status(404).json({ error: 'Wallet not found' });
 
   return res.status(200).json({
     walletId: wallet.id,

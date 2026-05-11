@@ -750,6 +750,11 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
 
   const { txId } = req.query;
   if (!txId || typeof txId !== 'string') return res.status(400).json({ error: 'txId required' });
+  if (!isValidUUID(txId)) return res.status(400).json({ error: 'Invalid txId format' });
+
+  // Require authentication for transaction status queries
+  const authUser = await authenticateUser(req);
+  if (!authUser) return res.status(401).json({ error: 'Authentication required' });
 
   try {
     const client = getClient();

@@ -13,7 +13,7 @@ export function setCorsHeaders(req: VercelRequest, res: VercelResponse): void {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 export function handleCors(req: VercelRequest, res: VercelResponse): boolean {

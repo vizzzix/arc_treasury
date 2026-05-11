@@ -318,73 +318,32 @@ async function handleFeedTop(_req: VercelRequest, res: VercelResponse) {
   return res.status(200).json(result);
 }
 
-async function handleDiagnose(_req: VercelRequest, res: VercelResponse) {
-  const results: Record<string, unknown> = {};
+async function handleDiagnose(req: VercelRequest, res: VercelResponse) {
+  // Require CRON secret for diagnostic endpoint — never expose infra details publicly
+  const cronSecret = process.env.CRON;
+  const authHeader = req.headers.authorization;
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 
-  // 1. Check supabaseAdmin initialization
+  const results: Record<string, unknown> = {};
   results.supabaseInitialized = !!supabaseAdmin;
-  results.supabaseUrl = process.env.SUPABASE_URL
-    ? `${process.env.SUPABASE_URL.substring(0, 30)}...`
-    : process.env.VITE_SUPABASE_URL
-      ? `VITE: ${process.env.VITE_SUPABASE_URL.substring(0, 30)}...`
-      : 'NOT SET';
-  results.keyType = process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? 'service_role'
-    : process.env.SUPABASE_KEY
-      ? 'SUPABASE_KEY (may be anon)'
-      : 'NOT SET';
 
   if (!supabaseAdmin) {
     return res.status(200).json(results);
   }
 
-  // 2. Test SELECT from swap_transactions
+  // Test SELECT from swap_transactions
   try {
     const { data, error } = await supabaseAdmin
       .from('swap_transactions')
-      .select('id, tx_hash')
+      .select('id')
       .limit(1);
     results.selectTest = error
-      ? { ok: false, error: error.message, code: error.code, details: error.details }
+      ? { ok: false, error: error.message }
       : { ok: true, rowCount: data?.length ?? 0 };
   } catch (e: any) {
     results.selectTest = { ok: false, exception: e.message };
-  }
-
-  // 3. Test INSERT into swap_transactions
-  const testHash = `0x_diag_test_${Date.now()}`;
-  try {
-    const { error } = await supabaseAdmin.from('swap_transactions').insert({
-      tx_hash: testHash,
-      wallet_address: '0x0000000000000000000000000000000000000000',
-      amount_usd: 0,
-      token_in: 'TEST',
-      token_out: 'TEST',
-      created_at: new Date().toISOString(),
-    });
-    results.insertTest = error
-      ? { ok: false, error: error.message, code: error.code, details: error.details, hint: error.hint }
-      : { ok: true };
-  } catch (e: any) {
-    results.insertTest = { ok: false, exception: e.message };
-  }
-
-  // 4. Clean up test record
-  try {
-    await supabaseAdmin.from('swap_transactions').delete().eq('tx_hash', testHash);
-    results.deleteTest = { ok: true };
-  } catch (e: any) {
-    results.deleteTest = { ok: false, exception: e.message };
-  }
-
-  // 5. Check triggers on swap_transactions
-  try {
-    const { data, error } = await supabaseAdmin.rpc('get_triggers_info', {});
-    results.triggersRpc = error
-      ? { ok: false, error: error.message }
-      : { ok: true, data };
-  } catch {
-    results.triggersRpc = { ok: false, note: 'RPC not available (expected)' };
   }
 
   return res.status(200).json(results);

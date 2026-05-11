@@ -169,7 +169,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('Sync error:', error);
     return res.status(500).json({
       error: 'Sync failed',
-      message: error.message,
     });
   }
 }

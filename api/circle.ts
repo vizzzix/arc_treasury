@@ -49,7 +49,7 @@ async function handleFees(req: VercelRequest, res: VercelResponse) {
     return res.status(response.status).json(data);
   } catch (error: any) {
     console.error('[Circle Fees Proxy] Error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to fetch fees' });
+    return res.status(500).json({ error: 'Failed to fetch fees' });
   }
 }
 
@@ -77,7 +77,7 @@ async function handleMessages(req: VercelRequest, res: VercelResponse) {
     return res.status(response.status).json(data);
   } catch (error: any) {
     console.error('[Circle Messages Proxy] Error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to fetch messages' });
+    return res.status(500).json({ error: 'Failed to fetch messages' });
   }
 }
 
