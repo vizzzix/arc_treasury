@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -38,6 +39,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const { action } = req.query;
+
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `vault:${clientIp}`;
+  if (!checkRateLimit(rlKey, 30, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 30);
+    Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
+    return res.status(429).json({ error: 'Too many requests' });
+  }
 
   try {
     switch (action) {
@@ -99,7 +108,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
   // USDC is native on Arc (18 decimals) — convert to wei string
   const amountWei = toWei(amount, 18);
 
-  console.log(`[Vault] Deposit USDC: wallet=${walletId}, amount=${amount}, wei=${amountWei}`);
+  console.log(`[Vault] Deposit USDC: amount=${amount}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -110,7 +119,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Deposit USDC result:', JSON.stringify(result));
+  console.log('[Vault] Deposit USDC: tx submitted');
 
   await trackTx(result, 'deposit-usdc', walletId, walletAddress, amount, 'USDC');
 
@@ -140,7 +149,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   // Approve 10x for future deposits
   const approveAmount = (BigInt(amountMicro) * 10n).toString();
 
-  console.log(`[Vault] Deposit EURC: wallet=${walletId}, amount=${amount}, micro=${amountMicro}`);
+  console.log(`[Vault] Deposit EURC: amount=${amount}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
@@ -163,7 +172,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   });
 
   const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve submitted:', approveTxId);
+  console.log('[Vault] EURC approve submitted');
 
   // Wait for approve to complete
   await waitForCircleTx(approveTxId);
@@ -177,7 +186,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Deposit EURC result:', JSON.stringify(depositResult));
+  console.log('[Vault] Deposit EURC: tx submitted');
 
   await trackTx(depositResult, 'deposit-eurc', walletId, walletAddress, amount, 'EURC');
 
@@ -196,7 +205,7 @@ async function handleWithdrawUsdc(req: VercelRequest, res: VercelResponse) {
   const { walletId, shares, walletAddress } = req.body;
   if (!walletId || !shares) return res.status(400).json({ error: 'walletId and shares required' });
 
-  console.log(`[Vault] Withdraw USDC: wallet=${walletId}, shares=${shares}`);
+  console.log(`[Vault] Withdraw USDC: shares=${shares}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -206,7 +215,7 @@ async function handleWithdrawUsdc(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Withdraw USDC result:', JSON.stringify(result));
+  console.log('[Vault] Withdraw USDC: tx submitted');
 
   await trackTx(result, 'withdraw-usdc', walletId, walletAddress, shares, 'USDC');
 
@@ -225,7 +234,7 @@ async function handleWithdrawEurc(req: VercelRequest, res: VercelResponse) {
   const { walletId, shares, walletAddress } = req.body;
   if (!walletId || !shares) return res.status(400).json({ error: 'walletId and shares required' });
 
-  console.log(`[Vault] Withdraw EURC: wallet=${walletId}, shares=${shares}`);
+  console.log(`[Vault] Withdraw EURC: shares=${shares}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -235,7 +244,7 @@ async function handleWithdrawEurc(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Withdraw EURC result:', JSON.stringify(result));
+  console.log('[Vault] Withdraw EURC: tx submitted');
 
   await trackTx(result, 'withdraw-eurc', walletId, walletAddress, shares, 'EURC');
 
@@ -264,7 +273,7 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
     ? toWei(minOutput, 6)
     : '0';
 
-  console.log(`[Vault] Swap USDC→EURC: wallet=${walletId}, amount=${amount}, minOutput=${minOutputMicro}`);
+  console.log(`[Vault] Swap USDC→EURC: amount=${amount}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -275,7 +284,7 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Swap USDC→EURC result:', JSON.stringify(result));
+  console.log('[Vault] Swap USDC→EURC: tx submitted');
 
   await trackTx(result, 'swap-usdc-eurc', walletId, walletAddress, amount, 'USDC');
 
@@ -309,7 +318,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
     ? toWei(minOutput, 18)
     : '0';
 
-  console.log(`[Vault] Swap EURC→USDC: wallet=${walletId}, amount=${amount}, minOutput=${minOutputWei}`);
+  console.log(`[Vault] Swap EURC→USDC: amount=${amount}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
@@ -332,7 +341,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
   });
 
   const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve for swap submitted:', approveTxId);
+  console.log('[Vault] EURC approve for swap submitted');
 
   await waitForCircleTx(approveTxId);
 
@@ -345,7 +354,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Swap EURC→USDC result:', JSON.stringify(result));
+  console.log('[Vault] Swap EURC→USDC: tx submitted');
 
   await trackTx(result, 'swap-eurc-usdc', walletId, walletAddress, amount, 'EURC');
 
@@ -378,7 +387,7 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
 
   const amountWei = toWei(amount, 18);
 
-  console.log(`[Vault] Deposit Locked USDC: wallet=${walletId}, amount=${amount}, months=${months}`);
+  console.log(`[Vault] Deposit Locked USDC: amount=${amount}, months=${months}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -389,7 +398,7 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Deposit Locked USDC result:', JSON.stringify(result));
+  console.log('[Vault] Deposit Locked USDC: tx submitted');
 
   await trackTx(result, 'deposit-locked-usdc', walletId, walletAddress, amount, 'USDC', { lockPeriodMonths: months });
 
@@ -423,7 +432,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
   const amountMicro = toWei(amount, 6);
   const approveAmount = (BigInt(amountMicro) * 10n).toString();
 
-  console.log(`[Vault] Deposit Locked EURC: wallet=${walletId}, amount=${amount}, months=${months}`);
+  console.log(`[Vault] Deposit Locked EURC: amount=${amount}, months=${months}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
@@ -446,7 +455,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
   });
 
   const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve for locked deposit submitted:', approveTxId);
+  console.log('[Vault] EURC approve for locked deposit submitted');
 
   await waitForCircleTx(approveTxId);
 
@@ -459,7 +468,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Deposit Locked EURC result:', JSON.stringify(depositResult));
+  console.log('[Vault] Deposit Locked EURC: tx submitted');
 
   await trackTx(depositResult, 'deposit-locked-eurc', walletId, walletAddress, amount, 'EURC', { lockPeriodMonths: months });
 
@@ -489,7 +498,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
   const eurcMicro = toWei(eurcAmount, 6);
   const approveAmount = (BigInt(eurcMicro) * 10n).toString();
 
-  console.log(`[Vault] Add Liquidity: wallet=${walletId}, usdc=${usdcAmount}, eurc=${eurcAmount}`);
+  console.log(`[Vault] Add Liquidity: usdc=${usdcAmount}, eurc=${eurcAmount}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
@@ -512,7 +521,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
   });
 
   const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve for addLiquidity submitted:', approveTxId);
+  console.log('[Vault] EURC approve for addLiquidity submitted');
 
   await waitForCircleTx(approveTxId);
 
@@ -526,7 +535,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Add Liquidity result:', JSON.stringify(result));
+  console.log('[Vault] Add Liquidity: tx submitted');
 
   await trackTx(result, 'add-liquidity', walletId, walletAddress, usdcAmount, 'USDC', { eurcAmount });
 
@@ -555,7 +564,7 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
   // LP tokens use 18 decimals
   const lpWei = toWei(lpAmount, 18);
 
-  console.log(`[Vault] Remove Liquidity: wallet=${walletId}, lp=${lpAmount}`);
+  console.log(`[Vault] Remove Liquidity: lp=${lpAmount}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -565,7 +574,7 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Remove Liquidity result:', JSON.stringify(result));
+  console.log('[Vault] Remove Liquidity: tx submitted');
 
   await trackTx(result, 'remove-liquidity', walletId, walletAddress, lpAmount, 'LP');
 
@@ -591,7 +600,7 @@ async function handleWithdrawLocked(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid positionIndex' });
   }
 
-  console.log(`[Vault] Withdraw Locked: wallet=${walletId}, index=${idx}`);
+  console.log(`[Vault] Withdraw Locked: index=${idx}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -601,7 +610,7 @@ async function handleWithdrawLocked(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Withdraw Locked result:', JSON.stringify(result));
+  console.log('[Vault] Withdraw Locked: tx submitted');
 
   await trackTx(result, 'withdraw-locked', walletId, walletAddress, undefined, undefined, { positionIndex: idx });
 
@@ -627,7 +636,7 @@ async function handleEarlyWithdrawLocked(req: VercelRequest, res: VercelResponse
     return res.status(400).json({ error: 'Invalid positionIndex' });
   }
 
-  console.log(`[Vault] Early Withdraw Locked: wallet=${walletId}, index=${idx}`);
+  console.log(`[Vault] Early Withdraw Locked: index=${idx}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -637,7 +646,7 @@ async function handleEarlyWithdrawLocked(req: VercelRequest, res: VercelResponse
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Early Withdraw Locked result:', JSON.stringify(result));
+  console.log('[Vault] Early Withdraw Locked: tx submitted');
 
   await trackTx(result, 'early-withdraw-locked', walletId, walletAddress, undefined, undefined, { positionIndex: idx });
 
@@ -663,7 +672,7 @@ async function handleClaimLockedYield(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid positionIndex' });
   }
 
-  console.log(`[Vault] Claim Locked Yield: wallet=${walletId}, index=${idx}`);
+  console.log(`[Vault] Claim Locked Yield: index=${idx}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -673,7 +682,7 @@ async function handleClaimLockedYield(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Claim Locked Yield result:', JSON.stringify(result));
+  console.log('[Vault] Claim Locked Yield: tx submitted');
 
   await trackTx(result, 'claim-locked-yield', walletId, walletAddress, undefined, undefined, { positionIndex: idx });
 
@@ -692,7 +701,7 @@ async function handleMintBadge(req: VercelRequest, res: VercelResponse) {
   const { walletId, walletAddress } = req.body;
   if (!walletId) return res.status(400).json({ error: 'walletId required' });
 
-  console.log(`[Vault] Mint Badge: wallet=${walletId}`);
+  console.log('[Vault] Mint Badge');
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -702,7 +711,7 @@ async function handleMintBadge(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Mint Badge result:', JSON.stringify(result));
+  console.log('[Vault] Mint Badge: tx submitted');
 
   await trackTx(result, 'mint-badge', walletId, walletAddress);
 
