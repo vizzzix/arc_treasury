@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
   const rlKey = `vault:${clientIp}`;
-  if (!checkRateLimit(rlKey, 30, 60_000)) {
+  if (!await checkRateLimit(rlKey, 30, 60_000)) {
     const headers = getRateLimitHeaders(rlKey, 30);
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(429).json({ error: 'Too many requests' });

@@ -19,7 +19,7 @@ export default async function handler(request: any, response: any) {
 
   const clientIp = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
   const rlKey = `email:${clientIp}`;
-  if (!checkRateLimit(rlKey, 5, 60_000)) {
+  if (!await checkRateLimit(rlKey, 5, 60_000)) {
     const headers = getRateLimitHeaders(rlKey, 5);
     Object.entries(headers).forEach(([k, v]: [string, string]) => response.setHeader(k, v));
     return response.status(429).json({ error: 'Too many requests' });

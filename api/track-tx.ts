@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const ip = getClientIp(req);
     const rateLimitKey = `post:${ip}`;
-    if (!checkRateLimit(rateLimitKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW)) {
+    if (!await checkRateLimit(rateLimitKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW)) {
       const headers = getRateLimitHeaders(rateLimitKey, RATE_LIMIT_MAX);
       for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
       return res.status(429).json({ error: 'Too many requests. Try again later.' });
