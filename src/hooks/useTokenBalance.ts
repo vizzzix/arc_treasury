@@ -90,7 +90,6 @@ export const useTokenBalance = ({
 
         if (isNativeUSDC) {
           // For Native USDC, use eth_getBalance (returns wei with 18 decimals)
-          console.log(`[useTokenBalance] Fetching Native USDC balance using getBalance() for address ${address}`);
           tokenDecimals = 18; // Native balance is always in wei (18 decimals)
           setDecimals(18);
 
@@ -105,7 +104,6 @@ export const useTokenBalance = ({
         } else {
           // For regular ERC20 tokens, fetch decimals and use balanceOf
           try {
-            console.log(`[useTokenBalance] Fetching decimals for token ${tokenAddress}...`);
             const decimalsResult = await rpcRateLimiter.execute(() =>
               withTimeout(
                 publicClient.readContract({
@@ -118,23 +116,18 @@ export const useTokenBalance = ({
             );
             tokenDecimals = decimalsResult;
             setDecimals(tokenDecimals);
-            console.log(`[useTokenBalance] Token decimals from contract:`, tokenDecimals);
           } catch (decimalsErr: any) {
-            console.warn(`[useTokenBalance] Failed to fetch decimals for ${tokenAddress}:`, decimalsErr);
             // Use provided decimals if available, otherwise default to 6
             if (providedDecimals) {
               tokenDecimals = providedDecimals;
               setDecimals(providedDecimals);
-              console.log(`[useTokenBalance] Using provided decimals:`, providedDecimals);
             } else {
-              console.warn(`[useTokenBalance] No provided decimals, using default 6`);
               tokenDecimals = 6;
               setDecimals(6);
             }
           }
 
           // Get balance with rate limiting
-          console.log(`[useTokenBalance] Fetching balance for token ${tokenAddress} on Arc Testnet for address ${address}`);
           result = await rpcRateLimiter.execute(() =>
             withTimeout(
               publicClient.readContract({
@@ -152,7 +145,6 @@ export const useTokenBalance = ({
           return;
         }
 
-        console.log(`[useTokenBalance] Balance result:`, result, `decimals:`, tokenDecimals);
         setBalance(result);
       } catch (err: any) {
         if (err?.name === 'AbortError' || abortController.signal.aborted) {
@@ -161,19 +153,11 @@ export const useTokenBalance = ({
         
         // Handle 429 (Too Many Requests) errors - rate limiter already handled it
         if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('Too Many Requests')) {
-          console.warn(`[useTokenBalance] Rate limited (429). Rate limiter will handle retry.`);
           setError(new Error('Rate limited. Please wait a moment.'));
           // Don't set balance to 0, keep previous value
           return;
         }
         
-        console.error(`[useTokenBalance] Error fetching token balance for ${tokenAddress}:`, err);
-        console.error(`[useTokenBalance] Error details:`, {
-          message: err?.message,
-          code: err?.code,
-          name: err?.name,
-          shortMessage: err?.shortMessage,
-        });
         setError(err as Error);
         setBalance(0n);
       } finally {

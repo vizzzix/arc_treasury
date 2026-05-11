@@ -142,8 +142,7 @@ const Bridge = () => {
       select(phantomWallet.adapter.name);
       try {
         await connect();
-      } catch (error) {
-        console.error('Failed to connect Phantom:', error);
+      } catch {
       }
     }
   }, [wallets, select, connect]);
@@ -256,9 +255,7 @@ const Bridge = () => {
 
   // Handle bridge based on networks
   const handleBridge = async () => {
-    console.log('[Bridge.tsx] handleBridge called!', { amount, fromNetwork, toNetwork, isEVMtoEVM, isCircleWallet });
     if (!amount || parseFloat(amount) <= 0) {
-      console.log('[Bridge.tsx] Early return - invalid amount');
       return;
     }
     setSavedBridgeParams({ amount, toNetwork });
@@ -270,9 +267,7 @@ const Bridge = () => {
       const destWalletId = isArcToSepolia ? circleWallet.walletId : circleWallet.arcWalletId;
       const address = unifiedWallet.address;
       const direction = isArcToSepolia ? 'arc-to-sepolia' : 'sepolia-to-arc';
-      console.log('[Bridge.tsx] Using server bridge for Circle wallet, direction:', direction);
       if (!walletId || !destWalletId || !address) {
-        console.error('[Bridge.tsx] Missing walletId, destWalletId, or address for server bridge');
         return;
       }
       await serverBridge.bridge(walletId, amount, address, direction as any, destWalletId, address);
@@ -280,7 +275,6 @@ const Bridge = () => {
     }
 
     if (isEVMtoEVM) {
-      console.log('[Bridge.tsx] Calling EVM bridge...');
       // EVM to EVM bridge
       await bridge({
         fromNetwork: fromNetwork as 'ethereumSepolia' | 'arcTestnet',

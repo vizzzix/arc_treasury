@@ -19,7 +19,6 @@ const trackSolanaBridge = async (txHash: string, walletAddress: string, amount: 
       direction,
       created_at: new Date().toISOString(),
     }, { onConflict: 'tx_hash' });
-    console.log('[useBridgeSolana] Tracked site bridge:', txHash, direction);
   } catch (error) {
     console.error('[useBridgeSolana] Failed to track bridge:', error);
   }
@@ -157,10 +156,8 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         throw new Error('Solana wallet not available. Please install Phantom.');
       }
 
-      console.log('[BridgeSolana] Creating EVM adapter...');
       const evmAdapter = await createEVMAdapter({ provider: evmProvider as any });
 
-      console.log('[BridgeSolana] Creating Solana adapter...');
       const solanaAdapter = await createSolanaAdapter({
         provider: solanaProvider,
         connection,
@@ -169,18 +166,13 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       const fromChain = SUPPORTED_NETWORKS[fromNetwork].bridgeKitChain;
       const toChain = SUPPORTED_NETWORKS.solanaDevnet.bridgeKitChain;
 
-      console.log(`[BridgeSolana] Bridging ${amount} USDC from ${fromChain} to ${toChain}`);
-
       const result = await (bridgeKit as any).bridge({
         from: { adapter: evmAdapter, chain: fromChain },
         to: { adapter: solanaAdapter, chain: toChain },
         amount: amount,
         token: 'USDC',
         onProgress: (progress: any) => {
-          console.log('[BridgeSolana] Progress (EVM→Sol):', JSON.stringify(progress, null, 2));
-
           const eventType = progress.type || progress.event || progress.status;
-          console.log('[BridgeSolana] Event type detected:', eventType);
 
           if (eventType === 'APPROVAL_STARTED' || eventType === 'approval') {
             setState(prev => ({ ...prev, attestationStatus: 'approval', attestationProgress: 10 }));
@@ -188,7 +180,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
             setState(prev => ({ ...prev, attestationProgress: 25 }));
           } else if (eventType === 'BURN_STARTED' || eventType === 'burn') {
             const txHash = progress.values?.txHash || progress.txHash || progress.transactionHash || progress.hash;
-            console.log('[BridgeSolana] BURN event - txHash:', txHash, 'progress:', progress);
             setState(prev => ({
               ...prev,
               attestationStatus: 'burn',
@@ -205,8 +196,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
             if (txHash && evmAddress) {
               const direction: SolanaDirection = fromNetwork === 'ethereumSepolia' ? 'sep_to_sol' : 'arc_to_sol';
               trackSolanaBridge(txHash, evmAddress, amount, direction);
-            } else {
-              console.warn('[BridgeSolana] Cannot track - missing txHash or evmAddress:', { txHash, evmAddress });
             }
           } else if (eventType === 'BURN_CONFIRMED') {
             setState(prev => ({
@@ -250,43 +239,25 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         },
       });
 
-      console.log('[BridgeSolana] Bridge result (EVM→Sol):', JSON.stringify(result, null, 2));
-
       // Try to track from result.steps if we didn't catch it from progress events
       const burnStep = (result as any)?.steps?.find((s: any) => s.type === 'burn' || s.step === 'burn' || s.name === 'burn');
       const resultTxHash = burnStep?.values?.txHash || burnStep?.txHash || burnStep?.transactionHash || burnStep?.hash || (result as any)?.txHash;
       if (resultTxHash && evmAddress) {
         const direction: SolanaDirection = fromNetwork === 'ethereumSepolia' ? 'sep_to_sol' : 'arc_to_sol';
-        console.log('[BridgeSolana] Tracking from result:', resultTxHash);
         trackSolanaBridge(resultTxHash, evmAddress, amount, direction);
-      } else {
-        console.warn('[BridgeSolana] Could not get txHash from result:', { resultTxHash, evmAddress, result });
       }
 
       // Bridge completed successfully - SDK Promise resolved means bridge is done
       // Force complete state since MINT_CONFIRMED event may not fire for Solana destination
-      console.log('[BridgeSolana] Bridge Promise resolved (EVM→Sol) - marking complete. Current state:', JSON.stringify({
-        isBridging: true,
-        attestationStatus: 'checking...',
-      }));
 
       // Force complete regardless of hasBurnTx - SDK Promise resolving means success
       setState(prev => {
-        console.log('[BridgeSolana] setState called. Prev state:', {
-          attestationStatus: prev.attestationStatus,
-          attestationProgress: prev.attestationProgress,
-          hasBurnTx: prev.transactions.some(tx => tx.step === 'Burn'),
-          transactions: prev.transactions.length,
-        });
-
         // If already complete, don't change
         if (prev.attestationStatus === 'complete') {
-          console.log('[BridgeSolana] Already complete, keeping state');
           return prev;
         }
 
         // SDK Promise resolved = success, set complete
-        console.log('[BridgeSolana] Setting complete state (EVM→Sol)');
         return {
           ...prev,
           isBridging: false,
@@ -297,8 +268,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       });
 
     } catch (error: any) {
-      console.error('[BridgeSolana] Bridge error (EVM→Sol):', error);
-
       // Detect user rejection — prefer structured errorCategory, fall back to string matching
       const errorMsg = error.message || error.toString() || '';
       const isUserRejection =
@@ -313,14 +282,12 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       setState(prev => {
         // If already complete (MINT_CONFIRMED fired before error), don't change state
         if (prev.attestationStatus === 'complete') {
-          console.log('[BridgeSolana] Already complete, ignoring error');
           return prev;
         }
 
         // If we reached mint stage (progress >= 80), the bridge likely succeeded
         // SDK may throw errors during cleanup after successful mint
         if (prev.attestationProgress >= 80 || prev.attestationStatus === 'mint') {
-          console.log('[BridgeSolana] Reached mint stage, treating as success despite error');
           return {
             ...prev,
             isBridging: false,
@@ -333,8 +300,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
         if (hasBurnTx) {
           // Burn happened but mint failed - show pending_mint for manual claim
-          const burnTx = prev.transactions.find(tx => tx.step === 'Burn');
-          console.warn('[BridgeSolana] Burn completed but mint failed. TxHash:', burnTx?.hash);
           return {
             ...prev,
             isBridging: false,
@@ -396,19 +361,15 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         throw new Error('EVM wallet provider not available');
       }
 
-      console.log('[BridgeSolana] Creating Solana adapter...');
       const solanaAdapter = await createSolanaAdapter({
         provider: solanaProvider,
         connection,
       });
 
-      console.log('[BridgeSolana] Creating EVM adapter...');
       const evmAdapter = await createEVMAdapter({ provider: evmProvider as any });
 
       const fromChain = SUPPORTED_NETWORKS.solanaDevnet.bridgeKitChain;
       const toChain = SUPPORTED_NETWORKS[toNetwork].bridgeKitChain;
-
-      console.log(`[BridgeSolana] Bridging ${amount} USDC from ${fromChain} to ${toChain}`);
 
       const result = await (bridgeKit as any).bridge({
         from: { adapter: solanaAdapter, chain: fromChain },
@@ -416,14 +377,10 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         amount: amount,
         token: 'USDC',
         onProgress: (progress: any) => {
-          console.log('[BridgeSolana] Progress (Sol→EVM):', JSON.stringify(progress, null, 2));
-
           const eventType = progress.type || progress.event || progress.status;
-          console.log('[BridgeSolana] Event type detected:', eventType);
 
           if (eventType === 'BURN_STARTED' || eventType === 'burn') {
             const txHash = progress.values?.txHash || progress.txHash || progress.transactionHash || progress.hash;
-            console.log('[BridgeSolana] BURN event (Sol→EVM) - txHash:', txHash, 'progress:', progress);
             setState(prev => ({
               ...prev,
               attestationStatus: 'burn',
@@ -440,8 +397,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
             if (txHash && publicKey) {
               const direction: SolanaDirection = toNetwork === 'ethereumSepolia' ? 'sol_to_sep' : 'sol_to_arc';
               trackSolanaBridge(txHash, publicKey.toBase58(), amount, direction);
-            } else {
-              console.warn('[BridgeSolana] Cannot track Sol→EVM - missing txHash or publicKey:', { txHash, publicKey: publicKey?.toBase58() });
             }
           } else if (eventType === 'BURN_CONFIRMED') {
             setState(prev => ({
@@ -485,39 +440,24 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         },
       });
 
-      console.log('[BridgeSolana] Bridge result (Sol→EVM):', JSON.stringify(result, null, 2));
-
       // Try to track from result.steps if we didn't catch it from progress events
       const burnStep = (result as any)?.steps?.find((s: any) => s.type === 'burn' || s.step === 'burn' || s.name === 'burn');
       const resultTxHash = burnStep?.values?.txHash || burnStep?.txHash || burnStep?.transactionHash || burnStep?.hash || (result as any)?.txHash;
       if (resultTxHash && publicKey) {
         const direction: SolanaDirection = toNetwork === 'ethereumSepolia' ? 'sol_to_sep' : 'sol_to_arc';
-        console.log('[BridgeSolana] Tracking from result (Sol→EVM):', resultTxHash);
         trackSolanaBridge(resultTxHash, publicKey.toBase58(), amount, direction);
-      } else {
-        console.warn('[BridgeSolana] Could not get txHash from result (Sol→EVM):', { resultTxHash, publicKey: publicKey?.toBase58(), result });
       }
 
       // Bridge completed successfully - SDK Promise resolved means bridge is done
-      console.log('[BridgeSolana] Bridge Promise resolved (Sol→EVM) - marking complete');
 
       // Force complete regardless of hasBurnTx - SDK Promise resolving means success
       setState(prev => {
-        console.log('[BridgeSolana] setState called (Sol→EVM). Prev state:', {
-          attestationStatus: prev.attestationStatus,
-          attestationProgress: prev.attestationProgress,
-          hasBurnTx: prev.transactions.some(tx => tx.step === 'Burn'),
-          transactions: prev.transactions.length,
-        });
-
         // If already complete, don't change
         if (prev.attestationStatus === 'complete') {
-          console.log('[BridgeSolana] Already complete, keeping state');
           return prev;
         }
 
         // SDK Promise resolved = success, set complete
-        console.log('[BridgeSolana] Setting complete state (Sol→EVM)');
         return {
           ...prev,
           isBridging: false,
@@ -528,8 +468,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       });
 
     } catch (error: any) {
-      console.error('[BridgeSolana] Bridge error (Sol→EVM):', error);
-
       // Detect user rejection — prefer structured errorCategory, fall back to string matching
       const errorMsg = error.message || error.toString() || '';
       const isUserRejection =
@@ -544,14 +482,12 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
       setState(prev => {
         // If already complete (MINT_CONFIRMED fired before error), don't change state
         if (prev.attestationStatus === 'complete') {
-          console.log('[BridgeSolana] Already complete, ignoring error');
           return prev;
         }
 
         // If we reached mint stage (progress >= 80), the bridge likely succeeded
         // SDK may throw errors during cleanup after successful mint
         if (prev.attestationProgress >= 80 || prev.attestationStatus === 'mint') {
-          console.log('[BridgeSolana] Reached mint stage, treating as success despite error');
           return {
             ...prev,
             isBridging: false,
@@ -564,8 +500,6 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
         const hasBurnTx = prev.transactions.some(tx => tx.step === 'Burn');
         if (hasBurnTx) {
           // Burn happened but mint failed - show pending_mint for manual claim
-          const burnTx = prev.transactions.find(tx => tx.step === 'Burn');
-          console.warn('[BridgeSolana] Burn completed but mint failed. TxHash:', burnTx?.hash);
           return {
             ...prev,
             isBridging: false,

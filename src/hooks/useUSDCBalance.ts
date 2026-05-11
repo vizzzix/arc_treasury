@@ -36,7 +36,6 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
   useEffect(() => {
     // For Arc Testnet, we don't need usdcAddress since USDC is native
     if (!isConnected || !address || !network) {
-      console.log(`[useUSDCBalance] Skipping fetch:`, { isConnected, address, network: network?.name });
       setBalance(null);
       setIsLoading(false);
       return;
@@ -44,7 +43,6 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
     
     // For other networks, we need usdcAddress
     if (networkKey !== 'arcTestnet' && !usdcAddress) {
-      console.log(`[useUSDCBalance] Skipping fetch: missing usdcAddress for ${network.name}`);
       setBalance(null);
       setIsLoading(false);
       return;
@@ -68,12 +66,6 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
       // Create new AbortController for this request
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
-      
-      console.log(`[useUSDCBalance] Fetching balance for ${network.name}:`, {
-        address,
-        usdcAddress,
-        chainId: network.chainId,
-      });
       
       // Timeout wrapper function with abort support
       const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 5000): Promise<T> => {
@@ -128,7 +120,6 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
         
         // Arc Testnet uses USDC as native currency, not as ERC20 token
         if (networkKey === 'arcTestnet') {
-          console.log(`[useUSDCBalance] Getting native USDC balance for Arc Testnet...`);
           result = await withTimeout(
             publicClient.getBalance({
               address: address as `0x${string}`,
@@ -136,8 +127,6 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
             5000
           );
         } else {
-          console.log(`[useUSDCBalance] Calling readContract for ${network.name}...`);
-          
           // Try to read balance directly
           try {
             result = await withTimeout(
@@ -151,7 +140,6 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
             );
           } catch (contractErr: any) {
             // If balanceOf fails, return 0 balance
-            console.warn(`[useUSDCBalance] readContract failed:`, contractErr);
             result = 0n;
             setError(new Error(`Unable to fetch balance: ${contractErr?.message || 'Contract read failed'}`));
           }
@@ -159,22 +147,18 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
 
         // Check if request was aborted
         if (abortController.signal.aborted) {
-          console.log(`[useUSDCBalance] Request was aborted`);
           return;
         }
 
-        console.log(`[useUSDCBalance] Balance result for ${network.name}:`, result);
         setBalance(result);
       } catch (err: any) {
         // Don't set error if request was aborted
         if (err?.name === 'AbortError' || abortController.signal.aborted) {
-          console.log(`[useUSDCBalance] Request was aborted`);
           return;
         }
         
         // Handle 429 (Too Many Requests) errors - rate limiter already handled it
         if (err?.status === 429 || err?.message?.includes('429') || err?.message?.includes('Too Many Requests')) {
-          console.warn(`[useUSDCBalance] Rate limited (429). Rate limiter will handle retry.`);
           setError(new Error('Rate limited. Please wait a moment.'));
           // Don't set balance to 0, keep previous value
           return;
@@ -238,27 +222,4 @@ export const useUSDCBalance = (networkKey: keyof typeof SUPPORTED_NETWORKS) => {
   };
 };
 
-// Hook to get balances for all testnet networks
-export const useAllUSDCBalances = () => {
-  const account = useAccount();
-  const unifiedWallet = useUnifiedWallet();
-  const address = account?.address || unifiedWallet.address;
-  const isConnected = (account?.isConnected ?? false) || unifiedWallet.isConnected;
-  
-  const testnetNetworks = useMemo(() => {
-    return Object.entries(SUPPORTED_NETWORKS)
-      .filter(([key, network]) => key !== 'arcTestnet' && network.isTestnet)
-      .map(([key]) => key as keyof typeof SUPPORTED_NETWORKS);
-  }, []);
-
-  const balances: Record<string, { balance: string; isLoading: boolean; error: any }> = {};
-
-  // We'll fetch balances using individual hooks in the component
-  // This is a helper to get the list of networks
-  return {
-    networks: testnetNetworks,
-    isConnected,
-    address,
-  };
-};
 

@@ -39,8 +39,7 @@ export const useReferralDetection = () => {
             if (data.success && data.address) {
               localStorage.setItem(REFERRAL_STORAGE_KEY, data.address.toLowerCase());
             }
-          } catch (error) {
-            console.error('Failed to resolve referral code:', error);
+          } catch {
           }
           cleanRefFromUrl();
         } else if (addressRegex.test(refParam)) {
@@ -81,8 +80,7 @@ export const useReferralDetection = () => {
           localStorage.setItem(registeredKey, 'true');
           localStorage.removeItem(REFERRAL_STORAGE_KEY);
         }
-      } catch (error) {
-        console.error('Error registering referral:', error);
+      } catch {
       }
     };
 

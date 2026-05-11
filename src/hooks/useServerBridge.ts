@@ -37,7 +37,6 @@ export const useServerBridge = () => {
         const res = await fetch(`/api/bridge?action=tx-status&txId=${txId}`);
         const data = await res.json();
 
-        console.log(`[ServerBridge] ${label} status (${attempts}):`, data.state);
 
         if (data.state === 'COMPLETE' || data.state === 'CONFIRMED') {
           return { txHash: data.txHash };
@@ -47,7 +46,6 @@ export const useServerBridge = () => {
         }
       } catch (e: any) {
         if (e.message?.includes('failed')) throw e;
-        console.warn(`[ServerBridge] Status poll error:`, e);
       }
     }
     throw new Error(`${label} timeout after ${MAX_ATTEMPTS * 2}s`);
@@ -97,7 +95,6 @@ export const useServerBridge = () => {
     const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
 
     try {
-      // Step 1: Approve
       toast.info('Approving USDC...');
       const approveRes = await fetch('/api/bridge?action=approve', {
         method: 'POST',
@@ -107,14 +104,10 @@ export const useServerBridge = () => {
       const approveData = await approveRes.json();
       if (!approveRes.ok) throw new Error(approveData.error || 'Approve failed');
 
-      console.log('[ServerBridge] Approve submitted:', approveData.transactionId);
-
       setState(s => ({ ...s, phase: 'waiting-approve' }));
       toast.info('Waiting for approval confirmation...');
       await waitForTx(approveData.transactionId, 'Approve');
-      console.log('[ServerBridge] Approve confirmed');
 
-      // Step 2: Burn (bridge)
       setState(s => ({ ...s, phase: 'burning' }));
       toast.info(`Bridging USDC to ${destName}...`);
       const burnRes = await fetch('/api/bridge?action=burn', {
@@ -125,12 +118,9 @@ export const useServerBridge = () => {
       const burnData = await burnRes.json();
       if (!burnRes.ok) throw new Error(burnData.error || 'Bridge failed');
 
-      console.log('[ServerBridge] Burn submitted:', burnData.transactionId);
-
       setState(s => ({ ...s, phase: 'waiting-burn' }));
       toast.info('Waiting for bridge transaction...');
       const { txHash: burnTxHash } = await waitForTx(burnData.transactionId, 'Bridge');
-      console.log('[ServerBridge] Burn confirmed, txHash:', burnTxHash);
 
       // Track in site_bridges for Live Activity
       const feedDirection = isArcToSepolia ? 'to_sepolia' : 'to_arc';
@@ -138,11 +128,8 @@ export const useServerBridge = () => {
 
       setState(s => ({ ...s, burnTxHash, phase: 'attestation' }));
 
-      // Step 3: Wait for attestation
       await waitForAttestation(burnTxHash, direction);
-      console.log('[ServerBridge] Attestation received');
 
-      // Step 4: Claim on destination chain (via Circle API)
       setState(s => ({ ...s, phase: 'claiming' }));
       toast.info(`Claiming USDC on ${destName}...`);
       const claimRes = await fetch('/api/bridge?action=claim', {

@@ -37,8 +37,7 @@ const BridgeSolana = () => {
       select(phantomWallet.adapter.name);
       try {
         await connect();
-      } catch (error) {
-        console.error('Failed to connect Phantom:', error);
+      } catch {
       }
     }
   }, [wallets, select, connect]);

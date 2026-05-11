@@ -65,7 +65,6 @@ export const WhitelistForm = () => {
         variant: "default",
       });
     } catch (error: any) {
-      console.error("Error submitting email:", error);
       toast({
         title: error.message?.includes("already") ? "Already registered" : "Error",
         description: error.message || "Failed to submit email. Please try again later.",

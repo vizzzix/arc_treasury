@@ -7,20 +7,6 @@ interface USYCPriceData {
   lastUpdated: string;
 }
 
-/**
- * Hook to fetch real-time USYC price and APY from Hashnote API
- *
- * Uses Vercel API endpoint /api/usyc-price to bypass CORS restrictions
- * Original API: https://usyc.hashnote.com/api/price-reports
- *
- * The API returns:
- * - price: Current USYC NAV price (e.g., 1.1077)
- * - apy: Annualized return calculated from historical price data (~4%)
- * - asOf: Timestamp of the price update
- *
- * APY is calculated server-side from real historical NAV changes,
- * not from daily price deltas which can be noisy.
- */
 export const useUSYCPrice = () => {
   const [data, setData] = useState<USYCPriceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,8 +17,6 @@ export const useUSYCPrice = () => {
 
     const fetchUSYCPrice = async () => {
       try {
-        console.log('[useUSYCPrice] Fetching USYC price from API...');
-
         // Use our Vercel API endpoint to bypass CORS
         const response = await fetch('/api/usyc-price');
 
@@ -41,7 +25,6 @@ export const useUSYCPrice = () => {
         }
 
         const apiData = await response.json();
-        console.log('[useUSYCPrice] API response:', apiData);
 
         // API now returns pre-calculated APY from historical data
         const currentPrice = parseFloat(apiData.price || '0');
@@ -50,11 +33,6 @@ export const useUSYCPrice = () => {
         if (currentPrice === 0) {
           throw new Error('Invalid price data from API');
         }
-
-        console.log('[useUSYCPrice] Using server-calculated APY:', {
-          price: currentPrice,
-          apy: apy.toFixed(2) + '%',
-        });
 
         if (isMounted) {
           setData({

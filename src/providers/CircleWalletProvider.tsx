@@ -105,8 +105,7 @@ export function CircleWalletProvider({ children }: { children: ReactNode }) {
 
       localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(newState));
       setState(newState);
-    } catch (error) {
-      console.warn('Circle wallet API unavailable, user authenticated but no wallet created yet:', error);
+    } catch {
       // User is authenticated via Supabase but wallet creation failed
       // This happens in local dev (no Vercel API routes) - will work on Vercel deploy
       const pendingState: CircleWalletState = {

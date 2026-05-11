@@ -443,12 +443,10 @@ export const useBridgeCCTP = () => {
               const response = await fetch(attestationUrl);
 
               if (!response.ok) {
-                console.log(`[useBridgeCCTP] Attestation API error: ${response.status}, attempt ${attempts}`);
                 continue;
               }
 
               const data = await response.json();
-              console.log(`[useBridgeCCTP] Attestation check ${attempts}:`, data.messages?.[0]?.status || 'no status');
 
               if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
                 debug(' Attestation received!');

@@ -61,8 +61,7 @@ const TwitterConnect = () => {
       const res = await fetch(`/api/twitter?action=status&walletAddress=${address}`);
       const data = await res.json();
       setStatus(data);
-    } catch (err) {
-      console.error('Failed to fetch Twitter status:', err);
+    } catch {
     }
   };
 

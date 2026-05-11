@@ -31,8 +31,7 @@ async function fetchRateOnce(): Promise<number | null> {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ rate, timestamp: Date.now() }));
       return rate;
     }
-  } catch (error) {
-    console.warn('Failed to fetch EUR/USD rate from frankfurter.app:', error);
+  } catch {
   }
 
   // Fallback: exchangerate.host
@@ -44,8 +43,7 @@ async function fetchRateOnce(): Promise<number | null> {
       localStorage.setItem(CACHE_KEY, JSON.stringify({ rate, timestamp: Date.now() }));
       return rate;
     }
-  } catch (error) {
-    console.warn('Failed to fetch EUR/USD rate from exchangerate.host:', error);
+  } catch {
   }
 
   return null;

@@ -129,9 +129,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
   });
 }
 
-// --- Deposit EURC (ERC20, needs approve first) ---
-// Step 1: approve(address,uint256) on EURC
-// Step 2: depositEURC(uint256) on vault — EURC 6 decimals
+// --- Deposit EURC (approve + deposit, 6 decimals) ---
 
 async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' });
@@ -162,7 +160,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Step 1: Approve EURC
+
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: EURC_ADDRESS,
@@ -177,7 +175,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   // Wait for approve to complete
   await waitForCircleTx(approveTxId);
 
-  // Step 2: Deposit EURC
+
   const depositResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: TREASURY_VAULT,
@@ -331,7 +329,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Step 1: Approve EURC for StablecoinSwap
+
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: EURC_ADDRESS,
@@ -345,7 +343,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
 
   await waitForCircleTx(approveTxId);
 
-  // Step 2: Swap
+
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: STABLECOIN_SWAP,
@@ -445,7 +443,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
     }
   }
 
-  // Step 1: Approve EURC
+
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: EURC_ADDRESS,
@@ -459,7 +457,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
 
   await waitForCircleTx(approveTxId);
 
-  // Step 2: Deposit Locked EURC
+
   const depositResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: TREASURY_VAULT,
@@ -511,7 +509,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Step 1: Approve EURC for StablecoinSwap
+
   const approveResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: EURC_ADDRESS,
@@ -525,7 +523,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
 
   await waitForCircleTx(approveTxId);
 
-  // Step 2: addLiquidity(uint256 eurcAmount, uint256 minLpTokens) payable
+
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
     contractAddress: STABLECOIN_SWAP,

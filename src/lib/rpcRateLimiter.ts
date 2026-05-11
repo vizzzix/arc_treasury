@@ -75,8 +75,6 @@ class RPCRateLimiter {
             this.maxBackoffDelay / this.minDelayBetweenRequests
           );
 
-          console.warn(`[RPCRateLimiter] Rate limited (429). Backoff multiplier: ${this.backoffMultiplier}, consecutive errors: ${this.consecutive429Errors}`);
-
           // Re-queue the request with backoff
           const backoffDelay = this.minDelayBetweenRequests * this.backoffMultiplier;
           setTimeout(() => {

@@ -69,8 +69,7 @@ export const WalletConnect = () => {
     setAuthLoading(true);
     try {
       await circleWallet.signInWithGoogle();
-    } catch (err) {
-      console.error('Google login failed:', err);
+    } catch {
     } finally {
       setAuthLoading(false);
     }

@@ -18,7 +18,7 @@ import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
 import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { useTVL } from "@/hooks/useTVL";
-import { TOKEN_ADDRESSES, TOKEN_DECIMALS, MIGRATION_IN_PROGRESS, SHOW_MIGRATION_SUCCESS, USYC_WHITELIST_PENDING, SUPPORTED_NETWORKS } from "@/lib/constants";
+import { TOKEN_ADDRESSES, TOKEN_DECIMALS, USYC_WHITELIST_PENDING, SUPPORTED_NETWORKS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 
 const DashboardSimplified = () => {
@@ -61,7 +61,6 @@ const DashboardSimplified = () => {
         variant: "default",
       });
     } catch (error: any) {
-      console.error('[DashboardSimplified] Network switch error:', error);
       toast({
         title: "Failed to switch network",
         description: error?.message || "Please manually switch to Arc Testnet in your wallet",
@@ -212,8 +211,6 @@ const DashboardSimplified = () => {
       // User wants to withdraw everything - read FRESH shares directly from contract
       // This prevents race conditions where cached shares are stale after a recent deposit
       const freshShares = await getFreshUserShares(tokenType);
-      console.log('[handleWithdraw] Full withdrawal, using fresh shares from contract:', freshShares.toString());
-
       if (freshShares === 0n) {
         throw new Error('No shares available to withdraw');
       }
@@ -228,7 +225,6 @@ const DashboardSimplified = () => {
       const sharesNum = dollarAmount / price;
       const floored = Math.floor(sharesNum * 1e6) / 1e6;
       const sharesToWithdraw = floored.toFixed(6);
-      console.log('[handleWithdraw] Partial withdrawal, shares:', sharesToWithdraw);
       const txHash = await withdraw(sharesToWithdraw, tokenType);
       refetchAll();
       return txHash;
@@ -300,25 +296,6 @@ const DashboardSimplified = () => {
           </div>
         </div>
       </nav>
-
-      {/* Migration Success Banner */}
-      {SHOW_MIGRATION_SUCCESS && (
-        <div className="bg-green-500/10 border-b border-green-500/30">
-          <div className="container mx-auto px-4 sm:px-6 py-4">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-green-600 dark:text-green-400 text-center">
-              <Shield className="w-5 h-5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-semibold mb-1">
-                  Migration Complete! Thank you for testing!
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  All funds from V4 have been returned to your wallets. The new V5 vault is now live with improved features. Thank you for your patience and support!
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* USYC Whitelist Pending Banner */}
       {USYC_WHITELIST_PENDING && (
@@ -545,7 +522,7 @@ const DashboardSimplified = () => {
                       onClick={() => setDepositModalOpen(true)}
                       size="sm"
                       className="h-7 text-xs px-2.5"
-                      disabled={MIGRATION_IN_PROGRESS || USYC_WHITELIST_PENDING}
+                      disabled={USYC_WHITELIST_PENDING}
                     >
                       Deposit
                     </Button>
@@ -604,8 +581,8 @@ const DashboardSimplified = () => {
                 <Button
                   onClick={() => setLockPositionModalOpen(true)}
                   className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto"
-                  disabled={MIGRATION_IN_PROGRESS || USYC_WHITELIST_PENDING}
-                  title={MIGRATION_IN_PROGRESS ? "Locks disabled during migration" : USYC_WHITELIST_PENDING ? "Locks disabled - awaiting USYC whitelist" : undefined}
+                  disabled={USYC_WHITELIST_PENDING}
+                  title={USYC_WHITELIST_PENDING ? "Locks disabled - awaiting USYC whitelist" : undefined}
                 >
                   <Lock className="w-4 h-4" />
                   New Lock Position
@@ -625,8 +602,8 @@ const DashboardSimplified = () => {
                   <Button
                     onClick={() => setLockPositionModalOpen(true)}
                     className="bg-primary hover:bg-primary/90"
-                    disabled={MIGRATION_IN_PROGRESS || USYC_WHITELIST_PENDING}
-                    title={MIGRATION_IN_PROGRESS ? "Locks disabled during migration" : USYC_WHITELIST_PENDING ? "Locks disabled - awaiting USYC whitelist" : undefined}
+                    disabled={USYC_WHITELIST_PENDING}
+                    title={USYC_WHITELIST_PENDING ? "Locks disabled - awaiting USYC whitelist" : undefined}
                   >
                     Create Your First Lock
                   </Button>

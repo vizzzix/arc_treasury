@@ -77,7 +77,6 @@ const Support = () => {
         setIsSuccess(false);
       }, 3000);
     } catch (error) {
-      console.error("Error submitting support request:", error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",

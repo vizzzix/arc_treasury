@@ -158,9 +158,6 @@ export const useTreasuryVault = () => {
   // Check if connected to Arc Testnet (Circle wallets are always on Arc)
   const isArcTestnet = isCircle || chainId === 5042002;
 
-  // Read total pool value
-  // Common query options to handle 429 errors
-  // Auto-refresh with longer interval to avoid 429 errors
   const commonQueryOptions = {
     refetchInterval: 60000, // Auto-refresh every 60 seconds
     staleTime: 30000, // Data considered fresh for 30s (avoids redundant refetches)

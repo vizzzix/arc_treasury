@@ -44,7 +44,6 @@ const Swap = () => {
         variant: "default",
       });
     } catch (error: any) {
-      console.error('[Swap] Network switch error:', error);
       toast({
         title: "Failed to switch network",
         description: error?.message || "Please manually switch to Arc Testnet in your wallet",

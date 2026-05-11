@@ -32,7 +32,6 @@ const Profile = lazyRetry(() => import("./pages/Profile"));
 const Rewards = lazyRetry(() => import("./pages/Rewards"));
 const Support = lazyRetry(() => import("./pages/Support"));
 const Litepaper = lazyRetry(() => import("./pages/Litepaper"));
-const LockDesignPreview = lazyRetry(() => import("./pages/LockDesignPreview"));
 const Swap = lazyRetry(() => import("./pages/Swap"));
 const PitchDeck = lazyRetry(() => import("./pages/PitchDeck"));
 const Metrics = lazyRetry(() => import("./pages/Metrics"));
@@ -93,7 +92,6 @@ const AppRoutes = () => {
           <Route path="/bridge" element={<PageTransition><Bridge /></PageTransition>} />
           <Route path="/support" element={<PageTransition><Support /></PageTransition>} />
           <Route path="/litepaper" element={<PageTransition><Litepaper /></PageTransition>} />
-          <Route path="/lock-preview" element={<LockDesignPreview />} />
           <Route path="/swap" element={<PageTransition><Swap /></PageTransition>} />
           <Route path="/bridge-solana" element={<PageTransition><BridgeSolana /></PageTransition>} />
           <Route path="/pitch/:token" element={<PageTransition><PitchDeck /></PageTransition>} />

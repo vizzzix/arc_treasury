@@ -72,23 +72,6 @@ All colors MUST be HSL.
                 0 0 40px hsl(var(--vault-glow) / 0.1);
   }
   
-  .metallic-gradient {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--metallic-start)),
-      hsl(var(--metallic-end))
-    );
-  }
-  
-  .glass-effect {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--card) / 0.8),
-      hsl(var(--card) / 0.4)
-    );
-    backdrop-filter: blur(12px);
-    border: 1px solid hsl(var(--glass-border) / 0.3);
-  }
 }
 
 /* Calculator Card Animations */

@@ -77,7 +77,6 @@ export const useReferral = () => {
         setReferralCode(codeData.code);
         setStats(statsData);
       } catch (err) {
-        console.error('Error fetching referral data:', err);
         setError((err as Error).message);
       } finally {
         setIsLoading(false);
