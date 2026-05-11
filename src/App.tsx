@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from 'wagmi';
 import { ThemeProvider } from "next-themes";
+import * as Sentry from '@sentry/react';
 import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
 import { StarField } from './components/StarField';
@@ -105,21 +106,33 @@ const AppRoutes = () => {
   );
 };
 
+const SentryErrorFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-8 text-center">
+    <h1 className="text-2xl font-bold">Something went wrong</h1>
+    <p className="text-muted-foreground">An unexpected error occurred. Please refresh the page.</p>
+    <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md">
+      Refresh
+    </button>
+  </div>
+);
+
 const App = () => (
-  <WagmiProvider config={config}>
-    <QueryClientProvider client={queryClient}>
-      <CircleWalletProvider>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <TooltipProvider>
-            <StarField />
-            <Toaster />
-            <Sonner />
-            <AppRoutes />
-          </TooltipProvider>
-        </ThemeProvider>
-      </CircleWalletProvider>
-    </QueryClientProvider>
-  </WagmiProvider>
+  <Sentry.ErrorBoundary fallback={<SentryErrorFallback />}>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <CircleWalletProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <TooltipProvider>
+              <StarField />
+              <Toaster />
+              <Sonner />
+              <AppRoutes />
+            </TooltipProvider>
+          </ThemeProvider>
+        </CircleWalletProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  </Sentry.ErrorBoundary>
 );
 
 export default App;

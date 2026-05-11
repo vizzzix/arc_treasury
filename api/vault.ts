@@ -5,6 +5,7 @@ import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 import { isValidUUID, isValidAmount, isValidAddress } from './_lib/validate';
 import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
+import { captureApiError } from './_lib/sentry';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -109,6 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error: any) {
     console.error('[Vault API] Error:', error.message || error);
+    captureApiError(error, { endpoint: 'vault', action: String(action) });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

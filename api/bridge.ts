@@ -5,6 +5,7 @@ import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 import { isValidUUID, isValidAddress, isValidTxHash } from './_lib/validate';
 import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
+import { captureApiError } from './_lib/sentry';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -82,6 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error: any) {
     console.error('[Bridge API] Error:', error.message || error);
+    captureApiError(error, { endpoint: 'bridge', action: String(action) });
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
