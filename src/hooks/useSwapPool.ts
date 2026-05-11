@@ -174,6 +174,40 @@ export interface SwapTransaction {
   explorerUrl: string;
 }
 
+export function calculateSlippageMinOutput(
+  outputAmount: bigint,
+  slippagePercent: number
+): bigint {
+  const slippageBps = BigInt(Math.round(slippagePercent * 100));
+  return outputAmount - (outputAmount * slippageBps / 10000n);
+}
+
+export function calculateTotalLiquidityUsd(
+  usdcReserveWei: bigint,
+  eurcReserve6dec: bigint,
+  eurToUsdRate: number
+): string {
+  const usdcVal = Number(formatEther(usdcReserveWei));
+  const eurcVal = Number(formatUnits(eurcReserve6dec, 6)) * eurToUsdRate;
+  return (usdcVal + eurcVal).toFixed(2);
+}
+
+export function calculateRemoveLiquidityMinOutputs(
+  lpAmount: string,
+  userLpTokens: string,
+  userUsdcShare: string,
+  userEurcShare: string,
+  slippagePercent: number = 0.99
+): { minUsdcOut: bigint; minEurcOut: bigint; expectedUsdc: number; expectedEurc: number } {
+  const userLp = parseFloat(userLpTokens);
+  const ratio = userLp > 0 ? Math.min(parseFloat(lpAmount) / userLp, 1.0) : 0;
+  const expectedUsdc = parseFloat(userUsdcShare) * ratio;
+  const expectedEurc = parseFloat(userEurcShare) * ratio;
+  const minUsdcOut = parseEther((expectedUsdc * slippagePercent).toFixed(18));
+  const minEurcOut = parseUnits((expectedEurc * slippagePercent).toFixed(6), 6);
+  return { minUsdcOut, minEurcOut, expectedUsdc, expectedEurc };
+}
+
 export function useSwapPool() {
   const account = useAccount();
   const unifiedWallet = useUnifiedWallet();
@@ -234,10 +268,7 @@ export function useSwapPool() {
       const [usdcReserve, eurcReserve] = reserves;
       const rateNum = Number(rate) / 1e6;
 
-      // Calculate total liquidity in USD using live EUR/USD rate
-      const usdcVal = Number(formatEther(usdcReserve));
-      const eurcVal = Number(formatUnits(eurcReserve, 6)) * liveRateRef.current;
-      const totalUsd = usdcVal + eurcVal;
+      const totalUsd = parseFloat(calculateTotalLiquidityUsd(usdcReserve, eurcReserve, liveRateRef.current));
 
       let userStats = {
         lpTokens: '0',
@@ -351,10 +382,8 @@ export function useSwapPool() {
     setLastSwap(null);
 
     try {
-      // BigInt slippage: avoid floating-point precision loss
       const outputUnits = parseUnits(minOutput, 6);
-      const slippageBps = BigInt(Math.round(slippagePercent * 100));
-      const minOutputWei = outputUnits - (outputUnits * slippageBps / 10000n);
+      const minOutputWei = calculateSlippageMinOutput(outputUnits, slippagePercent);
       const minOutputAdjusted = formatUnits(minOutputWei, 6);
 
       // Circle wallet path — server-side execution
@@ -443,10 +472,8 @@ export function useSwapPool() {
     setLastSwap(null);
 
     try {
-      // BigInt slippage: avoid floating-point precision loss
       const outputWei = parseEther(minOutput);
-      const slippageBps = BigInt(Math.round(slippagePercent * 100));
-      const minOutputWei = outputWei - (outputWei * slippageBps / 10000n);
+      const minOutputWei = calculateSlippageMinOutput(outputWei, slippagePercent);
       const minOutputAdjusted = formatEther(minOutputWei);
 
       // Circle wallet path — server-side execution (approve + swap handled on server)
@@ -652,13 +679,9 @@ export function useSwapPool() {
 
     setIsLoading(true);
     try {
-      // Calculate min outputs with 1% slippage protection
-      const userLp = parseFloat(poolStats.userLpTokens);
-      const ratio = userLp > 0 ? Math.min(parseFloat(lpAmount) / userLp, 1.0) : 0;
-      const expectedUsdc = parseFloat(poolStats.userUsdcShare) * ratio;
-      const expectedEurc = parseFloat(poolStats.userEurcShare) * ratio;
-      const minUsdcOut = parseEther((expectedUsdc * 0.99).toFixed(18));
-      const minEurcOut = parseUnits((expectedEurc * 0.99).toFixed(6), 6);
+      const { minUsdcOut, minEurcOut, expectedUsdc, expectedEurc } = calculateRemoveLiquidityMinOutputs(
+        lpAmount, poolStats.userLpTokens, poolStats.userUsdcShare, poolStats.userEurcShare
+      );
 
       // Circle wallet path — server-side execution
       if (isCircle) {

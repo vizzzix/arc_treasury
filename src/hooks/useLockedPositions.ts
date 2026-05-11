@@ -41,9 +41,47 @@ export interface LockedPositionDisplay {
   isUnlocked: boolean;
 }
 
-/**
- * Hook to fetch user's locked positions
- */
+const NATIVE_USDC = '0x3600000000000000000000000000000000000000';
+
+export function calculateEarnedYield(amount: number, apyPercent: number, depositTime: Date, now: number = Date.now()): number {
+  const timeElapsed = now - depositTime.getTime();
+  const yearsElapsed = timeElapsed / (365 * 24 * 60 * 60 * 1000);
+  return amount * (apyPercent / 100) * yearsElapsed;
+}
+
+export function mapLockedPosition(
+  pos: LockedPosition,
+  arrayIndex: number,
+  baseAPY: number,
+  now: number = Date.now()
+): LockedPositionDisplay | null {
+  if (pos.withdrawn) return null;
+
+  const isNativeUSDC = pos.token === NATIVE_USDC;
+  const tokenDecimals = isNativeUSDC ? 18 : 6;
+  const amount = Number(formatUnits(pos.amount, tokenDecimals));
+
+  const depositTime = new Date(Number(pos.depositTime) * 1000);
+  const unlockTime = new Date(Number(pos.unlockTime) * 1000);
+  const isUnlocked = now >= unlockTime.getTime();
+
+  const currentAPY = baseAPY;
+  const earnedYield = calculateEarnedYield(amount, currentAPY, depositTime, now);
+
+  return {
+    id: pos.id.toString(),
+    arrayIndex,
+    amount,
+    token: isNativeUSDC ? 'USDC' : 'EURC',
+    lockPeriodMonths: pos.lockPeriodMonths as 1 | 3 | 12,
+    depositTime,
+    unlockTime,
+    currentAPY,
+    earnedYield,
+    isUnlocked,
+  };
+}
+
 export function useLockedPositions(address?: `0x${string}`) {
   const [positions, setPositions] = useState<LockedPositionDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -71,43 +109,8 @@ export function useLockedPositions(address?: `0x${string}`) {
 
     setIsLoading(true);
 
-    // Map positions and preserve original array index, filter out withdrawn positions
     const displayPositions: LockedPositionDisplay[] = rawPositions
-      .map((pos: LockedPosition, arrayIndex: number) => {
-        // Skip withdrawn positions
-        if (pos.withdrawn) return null;
-
-        // Check if token is Native USDC (uses 18 decimals) or EURC (uses 6 decimals)
-        const isNativeUSDC = pos.token === '0x3600000000000000000000000000000000000000';
-        const tokenDecimals = isNativeUSDC ? 18 : 6;
-        const amount = Number(formatUnits(pos.amount, tokenDecimals));
-
-        const depositTime = new Date(Number(pos.depositTime) * 1000);
-        const unlockTime = new Date(Number(pos.unlockTime) * 1000);
-        const isUnlocked = Date.now() >= unlockTime.getTime();
-
-        // APY is the same for all lock periods (new business model)
-        // Lock bonus is only Points multiplier, not APY boost
-        const currentAPY = baseAPY;
-
-        // Calculate earned yield (simplified - should call contract for accurate value)
-        const timeElapsed = Date.now() - depositTime.getTime();
-        const yearsElapsed = timeElapsed / (365 * 24 * 60 * 60 * 1000);
-        const earnedYield = amount * (currentAPY / 100) * yearsElapsed;
-
-        return {
-          id: pos.id.toString(),
-          arrayIndex, // Original index in contract's array
-          amount,
-          token: pos.token === '0x3600000000000000000000000000000000000000' ? 'USDC' : 'EURC',
-          lockPeriodMonths: pos.lockPeriodMonths as 1 | 3 | 12,
-          depositTime,
-          unlockTime,
-          currentAPY,
-          earnedYield,
-          isUnlocked,
-        };
-      })
+      .map((pos: LockedPosition, arrayIndex: number) => mapLockedPosition(pos, arrayIndex, baseAPY))
       .filter((pos): pos is LockedPositionDisplay => pos !== null);
 
     setPositions(displayPositions);
