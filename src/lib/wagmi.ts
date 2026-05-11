@@ -38,9 +38,13 @@ export const config = createConfig({
   ],
   transports: {
     [mainnet.id]: http(),
-    [sepolia.id]: http(),
+    [sepolia.id]: fallback([
+      http('https://ethereum-sepolia-rpc.publicnode.com', { retryCount: 2, timeout: 30000 }),
+      http('https://rpc.sepolia.org', { retryCount: 1, timeout: 30000 }),
+      http(),
+    ]),
     [base.id]: http(),
     [baseSepolia.id]: http(),
-    [arcTestnetChain.id]: arcTestnetHttp, // Use custom transport with retry logic
+    [arcTestnetChain.id]: arcTestnetHttp,
   },
 })
