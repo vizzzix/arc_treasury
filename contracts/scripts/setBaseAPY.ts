@@ -80,7 +80,7 @@ async function main() {
 
   const receipt = await publicClient.waitForTransactionReceipt({
     hash,
-    timeout: 120_000,
+    timeout: 300_000,
   });
   console.log("Confirmed in block:", receipt.blockNumber);
 

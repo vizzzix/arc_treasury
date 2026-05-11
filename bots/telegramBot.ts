@@ -160,7 +160,7 @@ const TELLER_ABI = [
   { name: "maxDeposit", type: "function", inputs: [{ name: "account", type: "address" }], outputs: [{ type: "uint256" }], stateMutability: "view" },
 ] as const;
 
-const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+const publicClient = createPublicClient({ chain: arcTestnet, transport: http(undefined, { retryCount: 3, retryDelay: 2_000, timeout: 30_000 }) });
 const sepoliaPublicClient = createPublicClient({ chain: sepoliaChain, transport: http() });
 
 // Smart amount formatter - handles tiny testnet amounts better
@@ -685,7 +685,7 @@ async function handleSync(chatId: number) {
         gas: 100_000n,
         gasPrice,
       });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 300_000 });
 
       const message = `✅ *APY Synced!*
 
@@ -1408,7 +1408,7 @@ async function autoConvertUSDCtoUSYC() {
     });
 
     console.log(`[Auto-Convert] Tx: ${hash}`);
-    await publicClient.waitForTransactionReceipt({ hash });
+    await publicClient.waitForTransactionReceipt({ hash, timeout: 300_000 });
 
     // Get new totalUSYC
     // @ts-ignore
@@ -1518,7 +1518,7 @@ async function updateSwapExchangeRate() {
     });
 
     console.log(`[ExchangeRate] Tx: ${hash}`);
-    await publicClient.waitForTransactionReceipt({ hash });
+    await publicClient.waitForTransactionReceipt({ hash, timeout: 300_000 });
 
     const message = `💱 *Exchange Rate Updated*
 
@@ -1571,7 +1571,7 @@ async function checkAlerts() {
             gasPrice,
           });
 
-          const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
+          const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 300_000 });
 
           const message = `✅ *APY Auto-Synced*
 
