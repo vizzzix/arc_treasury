@@ -38,6 +38,15 @@ const NETWORK_TO_BLOCKCHAIN: Record<string, Blockchain> = {
   arcTestnet: Blockchain.Arc_Testnet,
 };
 
+export function calculateBridgeFee(amountWei: bigint): bigint {
+  const MAX_FEE_CAP = 5_000_000n; // 5 USDC (6 decimals)
+  const MIN_FEE = 100_000n;       // 0.1 USDC
+  const calculated = (amountWei * 50n) / 10_000n; // 0.5%
+  if (calculated < MIN_FEE) return MIN_FEE;
+  if (calculated > MAX_FEE_CAP) return MAX_FEE_CAP;
+  return calculated;
+}
+
 export const useBridgeCCTP = () => {
   const account = useAccount();
   const address = account?.address;
@@ -370,12 +379,7 @@ export const useBridgeCCTP = () => {
 
           const BRIDGE_SELECTOR = '0xd0d4229a' as `0x${string}`;
           const ARC_DESTINATION_DOMAIN = 26; // Arc Testnet CCTP domain
-          // maxFee is the MAXIMUM Circle relay can deduct (actual fee is lower)
-          // Setting generous maxFee ensures relay accepts the transfer
-          const MAX_FEE_CAP = 5_000_000n; // 5 USDC cap (6 decimals)
-          const MIN_FEE = 100_000n;       // 0.1 USDC floor
-          const calculatedFee = (amountWei * 50n) / 10_000n; // 0.5% of amount
-          const maxFee = calculatedFee < MIN_FEE ? MIN_FEE : calculatedFee > MAX_FEE_CAP ? MAX_FEE_CAP : calculatedFee;
+          const maxFee = calculateBridgeFee(amountWei);
           const minFinalityThreshold = 1000n; // Fast Transfer threshold
           const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
 
@@ -650,11 +654,7 @@ export const useBridgeCCTP = () => {
         const mintRecipient = pad(address as `0x${string}`, { size: 32 });
         const SEPOLIA_DESTINATION_DOMAIN = 0;
         const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`;
-        // maxFee is the MAXIMUM Circle relay can deduct (actual fee is lower)
-        const MAX_FEE_CAP = 5_000_000n; // 5 USDC cap (6 decimals)
-        const MIN_FEE = 100_000n;       // 0.1 USDC floor
-        const calculatedFee = (amountWei * 50n) / 10_000n; // 0.5% of amount
-        const maxFee = calculatedFee < MIN_FEE ? MIN_FEE : calculatedFee > MAX_FEE_CAP ? MAX_FEE_CAP : calculatedFee;
+        const maxFee = calculateBridgeFee(amountWei);
         const minFinalityThreshold = 2000; // Standard finality threshold
 
         debug(' depositForBurn params:', { amount: amountWei.toString(), maxFee: maxFee.toString(), minFinalityThreshold });

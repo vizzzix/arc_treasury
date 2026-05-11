@@ -9,6 +9,37 @@ import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
 
+export function formatPoolValue(value: bigint | undefined): string {
+  if (!value) return '0.00';
+  return parseFloat(formatUnits(value, 6)).toFixed(2);
+}
+
+export function formatShares(shares: bigint | undefined): string {
+  if (!shares) return '0';
+  const sharesValue = parseFloat(formatUnits(shares, 18));
+  const floored = Math.floor(sharesValue * 1e6) / 1e6;
+  return floored.toFixed(6);
+}
+
+export function calculateFlexibleYield(
+  totalDeposited: bigint,
+  userShareValue: bigint
+): number {
+  const deposited = parseFloat(formatUnits(totalDeposited, 6));
+  const current = parseFloat(formatUnits(userShareValue, 6));
+  const yield_ = current - deposited;
+  return yield_ > 0 ? yield_ : 0;
+}
+
+export function calculateEURCPricePerShare(
+  totalEURC: bigint | undefined,
+  totalEURCShares: bigint | undefined
+): string {
+  if (!totalEURC || !totalEURCShares || totalEURCShares === 0n) return '1.00';
+  const price = (totalEURC * BigInt(1e12) * BigInt(1e18)) / totalEURCShares;
+  return parseFloat(formatUnits(price, 18)).toFixed(4);
+}
+
 // Inline ABI subset — only functions used by this hook
 // Full ABI is in TreasuryVault.json (122KB Hardhat artifact with bytecode)
 const TREASURY_VAULT_ABI = [
@@ -224,10 +255,7 @@ export const useTreasuryVault = () => {
   const userInfoData = userData?.[3]?.result as readonly [bigint, bigint, bigint, `0x${string}`, bigint] | undefined;
 
   // Formatted values
-  const formattedTotalPoolValue = useMemo(() => {
-    if (!totalPoolValue) return '0.00';
-    return parseFloat(formatUnits(totalPoolValue, 6)).toFixed(2);
-  }, [totalPoolValue]);
+  const formattedTotalPoolValue = useMemo(() => formatPoolValue(totalPoolValue), [totalPoolValue]);
 
   const formattedPricePerShare = useMemo(() => {
     if (!pricePerShare) return '1.00';
@@ -237,17 +265,7 @@ export const useTreasuryVault = () => {
     return parseFloat(formatUnits(pricePerShare, 18)).toFixed(4);
   }, [pricePerShare]);
 
-  const formattedUserShares = useMemo(() => {
-    if (!userShares) return '0';
-    // Shares are stored as raw bigint values matching the USDC amount (for first deposit 1:1)
-    // Since totalUSDC is stored with 18 decimals, shares are also in 18 decimals format
-    // For display, we need to divide by 1e18 to get the actual share count in USDC terms
-    const sharesValue = parseFloat(formatUnits(userShares, 18));
-    // Use floor rounding to avoid withdrawing more shares than available
-    // toFixed() uses standard rounding which can round UP, causing "Insufficient shares" errors
-    const floored = Math.floor(sharesValue * 1e6) / 1e6;
-    return floored.toFixed(6);
-  }, [userShares]);
+  const formattedUserShares = useMemo(() => formatShares(userShares), [userShares]);
 
   const formattedUserShareValue = useMemo(() => {
     if (!userShareValue) return '0.00';
@@ -256,25 +274,12 @@ export const useTreasuryVault = () => {
     return parseFloat(formatUnits(userShareValue, 6)).toFixed(2);
   }, [userShareValue]);
 
-  // EURC formatted values
-  // Calculate EURC price per share from totalEURC / totalEURCShares
-  // Contract formula: pricePerShare = (totalEURC * 1e12 * PRECISION) / totalEURCShares
-  const formattedEURCPricePerShare = useMemo(() => {
-    if (!totalEURC || !totalEURCShares || totalEURCShares === 0n) return '1.00';
-    // totalEURC is 6 decimals, totalEURCShares is 18 decimals
-    // Price = (totalEURC * 1e12 * 1e18) / totalEURCShares - result in 18 decimals
-    const price = (totalEURC * BigInt(1e12) * BigInt(1e18)) / totalEURCShares;
-    return parseFloat(formatUnits(price, 18)).toFixed(4);
-  }, [totalEURC, totalEURCShares]);
+  const formattedEURCPricePerShare = useMemo(
+    () => calculateEURCPricePerShare(totalEURC, totalEURCShares),
+    [totalEURC, totalEURCShares]
+  );
 
-  const formattedUserEURCShares = useMemo(() => {
-    if (!userEURCShares) return '0';
-    // EURC shares are stored with 18 decimals (PRECISION)
-    const sharesValue = parseFloat(formatUnits(userEURCShares, 18));
-    // Use floor rounding to avoid withdrawing more shares than available
-    const floored = Math.floor(sharesValue * 1e6) / 1e6;
-    return floored.toFixed(6);
-  }, [userEURCShares]);
+  const formattedUserEURCShares = useMemo(() => formatShares(userEURCShares), [userEURCShares]);
 
   const formattedUserEURCShareValue = useMemo(() => {
     if (!userEURCShares || !totalEURC || !totalEURCShares || totalEURCShares === 0n) return '0.00';
@@ -289,14 +294,7 @@ export const useTreasuryVault = () => {
   // userInfoData: [permanentPoints, lastPointsUpdate, totalDeposited, referrer, referralPoints]
   const flexibleYield = useMemo(() => {
     if (!userInfoData || !userShareValue) return 0;
-    // totalDeposited is stored in 6 decimals in the contract
-    const totalDeposited = userInfoData[2] as bigint;
-    const depositedNum = parseFloat(formatUnits(totalDeposited, 6));
-    // userShareValue is already in 6 decimals from getUserShareValue
-    const currentValue = parseFloat(formatUnits(userShareValue, 6));
-    // Yield = current value - total deposited (can be negative if withdrawn more than deposited)
-    const yield_ = currentValue - depositedNum;
-    return yield_ > 0 ? yield_ : 0;
+    return calculateFlexibleYield(userInfoData[2] as bigint, userShareValue);
   }, [userInfoData, userShareValue]);
 
 
