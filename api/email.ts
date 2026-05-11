@@ -57,7 +57,8 @@ async function handleSendCode(request: any, response: any) {
       return response.status(400).json({ error: 'Invalid wallet address' });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const { randomInt } = await import('crypto');
+    const code = randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
     await supabase
