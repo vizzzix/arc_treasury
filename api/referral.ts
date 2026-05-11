@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { randomBytes } from 'crypto';
+import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
@@ -31,6 +33,16 @@ function generateReferralCode() {
 const addressRegex = /^0x[a-fA-F0-9]{40}$/;
 
 export default async function handler(request: any, response: any) {
+  if (handleCors(request, response)) return;
+
+  const clientIp = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `referral:${clientIp}`;
+  if (!checkRateLimit(rlKey, 20, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 20);
+    Object.entries(headers).forEach(([k, v]: [string, string]) => response.setHeader(k, v));
+    return response.status(429).json({ error: 'Too many requests' });
+  }
+
   const { action } = request.query;
 
   switch (action) {

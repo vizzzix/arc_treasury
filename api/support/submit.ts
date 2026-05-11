@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { handleCors } from '../_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from '../_lib/rateLimit';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -25,6 +27,16 @@ const SUPPORT_EMAIL = 'info@arctreasury.biz';
  * }
  */
 export default async function handler(request: any, response: any) {
+  if (handleCors(request, response)) return;
+
+  const clientIp = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `support:${clientIp}`;
+  if (!checkRateLimit(rlKey, 3, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 3);
+    Object.entries(headers).forEach(([k, v]: [string, string]) => response.setHeader(k, v));
+    return response.status(429).json({ error: 'Too many requests' });
+  }
+
   // Only allow POST requests
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method not allowed' });

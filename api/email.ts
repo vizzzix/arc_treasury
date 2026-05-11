@@ -1,5 +1,7 @@
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -13,6 +15,16 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const addressRegex = /^0x[a-fA-F0-9]{40}$/;
 
 export default async function handler(request: any, response: any) {
+  if (handleCors(request, response)) return;
+
+  const clientIp = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `email:${clientIp}`;
+  if (!checkRateLimit(rlKey, 5, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 5);
+    Object.entries(headers).forEach(([k, v]: [string, string]) => response.setHeader(k, v));
+    return response.status(429).json({ error: 'Too many requests' });
+  }
+
   const { action } = request.query;
 
   switch (action) {

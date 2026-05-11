@@ -49,10 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'claim':
         return await handleClaim(req, res);
       case 'health':
-        return res.status(200).json({
-          ok: true,
-          hasCircleApi: !!process.env.CircleAPI,
-        });
+        return res.status(200).json({ ok: true });
       default:
         return res.status(400).json({ error: 'Invalid action. Use: approve, burn, tx-status, claim' });
     }

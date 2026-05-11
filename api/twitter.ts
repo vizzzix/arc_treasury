@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://tclvgmhluhayiflwvkfq.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || '';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing SUPABASE_URL or SUPABASE_KEY');
 
 const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID || process.env.ClientID || '';
 const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET || process.env.ClientSecret || '';
@@ -13,6 +16,19 @@ const REQUIRED_TWEET_ID = process.env.TWITTER_REQUIRED_TWEET_ID || '123456789012
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export default async function handler(request: any, response: any) {
+  if (request.method === 'OPTIONS') {
+    handleCors(request, response);
+    return;
+  }
+
+  const clientIp = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `twitter:${clientIp}`;
+  if (!checkRateLimit(rlKey, 10, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 10);
+    Object.entries(headers).forEach(([k, v]: [string, string]) => response.setHeader(k, v));
+    return response.status(429).json({ error: 'Too many requests' });
+  }
+
   const { action } = request.query;
 
   switch (action) {

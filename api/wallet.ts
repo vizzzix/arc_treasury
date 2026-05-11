@@ -1,11 +1,20 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, circleGet } from './_lib/circle';
 import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const { action } = req.query;
+
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `wallet:${clientIp}`;
+  if (!checkRateLimit(rlKey, 10, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 10);
+    Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
+    return res.status(429).json({ error: 'Too many requests' });
+  }
 
   try {
     switch (action) {
@@ -16,11 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'get':
         return await handleGet(req, res);
       case 'health':
-        return res.status(200).json({
-          ok: true,
-          hasApiKey: !!process.env.CircleAPI,
-          hasEntitySecret: !!process.env.CIRCLE_ENTITY_SECRET,
-        });
+        return res.status(200).json({ ok: true });
       default:
         return res.status(400).json({ error: 'Invalid action. Use: create, balance, get, health' });
     }
