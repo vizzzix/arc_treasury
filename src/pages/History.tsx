@@ -22,6 +22,7 @@ import {
   Sparkles,
   RefreshCw,
   ChevronDown,
+  XCircle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -110,6 +111,12 @@ const History = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Animated gradient background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-primary/5 via-transparent to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-blue-500/5 via-transparent to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/20 bg-background/60 backdrop-blur-xl">
         <div className="container mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -143,7 +150,7 @@ const History = () => {
                 disabled={isLoading}
                 className="text-xs gap-1"
               >
-                <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : "hover:text-foreground"} transition-colors`} />
                 Refresh
               </Button>
             </div>
@@ -151,11 +158,12 @@ const History = () => {
             {isLoading && transactions.length === 0 ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                  <Skeleton key={i} className="h-16 w-full rounded-lg border border-border/50" />
                 ))}
               </div>
             ) : error ? (
-              <div className="text-center py-8">
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-center">
+                <XCircle className="w-5 h-5 text-red-400 mx-auto mb-2" />
                 <p className="text-red-400 text-sm">{error}</p>
                 <Button variant="outline" size="sm" onClick={refetch} className="mt-3">
                   Retry
@@ -188,7 +196,7 @@ const History = () => {
                     variant="ghost"
                     size="sm"
                     onClick={loadMore}
-                    className="w-full text-xs text-muted-foreground"
+                    className="w-full h-10 text-xs text-muted-foreground hover:text-foreground"
                   >
                     <ChevronDown className="w-3 h-3 mr-1" />
                     Load more

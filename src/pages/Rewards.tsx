@@ -344,27 +344,27 @@ const Rewards = () => {
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.bridgePoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Bridge</p>
-                    <p className="text-[9px] text-muted-foreground/60">${volumes.bridge.toLocaleString()}</p>
+                    <p className="text-[11px] text-muted-foreground/60">${volumes.bridge.toLocaleString()}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.vaultPoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Vault</p>
-                    <p className="text-[9px] text-muted-foreground/60">${realVaultBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    <p className="text-[11px] text-muted-foreground/60">${realVaultBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.swapPoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Swap</p>
-                    <p className="text-[9px] text-muted-foreground/60">${volumes.swap.toLocaleString()}</p>
+                    <p className="text-[11px] text-muted-foreground/60">${volumes.swap.toLocaleString()}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.liquidityPoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Liquidity</p>
-                    <p className="text-[9px] text-muted-foreground/60">${realLpBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    <p className="text-[11px] text-muted-foreground/60">${realLpBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                   </div>
                   <div className="text-center p-2 rounded-lg bg-white/[0.02]">
                     <p className="text-lg font-semibold">{breakdown.referralPoints.toFixed(0)}</p>
                     <p className="text-[10px] text-muted-foreground">Referral</p>
-                    <p className="text-[9px] text-muted-foreground/60">{volumes.referrals} refs</p>
+                    <p className="text-[11px] text-muted-foreground/60">{volumes.referrals} refs</p>
                   </div>
                 </div>
               </div>
@@ -449,13 +449,13 @@ const Rewards = () => {
                         className={`flex items-center gap-2 py-1.5 px-2 rounded-lg transition-colors text-xs ${
                           isCurrentUser
                             ? 'bg-primary/10'
-                            : 'bg-white/[0.02] hover:bg-white/[0.05]'
+                            : 'bg-white/[0.02] hover:bg-white/[0.05] transition-colors duration-200'
                         }`}
                       >
                         {/* Rank */}
                         <span className={`w-5 text-center font-medium ${
                           entry.rank === 1 ? 'text-yellow-500' :
-                          entry.rank === 2 ? 'text-gray-400' :
+                          entry.rank === 2 ? 'text-slate-300' :
                           entry.rank === 3 ? 'text-amber-600' : 'text-muted-foreground'
                         }`}>
                           {entry.rank}

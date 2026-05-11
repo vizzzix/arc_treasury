@@ -515,7 +515,7 @@ const Swap = () => {
                   placeholder="0.00"
                   value={outputAmount}
                   readOnly
-                  className="pr-20 h-14 text-xl bg-white/5 border-white/10"
+                  className="pr-20 h-14 text-xl bg-white/[0.02] border-white/10 cursor-default"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <div className="px-3 py-1.5 bg-white/10 rounded-lg font-medium text-sm">

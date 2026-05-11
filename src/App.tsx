@@ -10,6 +10,7 @@ import { config } from './lib/wagmi';
 import { useReferralDetection } from './hooks/useReferralDetection';
 import { StarField } from './components/StarField';
 import { CircleWalletProvider } from './providers/CircleWalletProvider';
+import { PageTransition } from './components/PageTransition';
 
 // Eagerly load landing page for fast initial render
 import Landing from "./pages/Landing";
@@ -81,23 +82,23 @@ const AppRoutes = () => {
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+      <Suspense fallback={<div className="flex flex-col items-center justify-center min-h-screen gap-3"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /><p className="text-sm text-muted-foreground animate-pulse">Loading...</p></div>}>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/app" element={<DashboardSimplified />} />
-          <Route path="/dashboard" element={<DashboardSimplified />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/rewards" element={<Rewards />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/bridge" element={<Bridge />} />
-          <Route path="/support" element={<Support />} />
-          <Route path="/litepaper" element={<Litepaper />} />
+          <Route path="/app" element={<PageTransition><DashboardSimplified /></PageTransition>} />
+          <Route path="/dashboard" element={<PageTransition><DashboardSimplified /></PageTransition>} />
+          <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
+          <Route path="/rewards" element={<PageTransition><Rewards /></PageTransition>} />
+          <Route path="/faq" element={<PageTransition><FAQ /></PageTransition>} />
+          <Route path="/bridge" element={<PageTransition><Bridge /></PageTransition>} />
+          <Route path="/support" element={<PageTransition><Support /></PageTransition>} />
+          <Route path="/litepaper" element={<PageTransition><Litepaper /></PageTransition>} />
           <Route path="/lock-preview" element={<LockDesignPreview />} />
-          <Route path="/swap" element={<Swap />} />
-          <Route path="/bridge-solana" element={<BridgeSolana />} />
-          <Route path="/pitch/:token" element={<PitchDeck />} />
-          <Route path="/metrics/:token" element={<Metrics />} />
-          <Route path="/history" element={<History />} />
+          <Route path="/swap" element={<PageTransition><Swap /></PageTransition>} />
+          <Route path="/bridge-solana" element={<PageTransition><BridgeSolana /></PageTransition>} />
+          <Route path="/pitch/:token" element={<PageTransition><PitchDeck /></PageTransition>} />
+          <Route path="/metrics/:token" element={<PageTransition><Metrics /></PageTransition>} />
+          <Route path="/history" element={<PageTransition><History /></PageTransition>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
