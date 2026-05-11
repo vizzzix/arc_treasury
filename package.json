@@ -26,7 +26,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "compile": "hardhat compile",
-    "test": "npm run test:contracts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:contracts": "cd contracts && npm install && npx hardhat test",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network arcTestnet",
     "deploy:local": "hardhat run scripts/deploy.ts --network hardhat",
@@ -89,6 +91,9 @@
     "@notionhq/client": "^5.4.0",
     "@openzeppelin/contracts": "^5.0.0",
     "@tailwindcss/typography": "^0.5.16",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.1",
     "@types/react": "^18.3.23",
@@ -107,6 +112,7 @@
     "globals": "^15.15.0",
     "hardhat": "^3.0.0",
     "https-proxy-agent": "^7.0.6",
+    "jsdom": "^29.1.1",
     "mocha": "^11.7.5",
     "pdf-lib": "^1.17.1",
     "postcss": "^8.5.6",
@@ -119,6 +125,7 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19",
+    "vitest": "^4.1.5",
     "xlsx": "^0.18.5"
   }
 }

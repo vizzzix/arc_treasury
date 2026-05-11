@@ -362,7 +362,7 @@ export const useBridgeCCTP = () => {
               functionName: 'approve',
               args: [ARC_BRIDGE_CONTRACT, amountWei * 10n], // Approve extra for future bridges
             });
-            await sepoliaClient!.waitForTransactionReceipt({ hash: approveHash });
+            await sepoliaClient!.waitForTransactionReceipt({ hash: approveHash, timeout: 120_000 });
           }
 
           // Step 2: Call bridgeWithPreapproval with raw calldata (selector 0xd0d4229a)
@@ -413,7 +413,7 @@ export const useBridgeCCTP = () => {
           burnTxHashRef.current = burnHash;
           burnConfirmedRef.current = true;
 
-          const receipt = await sepoliaClient!.waitForTransactionReceipt({ hash: burnHash });
+          const receipt = await sepoliaClient!.waitForTransactionReceipt({ hash: burnHash, timeout: 120_000 });
 
           if (receipt.status !== 'success') {
             throw new Error('Bridge transaction failed');
@@ -543,7 +543,7 @@ export const useBridgeCCTP = () => {
             debug(' Mint tx sent:', mintHash);
             mintTxHashRef.current = mintHash; // Mark that mint tx was sent
 
-            const mintReceipt = await arcClient!.waitForTransactionReceipt({ hash: mintHash });
+            const mintReceipt = await arcClient!.waitForTransactionReceipt({ hash: mintHash, timeout: 120_000 });
 
             if (mintReceipt.status === 'success') {
               debug(' Mint confirmed!');
@@ -643,7 +643,7 @@ export const useBridgeCCTP = () => {
             functionName: 'approve',
             args: [tokenMessenger, amountWei * 10n],
           });
-          await arcClient!.waitForTransactionReceipt({ hash: approveHash });
+          await arcClient!.waitForTransactionReceipt({ hash: approveHash, timeout: 120_000 });
         }
 
         // Step 2: Call CCTP V2 depositForBurn (7 params) on Arc's TokenMessengerV2
@@ -687,7 +687,7 @@ export const useBridgeCCTP = () => {
         burnTxHashRef.current = burnHash;
         burnConfirmedRef.current = true;
 
-        const receipt = await arcClient!.waitForTransactionReceipt({ hash: burnHash });
+        const receipt = await arcClient!.waitForTransactionReceipt({ hash: burnHash, timeout: 120_000 });
 
         if (receipt.status !== 'success') {
           throw new Error('Bridge transaction failed on Arc');
@@ -793,7 +793,7 @@ export const useBridgeCCTP = () => {
           debug(' Mint tx sent:', mintHash);
           mintTxHashRef.current = mintHash;
 
-          const mintReceipt = await sepoliaClient!.waitForTransactionReceipt({ hash: mintHash });
+          const mintReceipt = await sepoliaClient!.waitForTransactionReceipt({ hash: mintHash, timeout: 120_000 });
 
           if (mintReceipt.status === 'success') {
             debug(' Mint confirmed!');
@@ -1087,10 +1087,10 @@ export const useBridgeCCTP = () => {
       debug(' Claim tx hash:', hash);
       toast.info('Waiting for confirmation...');
 
-      // Wait for confirmation
+      // Wait for confirmation (with timeout to prevent infinite hang)
       const destClient = destNetwork === 'arcTestnet' ? arcClient : sepoliaClient;
       if (destClient) {
-        await destClient.waitForTransactionReceipt({ hash });
+        await destClient.waitForTransactionReceipt({ hash, timeout: 120_000 });
       }
 
       // Success - clear from localStorage
