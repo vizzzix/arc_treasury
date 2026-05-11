@@ -21,7 +21,7 @@ import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
 import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
 import { parseUnits, encodeAbiParameters, concat, createWalletClient, custom, pad } from 'viem';
 import { toast } from 'sonner';
-import { BridgeKit, Blockchain } from '@circle-fin/bridge-kit';
+import { BridgeKit, Blockchain, isKitError } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { MESSAGE_TRANSMITTER_ABI } from '@/lib/abis/cctp';
 import { debug, safeStringify, trackSiteBridge } from './bridge/utils';
@@ -830,8 +830,22 @@ export const useBridgeCCTP = () => {
 
         let errorMsg = error?.message || 'An unexpected error occurred';
 
-        // Handle common errors
-        if (errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('User denied')) {
+        // Use Bridge Kit structured error categories when available
+        if (isKitError(error)) {
+          if (error.type === 'INPUT' && error.name === 'USER_REJECTED') {
+            errorMsg = 'Transaction rejected by user';
+          } else if (error.type === 'BALANCE') {
+            errorMsg = 'Insufficient funds for gas';
+          } else if (error.type === 'ONCHAIN') {
+            errorMsg = error.message || 'On-chain transaction failed';
+          } else if (error.type === 'NETWORK') {
+            errorMsg = 'Network error — please check your connection';
+          } else if (error.type === 'RPC') {
+            errorMsg = 'RPC error — please try again';
+          } else if (error.type === 'RATE_LIMIT') {
+            errorMsg = 'Too many requests — please wait and retry';
+          }
+        } else if (errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('User denied')) {
           errorMsg = 'Transaction rejected by user';
         } else if (errorMsg.includes('insufficient funds')) {
           errorMsg = 'Insufficient funds for gas';
@@ -844,14 +858,15 @@ export const useBridgeCCTP = () => {
         debug(' On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
 
         // Check if error is about network switch - don't show "Your funds are safe" for network errors
-        const isNetworkError = errorMsg.includes('chain') || 
-                               errorMsg.includes('network') || 
+        const isNetworkSwitchError = (isKitError(error) && (error.type === 'NETWORK' || error.type === 'RPC')) ||
+                               errorMsg.includes('chain') ||
+                               errorMsg.includes('network') ||
                                errorMsg.includes('Chain ID') ||
                                errorMsg.includes('not switched') ||
                                errorMsg.includes('does not match') ||
                                (errorMsg.includes('current') && errorMsg.includes('expected'));
         
-        if (isNetworkError && burnConfirmedRef.current) {
+        if (isNetworkSwitchError && burnConfirmedRef.current) {
           debug(' Network switch error after burn - show network error, not "Your funds are safe"');
           toast.error('Network switch required', { 
             description: 'Please switch to Arc Testnet manually and try claiming again.',

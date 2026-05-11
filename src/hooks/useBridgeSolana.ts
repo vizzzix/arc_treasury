@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { useAccount, useWalletClient } from 'wagmi';
-import { BridgeKit } from '@circle-fin/bridge-kit';
+import { BridgeKit, isKitError } from '@circle-fin/bridge-kit';
 import { createAdapterFromProvider as createEVMAdapter } from '@circle-fin/adapter-viem-v2';
 import { createAdapterFromProvider as createSolanaAdapter } from '@circle-fin/adapter-solana';
 import { SUPPORTED_NETWORKS } from '@/lib/constants';
@@ -299,14 +299,15 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
     } catch (error: any) {
       console.error('[BridgeSolana] Bridge error (EVM→Sol):', error);
 
-      // Detect user rejection
+      // Detect user rejection — prefer structured errorCategory, fall back to string matching
       const errorMsg = error.message || error.toString() || '';
       const isUserRejection =
+        (isKitError(error) && error.type === 'INPUT' && error.name === 'USER_REJECTED') ||
         errorMsg.toLowerCase().includes('user rejected') ||
         errorMsg.toLowerCase().includes('user denied') ||
         errorMsg.toLowerCase().includes('user cancelled') ||
         errorMsg.toLowerCase().includes('rejected by user') ||
-        errorMsg.includes('4001') || // EIP-1193 user rejection
+        errorMsg.includes('4001') ||
         errorMsg.includes('ACTION_REJECTED');
 
       setState(prev => {
@@ -529,14 +530,15 @@ export function useBridgeSolana(): UseBridgeSolanaReturn {
     } catch (error: any) {
       console.error('[BridgeSolana] Bridge error (Sol→EVM):', error);
 
-      // Detect user rejection
+      // Detect user rejection — prefer structured errorCategory, fall back to string matching
       const errorMsg = error.message || error.toString() || '';
       const isUserRejection =
+        (isKitError(error) && error.type === 'INPUT' && error.name === 'USER_REJECTED') ||
         errorMsg.toLowerCase().includes('user rejected') ||
         errorMsg.toLowerCase().includes('user denied') ||
         errorMsg.toLowerCase().includes('user cancelled') ||
         errorMsg.toLowerCase().includes('rejected by user') ||
-        errorMsg.includes('4001') || // EIP-1193 user rejection
+        errorMsg.includes('4001') ||
         errorMsg.includes('ACTION_REJECTED');
 
       setState(prev => {
