@@ -3,6 +3,7 @@ import { circlePost, getClient } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
+import { isValidUUID, isValidAddress, isValidTxHash } from './_lib/validate';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -36,6 +37,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const headers = getRateLimitHeaders(rlKey, 20);
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(429).json({ error: 'Too many requests' });
+  }
+
+  if (req.method === 'POST' && req.body?.walletId && !isValidUUID(req.body.walletId)) {
+    return res.status(400).json({ error: 'Invalid walletId format' });
+  }
+  if (req.method === 'POST' && req.body?.destWalletId && !isValidUUID(req.body.destWalletId)) {
+    return res.status(400).json({ error: 'Invalid destWalletId format' });
+  }
+  if (req.method === 'POST' && req.body?.walletAddress && !isValidAddress(req.body.walletAddress)) {
+    return res.status(400).json({ error: 'Invalid walletAddress format' });
+  }
+  if (req.method === 'POST' && req.body?.burnTxHash && !isValidTxHash(req.body.burnTxHash)) {
+    return res.status(400).json({ error: 'Invalid burnTxHash format' });
   }
 
   try {

@@ -114,7 +114,7 @@ async function handleCallback(request: any, response: any) {
     const { code, state, error: oauthError } = request.query;
 
     if (oauthError) {
-      return response.redirect('/profile?twitter=error&reason=' + oauthError);
+      return response.redirect('/profile?twitter=error&reason=' + encodeURIComponent(String(oauthError)));
     }
 
     if (!code || !state) {

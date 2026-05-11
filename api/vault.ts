@@ -3,6 +3,7 @@ import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
+import { isValidUUID, isValidAmount, isValidAddress } from './_lib/validate';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -46,6 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const headers = getRateLimitHeaders(rlKey, 30);
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(429).json({ error: 'Too many requests' });
+  }
+
+  // Validate walletId format on all POST requests (all financial operations)
+  if (req.method === 'POST' && req.body?.walletId && !isValidUUID(req.body.walletId)) {
+    return res.status(400).json({ error: 'Invalid walletId format' });
+  }
+  if (req.method === 'POST' && req.body?.walletAddress && !isValidAddress(req.body.walletAddress)) {
+    return res.status(400).json({ error: 'Invalid walletAddress format' });
   }
 
   try {

@@ -11,13 +11,15 @@ vi.mock('../_lib/cors', () => ({
 
 import handler from '../circle';
 
+const VALID_TX_HASH = '0x' + 'ab'.repeat(32);
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('api/circle - messages proxy', () => {
   it('returns 400 when domain missing', async () => {
-    const req = createMockReq({ query: { action: 'messages', transactionHash: '0xabc' } });
+    const req = createMockReq({ query: { action: 'messages', transactionHash: VALID_TX_HASH } });
     const res = createMockRes();
     await handler(req as any, res);
     expect(res.status).toHaveBeenCalledWith(400);
@@ -41,13 +43,13 @@ describe('api/circle - messages proxy', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     const req = createMockReq({
-      query: { action: 'messages', domain: '26', transactionHash: '0xabc123' },
+      query: { action: 'messages', domain: '26', transactionHash: VALID_TX_HASH },
     });
     const res = createMockRes();
     await handler(req as any, res);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://iris-api-sandbox.circle.com/v2/messages/26?transactionHash=0xabc123',
+      `https://iris-api-sandbox.circle.com/v2/messages/26?transactionHash=${VALID_TX_HASH}`,
       expect.objectContaining({ headers: { Accept: 'application/json' } }),
     );
     expect(res.status).toHaveBeenCalledWith(200);
@@ -65,7 +67,7 @@ describe('api/circle - messages proxy', () => {
     vi.stubGlobal('fetch', mockFetch);
 
     const req = createMockReq({
-      query: { action: 'messages', domain: '0', transactionHash: '0xbad' },
+      query: { action: 'messages', domain: '0', transactionHash: VALID_TX_HASH },
     });
     const res = createMockRes();
     await handler(req as any, res);

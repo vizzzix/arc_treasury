@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { handleCors } from '../_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from '../_lib/rateLimit';
+import { escapeHtml } from '../_lib/validate';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -106,13 +107,13 @@ export default async function handler(request: any, response: any) {
           subject: `[${category.toUpperCase()}] ${subject}`,
           html: `
             <h2>New Support Request</h2>
-            <p><strong>Category:</strong> ${category}</p>
-            <p><strong>From:</strong> ${name} (${email})</p>
-            ${walletAddress ? `<p><strong>Wallet:</strong> ${walletAddress}</p>` : ''}
-            <p><strong>Subject:</strong> ${subject}</p>
+            <p><strong>Category:</strong> ${escapeHtml(category)}</p>
+            <p><strong>From:</strong> ${escapeHtml(name)} (${escapeHtml(email)})</p>
+            ${walletAddress ? `<p><strong>Wallet:</strong> ${escapeHtml(walletAddress)}</p>` : ''}
+            <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
             <hr />
             <p><strong>Message:</strong></p>
-            <p>${message.replace(/\n/g, '<br>')}</p>
+            <p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>
             <hr />
             <p><small>Submitted at: ${new Date().toISOString()}</small></p>
           `,

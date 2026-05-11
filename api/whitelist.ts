@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -36,7 +38,16 @@ export default async function handler(
   request: VercelRequest,
   response: VercelResponse,
 ) {
-  // Only allow POST requests
+  if (handleCors(request, response)) return;
+
+  const clientIp = (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `whitelist:${clientIp}`;
+  if (!checkRateLimit(rlKey, 5, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 5);
+    Object.entries(headers).forEach(([k, v]: [string, string]) => response.setHeader(k, v));
+    return response.status(429).json({ error: 'Too many requests' });
+  }
+
   if (request.method !== 'POST') {
     return response.status(405).json({ error: 'Method not allowed' });
   }

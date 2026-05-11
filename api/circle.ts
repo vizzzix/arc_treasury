@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'crypto';
 import { updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
+import { isValidDomain, isValidTxHash } from './_lib/validate';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -33,10 +34,12 @@ async function handleFees(req: VercelRequest, res: VercelResponse) {
   if (!destDomain || !srcDomain) {
     return res.status(400).json({ error: 'Missing destDomain or srcDomain' });
   }
+  if (!isValidDomain(destDomain as string) || !isValidDomain(srcDomain as string)) {
+    return res.status(400).json({ error: 'Invalid domain value' });
+  }
 
   try {
-    const circleUrl = `https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${destDomain}/${srcDomain}`;
-    console.log('[Circle Fees Proxy] Fetching:', circleUrl);
+    const circleUrl = `https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${parseInt(destDomain as string, 10)}/${parseInt(srcDomain as string, 10)}`;
 
     const response = await fetch(circleUrl, {
       headers: { 'Accept': 'application/json' },
@@ -56,10 +59,15 @@ async function handleMessages(req: VercelRequest, res: VercelResponse) {
   if (!domain || !transactionHash) {
     return res.status(400).json({ error: 'Missing domain or transactionHash' });
   }
+  if (!isValidDomain(domain as string)) {
+    return res.status(400).json({ error: 'Invalid domain value' });
+  }
+  if (!isValidTxHash(transactionHash as string)) {
+    return res.status(400).json({ error: 'Invalid transactionHash format' });
+  }
 
   try {
-    const circleUrl = `https://iris-api-sandbox.circle.com/v2/messages/${domain}?transactionHash=${transactionHash}`;
-    console.log('[Circle Messages Proxy] Fetching:', circleUrl);
+    const circleUrl = `https://iris-api-sandbox.circle.com/v2/messages/${parseInt(domain as string, 10)}?transactionHash=${transactionHash}`;
 
     const response = await fetch(circleUrl, {
       headers: { 'Accept': 'application/json' },

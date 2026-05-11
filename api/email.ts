@@ -136,7 +136,19 @@ async function handleVerifyCode(request: any, response: any) {
       return response.status(400).json({ error: 'Verification code expired. Please request a new one.' });
     }
 
+    const attempts = (data.attempts || 0) + 1;
     if (data.code !== code) {
+      if (attempts >= 5) {
+        await supabase
+          .from('email_verification_codes')
+          .delete()
+          .eq('wallet_address', walletAddress.toLowerCase());
+        return response.status(400).json({ error: 'Too many failed attempts. Request a new code.' });
+      }
+      await supabase
+        .from('email_verification_codes')
+        .update({ attempts })
+        .eq('wallet_address', walletAddress.toLowerCase());
       return response.status(400).json({ error: 'Invalid verification code' });
     }
 

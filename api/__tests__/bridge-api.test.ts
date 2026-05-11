@@ -33,6 +33,11 @@ import handler from '../bridge';
 import { circlePost, getClient } from '../_lib/circle';
 import { trackTx, updateCircleTxStatus } from '../_lib/supabase';
 
+const VALID_WALLET = '00000000-0000-0000-0000-000000000001';
+const VALID_WALLET2 = '00000000-0000-0000-0000-000000000002';
+const VALID_ADDRESS = '0xed0037e27139a7792c7982640d045a9d9f2aae8b';
+const VALID_TX_HASH = '0x' + 'ab'.repeat(32);
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -74,7 +79,7 @@ describe('api/bridge - approve', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'approve' },
-      body: { walletId: 'w1', amount: '100', walletAddress: '0xabc' },
+      body: { walletId: VALID_WALLET, amount: '100', walletAddress: VALID_ADDRESS },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -83,7 +88,7 @@ describe('api/bridge - approve', () => {
     expect(circlePost).toHaveBeenCalledWith(
       '/developer/transactions/contractExecution',
       expect.objectContaining({
-        walletId: 'w1',
+        walletId: VALID_WALLET,
         contractAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // USDC_SEPOLIA
         abiFunctionSignature: 'approve(address,uint256)',
       }),
@@ -95,7 +100,7 @@ describe('api/bridge - approve', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'approve' },
-      body: { walletId: 'w1', amount: '50', direction: 'arc-to-sepolia' },
+      body: { walletId: VALID_WALLET, amount: '50', direction: 'arc-to-sepolia' },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -112,7 +117,7 @@ describe('api/bridge - approve', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'approve' },
-      body: { walletId: 'w1', amount: '100' },
+      body: { walletId: VALID_WALLET, amount: '100' },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -136,7 +141,7 @@ describe('api/bridge - burn', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'burn' },
-      body: { walletId: 'w1', amount: '100' },
+      body: { walletId: VALID_WALLET, amount: '100' },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -148,7 +153,7 @@ describe('api/bridge - burn', () => {
       method: 'POST',
       query: { action: 'burn' },
       body: {
-        walletId: 'w1', amount: '100',
+        walletId: VALID_WALLET, amount: '100',
         recipientAddress: '0xed0037e27139a7792c7982640d045a9d9f2aae8b',
       },
     });
@@ -166,7 +171,7 @@ describe('api/bridge - burn', () => {
       method: 'POST',
       query: { action: 'burn' },
       body: {
-        walletId: 'w1', amount: '100',
+        walletId: VALID_WALLET, amount: '100',
         recipientAddress: '0xed0037e27139a7792c7982640d045a9d9f2aae8b',
         direction: 'arc-to-sepolia',
       },
@@ -185,7 +190,7 @@ describe('api/bridge - burn', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'burn' },
-      body: { walletId: 'w1', amount: '100', recipientAddress: addr },
+      body: { walletId: VALID_WALLET, amount: '100', recipientAddress: addr },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -268,7 +273,7 @@ describe('api/bridge - claim', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'claim' },
-      body: { destWalletId: 'w2' },
+      body: { destWalletId: VALID_WALLET2 },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -280,7 +285,7 @@ describe('api/bridge - claim', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'claim' },
-      body: { burnTxHash: '0xabc' },
+      body: { burnTxHash: VALID_TX_HASH },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -300,7 +305,7 @@ describe('api/bridge - claim', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'claim' },
-      body: { burnTxHash: '0xabc', destWalletId: 'w2', direction: 'sepolia-to-arc' },
+      body: { burnTxHash: VALID_TX_HASH, destWalletId: VALID_WALLET2, direction: 'sepolia-to-arc' },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -327,10 +332,10 @@ describe('api/bridge - claim', () => {
       method: 'POST',
       query: { action: 'claim' },
       body: {
-        burnTxHash: '0xabc',
-        destWalletId: 'w2',
+        burnTxHash: VALID_TX_HASH,
+        destWalletId: VALID_WALLET2,
         direction: 'arc-to-sepolia',
-        walletAddress: '0xed00',
+        walletAddress: VALID_ADDRESS,
       },
     });
     const res = createMockRes();
@@ -339,8 +344,8 @@ describe('api/bridge - claim', () => {
     expect(circlePost).toHaveBeenCalledWith(
       '/developer/transactions/contractExecution',
       expect.objectContaining({
-        walletId: 'w2',
-        contractAddress: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275', // SEPOLIA_MESSAGE_TRANSMITTER
+        walletId: VALID_WALLET2,
+        contractAddress: '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275',
         abiFunctionSignature: 'receiveMessage(bytes,bytes)',
         abiParameters: ['0xMSG', '0xATTEST'],
       }),
@@ -364,7 +369,7 @@ describe('api/bridge - claim', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'claim' },
-      body: { burnTxHash: '0xabc', destWalletId: 'w2', direction: 'sepolia-to-arc' },
+      body: { burnTxHash: VALID_TX_HASH, destWalletId: VALID_WALLET2, direction: 'sepolia-to-arc' },
     });
     const res = createMockRes();
     await handler(req as any, res);
@@ -386,7 +391,7 @@ describe('api/bridge - claim', () => {
     const req = createMockReq({
       method: 'POST',
       query: { action: 'claim' },
-      body: { burnTxHash: '0xabc', destWalletId: 'w2' },
+      body: { burnTxHash: VALID_TX_HASH, destWalletId: VALID_WALLET2 },
     });
     const res = createMockRes();
     await handler(req as any, res);
