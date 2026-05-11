@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { circlePost, getClient } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
+import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -28,6 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
 
   const { action } = req.query;
+
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rlKey = `bridge:${clientIp}`;
+  if (!checkRateLimit(rlKey, 20, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, 20);
+    Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
+    return res.status(429).json({ error: 'Too many requests' });
+  }
 
   try {
     switch (action) {
@@ -74,7 +83,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
   const contractAddress = isArcToSepolia ? USDC_ARC : USDC_SEPOLIA;
   const spender = isArcToSepolia ? ARC_TOKEN_MESSENGER : SEPOLIA_TOKEN_MESSENGER;
 
-  console.log(`[Bridge] Approve: wallet=${walletId}, amount=${amount}, direction=${direction || 'sepolia-to-arc'}, spender=${spender}`);
+  console.log(`[Bridge] Approve: amount=${amount}, direction=${direction || 'sepolia-to-arc'}`);
 
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
@@ -84,7 +93,7 @@ async function handleApprove(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Bridge] Approve result:', JSON.stringify(result));
+  console.log('[Bridge] Approve: tx submitted');
   await trackTx(result, 'bridge-approve', walletId, walletAddress, amount, 'USDC', { direction: direction || 'sepolia-to-arc' });
 
   return res.status(200).json({
@@ -112,7 +121,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
   const maxFee = calculatedFee < MIN_FEE ? MIN_FEE : calculatedFee > MAX_FEE_CAP ? MAX_FEE_CAP : calculatedFee;
   const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
-  console.log(`[Bridge] Burn: wallet=${walletId}, amount=${amount}, recipient=${recipientAddress}, direction=${direction || 'sepolia-to-arc'}`);
+  console.log(`[Bridge] Burn: amount=${amount}, direction=${direction || 'sepolia-to-arc'}`);
 
   if (isArcToSepolia) {
     // Arc → Sepolia: CCTP V2 depositForBurn on TokenMessenger
@@ -134,7 +143,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
       feeLevel: 'HIGH',
     });
 
-    console.log('[Bridge] Burn (Arc→Sepolia) result:', JSON.stringify(result));
+    console.log('[Bridge] Burn (Arc→Sepolia): tx submitted');
     await trackTx(result, 'bridge-burn', walletId, walletAddress, amount, 'USDC', { direction: 'arc-to-sepolia' });
 
     return res.status(200).json({
@@ -161,7 +170,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
       feeLevel: 'HIGH',
     });
 
-    console.log('[Bridge] Burn (Sepolia→Arc) result:', JSON.stringify(result));
+    console.log('[Bridge] Burn (Sepolia→Arc): tx submitted');
     await trackTx(result, 'bridge-burn', walletId, walletAddress, amount, 'USDC', { direction: 'sepolia-to-arc' });
 
     return res.status(200).json({
@@ -226,7 +235,7 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
   const sourceDomain = isArcToSepolia ? ARC_DESTINATION_DOMAIN : SEPOLIA_DOMAIN;
   const destTransmitter = isArcToSepolia ? SEPOLIA_MESSAGE_TRANSMITTER : ARC_MESSAGE_TRANSMITTER;
 
-  console.log(`[Bridge] Claim: fetching attestation for ${burnTxHash}, direction=${direction || 'sepolia-to-arc'}`);
+  console.log(`[Bridge] Claim: fetching attestation, direction=${direction || 'sepolia-to-arc'}`);
 
   const attestationUrl = `${ATTESTATION_API}/${sourceDomain}?transactionHash=${burnTxHash}`;
   const attestResponse = await fetch(attestationUrl, {
@@ -260,7 +269,7 @@ async function handleClaim(req: VercelRequest, res: VercelResponse) {
     feeLevel: 'HIGH',
   });
 
-  console.log('[Bridge] Claim submitted via Circle:', JSON.stringify(result));
+  console.log('[Bridge] Claim: tx submitted');
   await trackTx(result, 'bridge-claim', destWalletId, walletAddress, undefined, 'USDC', { direction: direction || 'sepolia-to-arc', burnTxHash });
 
   return res.status(200).json({
