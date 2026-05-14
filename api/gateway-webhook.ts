@@ -38,6 +38,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleCreateSubscription(req, res);
   }
 
+  // Health check — Circle verifies endpoint with GET during subscription
+  if (req.method === 'GET' && !action) {
+    return res.status(200).json({ ok: true, service: 'gateway-webhook' });
+  }
+
   // Webhook receiver (POST without action param)
   if (req.method === 'POST' && !action) {
     return handleWebhookEvent(req, res);
