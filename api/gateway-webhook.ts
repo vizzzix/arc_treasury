@@ -38,14 +38,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return handleCreateSubscription(req, res);
   }
 
-  // Health check — Circle verifies endpoint with GET during subscription
-  if (req.method === 'GET' && !action) {
-    return res.status(200).json({ ok: true, service: 'gateway-webhook' });
-  }
-
-  // Webhook receiver (POST without action param)
-  if (req.method === 'POST' && !action) {
-    return handleWebhookEvent(req, res);
+  // No action param — this is either a webhook event or a verification check
+  if (!action) {
+    // GET = health check / Circle endpoint verification
+    if (req.method === 'GET') {
+      return res.status(200).json({ ok: true, service: 'gateway-webhook' });
+    }
+    // POST without valid event = verification ping
+    if (req.method === 'POST') {
+      const event = req.body as GatewayWebhookEvent;
+      if (!event?.id || !event?.type) {
+        return res.status(200).json({ ok: true, verified: true });
+      }
+      return handleWebhookEvent(req, res);
+    }
+    // Any other method — accept for verification
+    return res.status(200).json({ ok: true });
   }
 
   return res.status(400).json({ error: 'Invalid request' });
