@@ -1,7 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin } from '../_lib/supabase';
-import { captureApiError } from '../_lib/sentry';
+import { supabaseAdmin } from './_lib/supabase';
+import { handleCors } from './_lib/cors';
+import { captureApiError } from './_lib/sentry';
 
+const GATEWAY_NOTIFICATIONS_API = 'https://api.circle.com/v2/notifications/subscriptions/permissionless';
 const PROCESSED_IDS = new Set<string>();
 
 interface GatewayWebhookEvent {
@@ -24,10 +26,27 @@ interface GatewayWebhookEvent {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (handleCors(req, res)) return;
+
+  const { action } = req.query;
+
+  // Subscription management
+  if (action === 'subscribe-list') {
+    return handleListSubscriptions(req, res);
+  }
+  if (action === 'subscribe-create') {
+    return handleCreateSubscription(req, res);
   }
 
+  // Webhook receiver (POST without action param)
+  if (req.method === 'POST' && !action) {
+    return handleWebhookEvent(req, res);
+  }
+
+  return res.status(400).json({ error: 'Invalid request' });
+}
+
+async function handleWebhookEvent(req: VercelRequest, res: VercelResponse) {
   try {
     const event = req.body as GatewayWebhookEvent;
 
@@ -40,7 +59,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     PROCESSED_IDS.add(event.id);
 
-    // Keep set bounded
     if (PROCESSED_IDS.size > 10_000) {
       const first = PROCESSED_IDS.values().next().value;
       if (first) PROCESSED_IDS.delete(first);
@@ -56,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await handleMintFinalized(event);
         break;
       case 'gateway.mint.forwarded':
-        await handleMintForwarded(event);
+        console.log(`[Gateway Webhook] Mint forwarded: ${event.data.destinationTxHash}`);
         break;
       default:
         console.log(`[Gateway Webhook] Unknown event type: ${event.type}`);
@@ -64,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ ok: true });
   } catch (error) {
-    captureApiError(error, 'gateway-webhook');
+    captureApiError(error, { source: 'gateway-webhook' });
     console.error('[Gateway Webhook] Error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
@@ -93,13 +111,9 @@ async function handleDepositFinalized(event: GatewayWebhookEvent) {
 async function handleMintFinalized(event: GatewayWebhookEvent) {
   if (!supabaseAdmin) return;
 
-  const { recipient, amount, destinationTxHash, sourceTxHash, destinationDomain } = event.data;
+  const { recipient, destinationTxHash } = event.data;
   if (!recipient) return;
 
-  const txHash = sourceTxHash || destinationTxHash;
-  if (!txHash) return;
-
-  // Update site_bridges with mint completion
   const { error: bridgeError } = await supabaseAdmin
     .from('site_bridges')
     .update({
@@ -116,7 +130,6 @@ async function handleMintFinalized(event: GatewayWebhookEvent) {
     console.error('[Gateway Webhook] site_bridges update error:', bridgeError.message);
   }
 
-  // Update circle_transactions if there's a matching pending bridge tx
   const { data: pendingTxs } = await supabaseAdmin
     .from('circle_transactions')
     .select('circle_tx_id')
@@ -140,6 +153,35 @@ async function handleMintFinalized(event: GatewayWebhookEvent) {
   console.log(`[Gateway Webhook] Mint finalized: ${destinationTxHash} to ${recipient}`);
 }
 
-async function handleMintForwarded(event: GatewayWebhookEvent) {
-  console.log(`[Gateway Webhook] Mint forwarded: ${event.data.destinationTxHash}`);
+async function handleListSubscriptions(_req: VercelRequest, res: VercelResponse) {
+  const apiKey = process.env.CircleAPI?.trim();
+  if (!apiKey) return res.status(500).json({ error: 'CircleAPI not configured' });
+
+  const response = await fetch(GATEWAY_NOTIFICATIONS_API, {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+  });
+  const data = await response.json();
+  return res.status(200).json(data);
+}
+
+async function handleCreateSubscription(req: VercelRequest, res: VercelResponse) {
+  const apiKey = process.env.CircleAPI?.trim();
+  if (!apiKey) return res.status(500).json({ error: 'CircleAPI not configured' });
+
+  const webhookUrl = req.body?.webhookUrl;
+  if (!webhookUrl) return res.status(400).json({ error: 'webhookUrl required' });
+
+  const response = await fetch(GATEWAY_NOTIFICATIONS_API, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      endpoint: webhookUrl,
+      notificationTypes: ['gateway.*'],
+    }),
+  });
+  const data = await response.json();
+  return res.status(response.ok ? 201 : response.status).json(data);
 }
