@@ -171,6 +171,12 @@ async function handleCreateSubscription(req: VercelRequest, res: VercelResponse)
   const webhookUrl = req.body?.webhookUrl;
   if (!webhookUrl) return res.status(400).json({ error: 'webhookUrl required' });
 
+  const addresses = req.body?.addresses;
+  const domains = req.body?.domains;
+  if (!addresses?.length || !domains?.length) {
+    return res.status(400).json({ error: 'addresses and domains required' });
+  }
+
   const response = await fetch(GATEWAY_NOTIFICATIONS_API, {
     method: 'POST',
     headers: {
@@ -179,6 +185,9 @@ async function handleCreateSubscription(req: VercelRequest, res: VercelResponse)
     },
     body: JSON.stringify({
       endpoint: webhookUrl,
+      environment: 'TEST',
+      addresses,
+      domains,
       notificationTypes: ['gateway.*'],
     }),
   });
