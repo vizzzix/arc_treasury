@@ -86,6 +86,11 @@ nul
 CLAUDE.md
 *PLAN*.md
 
+# Confidential pages (investor pitch, metrics dashboard)
+src/pages/PitchDeck.tsx
+src/pages/Metrics.tsx
+docs/arc-house-post.html
+
 # Sensitive configs
 supabase.json
 firebase.json
