@@ -146,7 +146,8 @@ const Analytics = () => {
   }, [fetchStats, fetchDailyActivity]);
 
   const netAPY = (apy * 0.95).toFixed(2);
-  const maxVolume = dailyActivity.length > 0 ? Math.max(...dailyActivity.map(d => d.volume), 1) : 1;
+  const maxVolumeRaw = dailyActivity.length > 0 ? Math.max(...dailyActivity.map(d => d.volume), 1) : 1;
+  const maxVolumeSqrt = Math.sqrt(maxVolumeRaw);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -279,8 +280,8 @@ const Analytics = () => {
             {/* Y-axis labels + bars */}
             <div className="flex gap-3">
               <div className="flex flex-col justify-between text-xs text-muted-foreground py-0.5 w-12 text-right shrink-0" style={{ height: '180px' }}>
-                <span>{formatUSD(maxVolume)}</span>
-                <span>{formatUSD(maxVolume * 0.5)}</span>
+                <span>{formatUSD(maxVolumeRaw)}</span>
+                <span></span>
                 <span>$0</span>
               </div>
               <div className="flex-1 relative" style={{ height: '180px' }}>
@@ -294,7 +295,7 @@ const Analytics = () => {
                 <div className="flex items-end gap-[2px] h-full relative z-10">
                   {dailyActivity.map((day) => {
                     const hasData = day.volume > 0;
-                    const heightPx = hasData ? Math.max(Math.round((day.volume / maxVolume) * 176), 4) : 0;
+                    const heightPx = hasData ? Math.max(Math.round((Math.sqrt(day.volume) / maxVolumeSqrt) * 176), 6) : 0;
                     const total = day.bridges + day.swaps + day.lp;
                     return (
                       <div key={day.date} className="flex-1 relative group h-full">
