@@ -125,7 +125,16 @@ const Analytics = () => {
         dayMap[d].volume += Number(r.amount_usd);
       });
 
-      setDailyActivity(Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date)));
+      const allDays: DailyActivity[] = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        allDays.push(dayMap[key] || { date: key, bridges: 0, swaps: 0, lp: 0, volume: 0 });
+      }
+
+      setDailyActivity(allDays);
     } catch (e) {
       console.error('Failed to fetch daily activity:', e);
     }
@@ -262,41 +271,68 @@ const Analytics = () => {
           </div>
 
           {/* Daily Activity Chart (simple bar chart) */}
-          {dailyActivity.length > 0 && (
-            <div className="p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                Daily Volume (Last 30 Days)
-              </h3>
-              <div className="flex items-end gap-1" style={{ height: '160px' }}>
-                {dailyActivity.map((day) => {
-                  const heightPx = Math.max(Math.round((day.volume / maxVolume) * 156), 3);
-                  const total = day.bridges + day.swaps + day.lp;
-                  return (
-                    <div key={day.date} className="flex-1 relative group" style={{ height: '160px' }}>
-                      <div className="absolute bottom-0 left-0 right-0 hidden group-hover:block z-10" style={{ bottom: `${heightPx + 8}px` }}>
-                        <div className="border border-white/10 rounded-lg p-2 text-xs whitespace-nowrap shadow-xl" style={{ background: '#1a1a28' }}>
-                          <div className="font-semibold">{day.date}</div>
-                          <div className="text-muted-foreground">{formatUSD(day.volume)} · {total} txs</div>
-                          {day.bridges > 0 && <div className="text-cyan-400">{day.bridges} bridges</div>}
-                          {day.swaps > 0 && <div className="text-indigo-400">{day.swaps} swaps</div>}
-                          {day.lp > 0 && <div className="text-emerald-400">{day.lp} LP</div>}
-                        </div>
-                      </div>
-                      <div
-                        className="absolute bottom-0 left-0 right-0 rounded-t bg-gradient-to-t from-primary/60 to-primary/30 hover:from-primary/80 hover:to-primary/50 transition-all cursor-pointer"
-                        style={{ height: `${heightPx}px` }}
-                      />
-                    </div>
-                  );
-                })}
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-white/5 to-white/[0.02] border border-white/10 backdrop-blur-sm">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              Daily Volume (Last 30 Days)
+            </h3>
+            {/* Y-axis labels + bars */}
+            <div className="flex gap-3">
+              <div className="flex flex-col justify-between text-xs text-muted-foreground py-0.5 w-12 text-right shrink-0" style={{ height: '180px' }}>
+                <span>{formatUSD(maxVolume)}</span>
+                <span>{formatUSD(maxVolume * 0.5)}</span>
+                <span>$0</span>
               </div>
-              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>{dailyActivity[0]?.date}</span>
-                <span>{dailyActivity[dailyActivity.length - 1]?.date}</span>
+              <div className="flex-1 relative" style={{ height: '180px' }}>
+                {/* Grid lines */}
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                  <div className="border-b border-white/5" />
+                  <div className="border-b border-white/5" />
+                  <div className="border-b border-white/5" />
+                </div>
+                {/* Bars */}
+                <div className="flex items-end gap-[2px] h-full relative z-10">
+                  {dailyActivity.map((day) => {
+                    const hasData = day.volume > 0;
+                    const heightPx = hasData ? Math.max(Math.round((day.volume / maxVolume) * 176), 4) : 0;
+                    const total = day.bridges + day.swaps + day.lp;
+                    return (
+                      <div key={day.date} className="flex-1 relative group h-full">
+                        {hasData && (
+                          <div className="absolute left-1/2 -translate-x-1/2 hidden group-hover:block z-20" style={{ bottom: `${heightPx + 8}px` }}>
+                            <div className="border border-white/10 rounded-lg p-2.5 text-xs whitespace-nowrap shadow-xl" style={{ background: '#1a1a28' }}>
+                              <div className="font-semibold text-foreground">{day.date}</div>
+                              <div className="text-muted-foreground mt-0.5">{formatUSD(day.volume)} · {total} txs</div>
+                              {day.bridges > 0 && <div className="text-cyan-400 mt-0.5">{day.bridges} bridge{day.bridges > 1 ? 's' : ''}</div>}
+                              {day.swaps > 0 && <div className="text-indigo-400">{day.swaps} swap{day.swaps > 1 ? 's' : ''}</div>}
+                              {day.lp > 0 && <div className="text-emerald-400">{day.lp} LP</div>}
+                            </div>
+                          </div>
+                        )}
+                        <div
+                          className={`absolute bottom-0 left-0 right-0 rounded-t transition-all ${
+                            hasData
+                              ? 'bg-gradient-to-t from-primary to-primary/50 hover:from-primary hover:to-primary/70 cursor-pointer shadow-[0_0_8px_rgba(99,102,241,0.3)]'
+                              : 'bg-white/5'
+                          }`}
+                          style={{ height: hasData ? `${heightPx}px` : '1px' }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          )}
+            {/* X-axis labels */}
+            <div className="flex gap-3 mt-2">
+              <div className="w-12 shrink-0" />
+              <div className="flex-1 flex justify-between text-xs text-muted-foreground">
+                <span>{dailyActivity[0]?.date.slice(5)}</span>
+                <span>{dailyActivity[Math.floor(dailyActivity.length / 2)]?.date.slice(5)}</span>
+                <span>{dailyActivity[dailyActivity.length - 1]?.date.slice(5)}</span>
+              </div>
+            </div>
+          </div>
 
           {/* Top Users */}
           {topWallets.length > 0 && (
