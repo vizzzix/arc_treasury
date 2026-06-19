@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arc Treasury — Investor Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a28;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0f0f5;
+    --text2: #8888a0;
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --yellow: #eab308;
+    --cyan: #06b6d4;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .slide {
+    width: 100%;
+    min-height: 100vh;
+    padding: 60px 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .slide::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    right: -200px;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .slide-number {
+    position: absolute;
+    bottom: 30px;
+    right: 40px;
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  .logo-bar {
+    position: absolute;
+    top: 30px;
+    left: 40px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+  }
+
+  .logo-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, var(--primary), var(--purple));
+  }
+
+  /* Slide 1 — Cover */
+  .cover {
+    text-align: center;
+    align-items: center;
+  }
+
+  .cover h1 {
+    font-size: 64px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #fff 0%, var(--primary-light) 50%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+
+  .cover .tagline {
+    font-size: 22px;
+    color: var(--text2);
+    font-weight: 400;
+    max-width: 600px;
+    line-height: 1.5;
+    margin-bottom: 40px;
+  }
+
+  .cover-meta {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .cover-meta span {
+    padding: 8px 20px;
+    border-radius: 100px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  /* Headings */
+  h2 {
+    font-size: 42px;
+    font-weight: 800;
+    margin-bottom: 36px;
+    line-height: 1.15;
+  }
+
+  h2 .accent {
+    background: linear-gradient(135deg, var(--primary-light), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  /* Cards grid */
+  .cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 8px;
+  }
+
+  .cards-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .card {
+    padding: 28px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .card-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 14px;
+    font-weight: 700;
+  }
+
+  .card h3 { font-size: 16px; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--text2); line-height: 1.6; }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .stat {
+    text-align: center;
+    padding: 24px 16px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .stat-value {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary-light), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 28px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .flow-arrow {
+    color: var(--text2);
+    font-size: 22px;
+  }
+
+  /* Table */
+  .table-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-top: 16px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  th {
+    background: var(--surface2);
+    padding: 14px 20px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+  }
+
+  td {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .badge-purple { background: rgba(168,85,247,0.15); color: var(--purple); }
+  .badge-yellow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+  /* Timeline */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .tl-item {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 20px 24px;
+    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .tl-badge {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .tl-content h3 { font-size: 15px; margin-bottom: 4px; }
+  .tl-content p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+  /* Bullets */
+  .bullets {
+    list-style: none;
+    margin-top: 8px;
+  }
+
+  .bullets li {
+    padding: 8px 0;
+    font-size: 16px;
+    color: var(--text);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    line-height: 1.5;
+  }
+
+  .bullets li::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    margin-top: 8px;
+    flex-shrink: 0;
+  }
+
+  .sub-text {
+    font-size: 14px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-top: 8px;
+  }
+
+  /* Ask slide */
+  .ask-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .ask-card {
+    padding: 28px;
+    border-radius: 16px;
+    text-align: center;
+  }
+
+  .ask-amount {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .ask-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .ask-desc {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* Contact */
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .contact-item {
+    padding: 16px 20px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .contact-item .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text2);
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  /* Print */
+  @media print {
+    .slide {
+      min-height: 100vh;
+      padding: 40px 50px;
+    }
+    body { background: var(--bg) !important; }
+    .slide::before { display: none; }
+  }
+
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- SLIDE 1: Cover -->
+<div class="slide cover">
+  <h1>Arc Treasury</h1>
+  <p class="tagline">Earn yield on stablecoins backed by US Treasury Bills on Arc Network</p>
+  <div class="cover-meta">
+    <span>Built on Circle's Arc Network</span>
+    <span>~4.2% Net APY</span>
+    <span>USDC / EURC / USYC</span>
+    <span>Live on Testnet</span>
+  </div>
+  <div style="margin-top: 60px; font-size: 14px; color: var(--text2);">
+    Circle Grant Application &middot; June 2026
+  </div>
+  <div class="slide-number">1 / 12</div>
+</div>
+
+<!-- SLIDE 2: Problem -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>The <span class="accent">Problem</span></h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-icon" style="background: rgba(239,68,68,0.15); color: #ef4444;">$</div>
+      <h3>$140B+ USDC Sits Idle</h3>
+      <p>Stablecoin holders earn zero yield while inflation erodes purchasing power. Accessing treasury yields requires complex multi-protocol interactions.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background: rgba(234,179,8,0.15); color: #eab308;">!</div>
+      <h3>No DeFi on Arc</h3>
+      <p>Arc Network is purpose-built for stablecoins, yet lacks native DeFi infrastructure. Users who bridge have no incentive to keep assets on-chain.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background: rgba(168,85,247,0.15); color: #a855f7;">&#9679;</div>
+      <h3>Complex User Experience</h3>
+      <p>Traditional DeFi requires managing wallets, seed phrases, gas tokens, and multiple protocols. This excludes 95% of potential users.</p>
+    </div>
+    <div class="card">
+      <div class="card-icon" style="background: rgba(59,130,246,0.15); color: #3b82f6;">&#8644;</div>
+      <h3>Fragmented Stablecoin Liquidity</h3>
+      <p>No USDC/EURC swap infrastructure on Arc. Users can't easily convert between dollar and euro stablecoins on-chain.</p>
+    </div>
+  </div>
+  <div class="slide-number">2 / 12</div>
+</div>
+
+<!-- SLIDE 3: Solution -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>The <span class="accent">Solution</span></h2>
+  <div class="flow">
+    <div class="flow-step" style="background: rgba(99,102,241,0.15); color: var(--primary-light);">USDC / EURC</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="background: rgba(59,130,246,0.15); color: var(--blue);">Arc Treasury Vault</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="background: rgba(34,197,94,0.15); color: var(--green);">USYC (Hashnote)</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="background: rgba(234,179,8,0.2); color: var(--yellow); font-size: 18px;">~4.2% APY</div>
+  </div>
+  <div class="cards cards-3" style="margin-top: 24px;">
+    <div class="card" style="border-color: rgba(99,102,241,0.3);">
+      <h3 style="color: var(--primary-light);">Yield Vault</h3>
+      <p>One-click deposit USDC/EURC. Auto-conversion to USYC via Hashnote Teller. Flexible or locked positions (1/3/12 months). 95% yield to users.</p>
+    </div>
+    <div class="card" style="border-color: rgba(6,182,212,0.3);">
+      <h3 style="color: var(--cyan);">Swap Pool</h3>
+      <p>USDC/EURC AMM with 0.2% fee. Add liquidity, earn points. Essential FX infrastructure for Arc ecosystem.</p>
+    </div>
+    <div class="card" style="border-color: rgba(168,85,247,0.3);">
+      <h3 style="color: var(--purple);">CCTP Bridge</h3>
+      <p>Circle CCTP V2: Ethereum &harr; Arc &harr; Solana. Seamless cross-chain USDC transfers for both wallet types.</p>
+    </div>
+  </div>
+  <div class="slide-number">3 / 12</div>
+</div>
+
+<!-- SLIDE 4: Dual Wallet -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Dual Wallet <span class="accent">Architecture</span></h2>
+  <p class="sub-text" style="font-size: 17px; max-width: 700px; margin-bottom: 28px;">Every feature works with both wallet types &mdash; one codebase, two onboarding paths, zero compromise.</p>
+  <div class="cards">
+    <div class="card" style="border-color: rgba(234,179,8,0.3);">
+      <h3 style="color: var(--yellow); font-size: 20px;">MetaMask</h3>
+      <p style="font-size: 15px; line-height: 1.7;">
+        Self-custody via wagmi/viem<br>
+        Client-side transaction signing<br>
+        Direct on-chain interaction<br>
+        For crypto-native users
+      </p>
+    </div>
+    <div class="card" style="border-color: rgba(99,102,241,0.3);">
+      <h3 style="color: var(--primary-light); font-size: 20px;">Circle Wallet</h3>
+      <p style="font-size: 15px; line-height: 1.7;">
+        Google OAuth / Email OTP login<br>
+        No seed phrases, no extensions<br>
+        Server-side via Circle API<br>
+        For mainstream users
+      </p>
+    </div>
+  </div>
+  <div style="margin-top: 28px; padding: 20px 24px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border);">
+    <p style="font-size: 14px; color: var(--text2); text-align: center;">
+      <strong style="color: var(--text);">Circle Programmable Wallets:</strong> 2 wallets per user (Sepolia + Arc) &middot; Same EOA address on both chains &middot; All vault/swap/bridge ops supported server-side via <code style="color: var(--primary-light);">contractExecution</code> API
+    </p>
+  </div>
+  <div class="slide-number">4 / 12</div>
+</div>
+
+<!-- SLIDE 5: Circle Integration -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Circle Product <span class="accent">Integration</span></h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Product</th><th>Status</th><th>Implementation</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>USDC</strong></td>
+          <td><span class="badge badge-green">LIVE</span></td>
+          <td>Native gas token on Arc (18 dec). Core of all vault, swap, and bridge operations</td>
+        </tr>
+        <tr>
+          <td><strong>CCTP V2</strong></td>
+          <td><span class="badge badge-green">LIVE</span></td>
+          <td>Cross-chain bridge Sepolia &harr; Arc (domains 0 &harr; 26). TokenMessenger + MessageTransmitter + Attestation API</td>
+        </tr>
+        <tr>
+          <td><strong>Programmable Wallets</strong></td>
+          <td><span class="badge badge-green">LIVE</span></td>
+          <td>Developer Controlled Wallets. Google OAuth + Email OTP. Server-side contractExecution for all operations</td>
+        </tr>
+        <tr>
+          <td><strong>Circle Gateway</strong></td>
+          <td><span class="badge badge-green">LIVE</span></td>
+          <td>Webhook subscriptions for bridge notifications (deposit.finalized, mint.finalized)</td>
+        </tr>
+        <tr>
+          <td><strong>EURC</strong></td>
+          <td><span class="badge badge-green">LIVE</span></td>
+          <td>Testnet EURC for USDC/EURC AMM. Migration to official Circle EURC planned for mainnet</td>
+        </tr>
+        <tr>
+          <td><strong>Circle Mint</strong></td>
+          <td><span class="badge badge-blue">PLANNED</span></td>
+          <td>Institutional USDC on/off-ramp for mainnet users</td>
+        </tr>
+        <tr>
+          <td><strong>CCTP Multi-chain</strong></td>
+          <td><span class="badge badge-blue">PLANNED</span></td>
+          <td>Expand to Solana, Polygon, Arbitrum mainnets</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="slide-number">5 / 12</div>
+</div>
+
+<!-- SLIDE 6: Smart Contracts -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Smart <span class="accent">Contracts</span></h2>
+  <p class="sub-text" style="margin-bottom: 20px;">9 contracts deployed on Arc Testnet (Chain ID 5042002) &middot; Explorer: testnet.arcscan.app</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Contract</th><th>Address</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>TreasuryVault</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0x17ca...F729</td><td>UUPS proxy, V14 implementation. Yield vault core</td></tr>
+        <tr><td><strong>StablecoinSwapV2</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0x3a59...04bf</td><td>USDC/EURC AMM pool, 0.2% fee</td></tr>
+        <tr><td><strong>EURC</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0x742b...4b69</td><td>Mintable test EURC, 6 decimals</td></tr>
+        <tr><td><strong>USYC</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0xe918...b86C</td><td>Hashnote yield token, 6 decimals</td></tr>
+        <tr><td><strong>USYCOracle</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0xfe51...d378</td><td>USYC price feed</td></tr>
+        <tr><td><strong>EarlySupporterBadge</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0xb26a...d13</td><td>NFT badge, 1.2x points multiplier</td></tr>
+        <tr><td><strong>Entitlements</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0xcc20...0113</td><td>USYC allowlist manager</td></tr>
+        <tr><td><strong>USYC Teller</strong></td><td style="font-family: monospace; font-size: 12px; color: var(--primary-light);">0x9fdF...05A</td><td>USDC &harr; USYC conversion</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="slide-number">6 / 12</div>
+</div>
+
+<!-- SLIDE 7: Traction -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Traction & <span class="accent">Metrics</span></h2>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value">7+</div>
+      <div class="stat-label">Months Building</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">318</div>
+      <div class="stat-label">Git Commits</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">30K+</div>
+      <div class="stat-label">Lines of Code</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">14</div>
+      <div class="stat-label">Vault Versions</div>
+    </div>
+  </div>
+  <div class="stats" style="margin-top: 16px;">
+    <div class="stat">
+      <div class="stat-value">167</div>
+      <div class="stat-label">Source Files</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">21</div>
+      <div class="stat-label">API Endpoints</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">18</div>
+      <div class="stat-label">Database Tables</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">4</div>
+      <div class="stat-label">Circle Products</div>
+    </div>
+  </div>
+  <p class="sub-text" style="text-align: center; margin-top: 24px;">
+    Active since November 2025 &middot; Circle Developer Console since Nov 11, 2025 &middot; Bootstrapped, solo founder
+  </p>
+  <div class="slide-number">7 / 12</div>
+</div>
+
+<!-- SLIDE 8: Tech Stack -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Tech <span class="accent">Stack</span></h2>
+  <div class="cards">
+    <div class="card">
+      <h3 style="color: var(--cyan);">Frontend</h3>
+      <p>Vite + React + TypeScript + Tailwind + shadcn/ui<br>12 pages, 28 components, 21 custom hooks<br>wagmi/viem for on-chain interactions</p>
+    </div>
+    <div class="card">
+      <h3 style="color: var(--green);">Backend</h3>
+      <p>Vercel Serverless Functions (21 endpoints)<br>Circle SDK for Programmable Wallets<br>Supabase Realtime for live updates</p>
+    </div>
+    <div class="card">
+      <h3 style="color: var(--yellow);">Smart Contracts</h3>
+      <p>Solidity + Hardhat + OpenZeppelin<br>UUPS upgradeable proxy (14 versions)<br>Oracle integration, entitlements, teller</p>
+    </div>
+    <div class="card">
+      <h3 style="color: var(--purple);">Infrastructure</h3>
+      <p>Supabase (18 tables, Realtime, Auth)<br>Telegram monitoring bot<br>On-chain indexer + blog (Next.js/MDX)</p>
+    </div>
+  </div>
+  <div class="slide-number">8 / 12</div>
+</div>
+
+<!-- SLIDE 9: Business Model -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Business <span class="accent">Model</span></h2>
+  <div class="cards" style="margin-bottom: 28px;">
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 48px; font-weight: 800; color: var(--green); margin-bottom: 8px;">95%</div>
+      <h3>To Users</h3>
+      <p>USYC yield passes through directly to depositors</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 48px; font-weight: 800; color: var(--primary-light); margin-bottom: 8px;">5%</div>
+      <h3>Platform Fee</h3>
+      <p>Sustainable revenue from yield spread</p>
+    </div>
+  </div>
+  <div class="cards cards-3">
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 28px; font-weight: 800; color: var(--yellow); margin-bottom: 4px;">0.2%</div>
+      <p>Swap Fee (AMM)</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 28px; font-weight: 800; color: var(--purple); margin-bottom: 4px;">25%</div>
+      <p>Early Withdrawal Penalty</p>
+    </div>
+    <div class="card" style="text-align: center;">
+      <div style="font-size: 28px; font-weight: 800; color: var(--cyan); margin-bottom: 4px;">~4.2%</div>
+      <p>Net APY to Users</p>
+    </div>
+  </div>
+  <div class="slide-number">9 / 12</div>
+</div>
+
+<!-- SLIDE 10: Roadmap -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2><span class="accent">Roadmap</span> 2026</h2>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-badge" style="background: rgba(34,197,94,0.15); color: var(--green);">M 1-2</div>
+      <div class="tl-content">
+        <h3>Security Audit + Mainnet Deploy</h3>
+        <p>Professional audit of TreasuryVaultV14 & SwapV2. Deploy to Arc Mainnet. USYC whitelist. Official EURC. Target: mainnet live.</p>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-badge" style="background: rgba(59,130,246,0.15); color: var(--blue);">M 2-3</div>
+      <div class="tl-content">
+        <h3>Production Launch</h3>
+        <p>Public launch with dual wallets. CCTP V2 mainnet bridge. Circle Gateway webhooks. Marketing + referrals. Target: $1M TVL.</p>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-badge" style="background: rgba(168,85,247,0.15); color: var(--purple);">M 3-4</div>
+      <div class="tl-content">
+        <h3>Growth + Multi-Chain</h3>
+        <p>Multi-strategy yield (Aave/Pendle). CCTP bridge to Solana/Polygon/Arbitrum. Circle Mint integration. Target: $5M TVL.</p>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-badge" style="background: rgba(234,179,8,0.15); color: var(--yellow);">M 4-6</div>
+      <div class="tl-content">
+        <h3>Scale + Governance</h3>
+        <p>Governance token, points-to-token conversion, DAO. Institutional onboarding. Compliance Engine. Target: $10M+ TVL.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slide-number">10 / 12</div>
+</div>
+
+<!-- SLIDE 11: The Ask -->
+<div class="slide">
+  <div class="logo-bar"><div class="logo-dot"></div> ARC TREASURY</div>
+  <h2>Grant <span class="accent">Allocation</span></h2>
+  <p class="sub-text" style="font-size: 16px; margin-bottom: 24px;">The grant directly unblocks mainnet launch &mdash; without it, timeline extends 6+ months due to audit costs alone.</p>
+  <div class="ask-grid">
+    <div class="ask-card" style="background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.03)); border: 1px solid rgba(34,197,94,0.2); border-radius: 16px;">
+      <div class="ask-amount" style="color: var(--green);">$15-25K</div>
+      <div class="ask-label" style="color: var(--green);">Smart Contract Audit</div>
+      <div class="ask-desc">Professional security audit of TreasuryVaultV14 and StablecoinSwapV2. Primary blocker for mainnet launch.</div>
+    </div>
+    <div class="ask-card" style="background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.03)); border: 1px solid rgba(59,130,246,0.2); border-radius: 16px;">
+      <div class="ask-amount" style="color: var(--blue);">$5-10K</div>
+      <div class="ask-label" style="color: var(--blue);">Infrastructure</div>
+      <div class="ask-desc">Mainnet RPC nodes, Supabase Pro, Vercel Pro, monitoring for production-grade reliability.</div>
+    </div>
+    <div class="ask-card" style="background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(168,85,247,0.03)); border: 1px solid rgba(168,85,247,0.2); border-radius: 16px;">
+      <div class="ask-amount" style="color: var(--purple);">$5-10K</div>
+      <div class="ask-label" style="color: var(--purple);">Growth & Marketing</div>
+      <div class="ask-desc">Liquidity bootstrapping, community incentives, content, partnerships to drive TVL on Arc.</div>
+    </div>
+  </div>
+  <div style="margin-top: 32px; padding: 20px; border-radius: 12px; background: var(--surface); border: 1px solid rgba(99,102,241,0.3); text-align: center;">
+    <p style="font-size: 16px; font-weight: 600;">With this grant: <span style="color: var(--green);">Arc Mainnet launch in 8 weeks</span></p>
+    <p style="font-size: 13px; color: var(--text2); margin-top: 4px;">Without it: 6+ month delay due to audit costs</p>
+  </div>
+  <div class="slide-number">11 / 12</div>
+</div>
+
+<!-- SLIDE 12: Contact -->
+<div class="slide cover">
+  <h1 style="font-size: 52px;">Arc Treasury</h1>
+  <p class="tagline" style="font-size: 18px;">Sustainable yield on stablecoins via US Treasury Bills on Arc Network</p>
+  <div class="contact-grid" style="max-width: 500px;">
+    <div class="contact-item">
+      <div class="label">Website</div>
+      arctreasury.biz
+    </div>
+    <div class="contact-item">
+      <div class="label">Twitter / X</div>
+      @arctreasury
+    </div>
+    <div class="contact-item">
+      <div class="label">Email</div>
+      vizzzix@gmail.com
+    </div>
+    <div class="contact-item">
+      <div class="label">Explorer</div>
+      testnet.arcscan.app
+    </div>
+  </div>
+  <div style="margin-top: 40px; font-size: 13px; color: var(--text2);">
+    Built with Circle &middot; USDC &middot; CCTP V2 &middot; Programmable Wallets &middot; Gateway
+  </div>
+  <div class="slide-number">12 / 12</div>
+</div>
+
+</body>
+</html>

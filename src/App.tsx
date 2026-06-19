@@ -35,6 +35,7 @@ const Support = lazyRetry(() => import("./pages/Support"));
 const Litepaper = lazyRetry(() => import("./pages/Litepaper"));
 const Swap = lazyRetry(() => import("./pages/Swap"));
 const History = lazyRetry(() => import("./pages/History"));
+const Analytics = lazyRetry(() => import("./pages/Analytics"));
 const NotFound = lazyRetry(() => import("./pages/NotFound"));
 
 // Bridge pages: lazy-load WITH SolanaWalletProvider to defer ~2MB of Solana deps
@@ -94,6 +95,7 @@ const AppRoutes = () => {
           <Route path="/swap" element={<PageTransition><Swap /></PageTransition>} />
           <Route path="/bridge-solana" element={<PageTransition><BridgeSolana /></PageTransition>} />
           <Route path="/history" element={<PageTransition><History /></PageTransition>} />
+          <Route path="/analytics" element={<PageTransition><Analytics /></PageTransition>} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
