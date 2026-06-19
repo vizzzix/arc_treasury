@@ -268,24 +268,24 @@ const Analytics = () => {
                 <Clock className="w-5 h-5 text-primary" />
                 Daily Volume (Last 30 Days)
               </h3>
-              <div className="flex items-end gap-1 h-40">
+              <div className="flex items-end gap-1" style={{ height: '160px' }}>
                 {dailyActivity.map((day) => {
-                  const heightPct = Math.max((day.volume / maxVolume) * 100, 2);
+                  const heightPx = Math.max(Math.round((day.volume / maxVolume) * 156), 3);
                   const total = day.bridges + day.swaps + day.lp;
                   return (
-                    <div key={day.date} className="flex-1 flex flex-col items-center group relative">
-                      <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
-                        <div className="bg-surface border border-white/10 rounded-lg p-2 text-xs whitespace-nowrap shadow-xl" style={{ background: '#1a1a28' }}>
+                    <div key={day.date} className="flex-1 relative group" style={{ height: '160px' }}>
+                      <div className="absolute bottom-0 left-0 right-0 hidden group-hover:block z-10" style={{ bottom: `${heightPx + 8}px` }}>
+                        <div className="border border-white/10 rounded-lg p-2 text-xs whitespace-nowrap shadow-xl" style={{ background: '#1a1a28' }}>
                           <div className="font-semibold">{day.date}</div>
-                          <div className="text-muted-foreground">{formatUSD(day.volume)} &middot; {total} txs</div>
+                          <div className="text-muted-foreground">{formatUSD(day.volume)} · {total} txs</div>
                           {day.bridges > 0 && <div className="text-cyan-400">{day.bridges} bridges</div>}
                           {day.swaps > 0 && <div className="text-indigo-400">{day.swaps} swaps</div>}
                           {day.lp > 0 && <div className="text-emerald-400">{day.lp} LP</div>}
                         </div>
                       </div>
                       <div
-                        className="w-full rounded-t bg-gradient-to-t from-primary/60 to-primary/30 hover:from-primary/80 hover:to-primary/50 transition-all cursor-pointer min-h-[2px]"
-                        style={{ height: `${heightPct}%` }}
+                        className="absolute bottom-0 left-0 right-0 rounded-t bg-gradient-to-t from-primary/60 to-primary/30 hover:from-primary/80 hover:to-primary/50 transition-all cursor-pointer"
+                        style={{ height: `${heightPx}px` }}
                       />
                     </div>
                   );
