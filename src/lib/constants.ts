@@ -83,6 +83,11 @@ export const ENTITLEMENTS_ADDRESS = '0xcc205224862c7641930c87679e98999d23c26113'
 // USYC Teller contract (USDC/USYC conversion via Circle/Hashnote)
 export const USYC_TELLER_ADDRESS = '0x9fdF14c5B14173D74C08Af27AebFf39240dC105A' as `0x${string}`;
 
+// Multicall3From: Arc Testnet predeploy (v0.7.2 hardfork). Batches multiple calls
+// in one tx while preserving the original msg.sender in each subcall via the
+// CallFrom precompile. Required for atomic approve + action flows.
+export const MULTICALL3_FROM_ADDRESS = '0x522fAf9A91c41c443c66765030741e4AaCe147D0' as `0x${string}`;
+
 // Deployed Treasury Vault contracts on Arc Testnet
 // Updated: 2025-11-27 - V8 with permanent points system
 export const TREASURY_CONTRACTS = {

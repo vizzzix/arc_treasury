@@ -4,8 +4,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
-import { formatEther, formatUnits, parseEther, parseUnits } from 'viem';
+import { formatEther, formatUnits, parseEther, parseUnits, encodeFunctionData } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
+import { MULTICALL3_FROM_ADDRESS, buildCall3, encodeAggregate3 } from '@/lib/batchCall';
 import { arcTestnet } from '@/lib/wagmi';
 import { toast } from 'sonner';
 import { useExchangeRate } from './useExchangeRate';
@@ -505,32 +506,30 @@ export function useSwapPool() {
 
       const amountWei = parseUnits(amount, 6);
 
-      // Check allowance
-      const allowance = await publicClient.readContract({
-        address: eurcAddress,
+      // Batch EURC approve + swap into one atomic tx via Multicall3From.
+      // CallFrom preserves the EOA as msg.sender, so the allowance registers
+      // under the user and swapEurcForUsdc's transferFrom succeeds in the same tx.
+      const approveCallData = encodeFunctionData({
         abi: EURC_ABI,
-        functionName: 'allowance',
-        args: [address, swapAddress],
+        functionName: 'approve',
+        args: [swapAddress, amountWei],
       });
-
-      if (allowance < amountWei) {
-        toast.info('Approving EURC...');
-        const approveHash = await walletClient.writeContract({
-          address: eurcAddress,
-          abi: EURC_ABI,
-          functionName: 'approve',
-          args: [swapAddress, amountWei * 10n],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
-      }
-
-      toast.info('Swapping EURC for USDC...');
-
-      const hash = await walletClient.writeContract({
-        address: swapAddress,
+      const swapCallData = encodeFunctionData({
         abi: SWAP_ABI,
         functionName: 'swapEurcForUsdc',
         args: [amountWei, minOutputWei],
+      });
+
+      toast.info('Swapping EURC for USDC...');
+
+      const batchData = encodeAggregate3([
+        buildCall3(eurcAddress, approveCallData),
+        buildCall3(swapAddress, swapCallData),
+      ]);
+
+      const hash = await walletClient.sendTransaction({
+        to: MULTICALL3_FROM_ADDRESS,
+        data: batchData,
       });
 
       trackTransaction({ txHash: hash, txType: 'swap-eurc-usdc', walletAddress: address, amount, currency: 'EURC' });
