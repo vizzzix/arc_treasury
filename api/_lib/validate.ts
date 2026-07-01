@@ -19,8 +19,12 @@ export function isValidDomain(domain: string | number): boolean {
   return Number.isFinite(n) && n >= 0 && n <= 100;
 }
 
+// Strict decimal format only: downstream conversion uses BigInt on the raw
+// string (toMicro), which throws on inputs parseFloat would accept ("5abc", "1e3")
+const AMOUNT_RE = /^\d+(\.\d+)?$/;
+
 export function isValidAmount(amount: string): boolean {
-  if (typeof amount !== 'string') return false;
+  if (typeof amount !== 'string' || !AMOUNT_RE.test(amount)) return false;
   const n = parseFloat(amount);
   return Number.isFinite(n) && n > 0 && n < 1_000_000_000;
 }

@@ -38,13 +38,15 @@ describe('savePendingBurn', () => {
     savePendingBurn('0xaddr1', makePendingBurn({ amount: '50' }));
     savePendingBurn('0xaddr2', makePendingBurn({ amount: '100' }));
 
-    // savePendingBurn overwrites the whole map for each address,
-    // so we need to manually build the expected state
-    // Actually, the implementation stores per-call, let's verify
     const stored1 = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-    // The implementation replaces the entire object each time a new address is saved
-    // So only addr2 will be in storage (implementation stores {[address]: burn})
+    expect(stored1['0xaddr1']).toBeDefined();
     expect(stored1['0xaddr2']).toBeDefined();
+
+    savePendingBurn('0xaddr1', null);
+
+    const stored2 = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+    expect(stored2['0xaddr1']).toBeUndefined();
+    expect(stored2['0xaddr2']).toBeDefined();
   });
 
   it('handles localStorage errors gracefully', () => {

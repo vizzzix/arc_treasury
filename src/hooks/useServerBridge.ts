@@ -1,6 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { trackSiteBridge } from './bridge/utils';
+import { pollAttestation } from './bridge/attestation';
+import { CCTP_DOMAINS } from '@/lib/constants';
 import { getAuthHeaders } from '@/lib/authHeaders';
 
 type BridgePhase = 'idle' | 'approving' | 'waiting-approve' | 'burning' | 'waiting-burn' | 'attestation' | 'claiming' | 'complete' | 'error';
@@ -25,17 +27,25 @@ export const useServerBridge = () => {
     setState({ phase: 'idle', error: null, burnTxHash: null, claimTxHash: null });
   }, []);
 
+  // Cancels in-flight polling when the component unmounts
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Marker error so the catch block can distinguish unmount from real failures
+  const ABORTED = new Error('aborted');
+
   // Poll Circle transaction status until COMPLETE or FAILED
-  const waitForTx = async (txId: string, label: string): Promise<{ txHash: string }> => {
+  const waitForTx = async (txId: string, label: string, signal: AbortSignal): Promise<{ txHash: string }> => {
     let attempts = 0;
     const MAX_ATTEMPTS = 60;
 
     while (attempts < MAX_ATTEMPTS) {
       await new Promise(r => setTimeout(r, 2000));
+      if (signal.aborted) throw ABORTED;
       attempts++;
 
       try {
-        const res = await fetch(`/api/bridge?action=tx-status&txId=${txId}`);
+        const res = await fetch(`/api/bridge?action=tx-status&txId=${txId}`, { signal });
         const data = await res.json();
 
 
@@ -46,6 +56,7 @@ export const useServerBridge = () => {
           throw new Error(`${label} failed: ${data.errorReason || data.state}`);
         }
       } catch (e: any) {
+        if (signal.aborted) throw ABORTED;
         if (e.message?.includes('failed')) throw e;
       }
     }
@@ -53,40 +64,26 @@ export const useServerBridge = () => {
   };
 
   // Poll attestation until ready
-  const waitForAttestation = async (burnTxHash: string, direction: BridgeDirection): Promise<void> => {
-    let attempts = 0;
-    const MAX_ATTEMPTS = 150;
+  const waitForAttestation = async (burnTxHash: string, direction: BridgeDirection, signal: AbortSignal): Promise<void> => {
     let toastId: string | number | undefined;
-    const domain = direction === 'arc-to-sepolia' ? 26 : 0;
+    const domain = direction === 'arc-to-sepolia' ? CCTP_DOMAINS.arcTestnet : CCTP_DOMAINS.ethereumSepolia;
 
-    while (attempts < MAX_ATTEMPTS) {
-      await new Promise(r => setTimeout(r, 2000));
-      attempts++;
-      const seconds = attempts * 2;
-
-      if (toastId) {
-        toast.loading(`Waiting for attestation... (${seconds}s)`, { id: toastId });
-      } else {
-        toastId = toast.loading(`Waiting for attestation... (${seconds}s)`, { duration: Infinity });
-      }
-
-      try {
-        const res = await fetch(`/api/circle?action=messages&domain=${domain}&transactionHash=${burnTxHash}`);
-        if (!res.ok) continue;
-        const data = await res.json();
-        const msg = data.messages?.[0];
-
-        if (msg?.attestation && msg.attestation !== 'PENDING') {
-          if (toastId) toast.dismiss(toastId);
-          return;
+    const result = await pollAttestation({
+      domain,
+      txHash: burnTxHash,
+      signal,
+      onTick: (_attempt, seconds) => {
+        if (toastId) {
+          toast.loading(`Waiting for attestation... (${seconds}s)`, { id: toastId });
+        } else {
+          toastId = toast.loading(`Waiting for attestation... (${seconds}s)`, { duration: Infinity });
         }
-      } catch {
-        // Continue polling
-      }
-    }
+      },
+    });
 
     if (toastId) toast.dismiss(toastId);
-    throw new Error('Attestation timeout');
+    if (result.status === 'aborted') throw ABORTED;
+    if (result.status === 'timeout') throw new Error('Attestation timeout');
   };
 
   // Main bridge function — supports both directions
@@ -94,6 +91,11 @@ export const useServerBridge = () => {
     setState({ phase: 'approving', error: null, burnTxHash: null, claimTxHash: null });
     const isArcToSepolia = direction === 'arc-to-sepolia';
     const destName = isArcToSepolia ? 'Sepolia' : 'Arc Testnet';
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
 
     try {
       const headers = await getAuthHeaders();
@@ -109,7 +111,7 @@ export const useServerBridge = () => {
 
       setState(s => ({ ...s, phase: 'waiting-approve' }));
       toast.info('Waiting for approval confirmation...');
-      await waitForTx(approveData.transactionId, 'Approve');
+      await waitForTx(approveData.transactionId, 'Approve', signal);
 
       setState(s => ({ ...s, phase: 'burning' }));
       toast.info(`Bridging USDC to ${destName}...`);
@@ -123,7 +125,7 @@ export const useServerBridge = () => {
 
       setState(s => ({ ...s, phase: 'waiting-burn' }));
       toast.info('Waiting for bridge transaction...');
-      const { txHash: burnTxHash } = await waitForTx(burnData.transactionId, 'Bridge');
+      const { txHash: burnTxHash } = await waitForTx(burnData.transactionId, 'Bridge', signal);
 
       // Track in site_bridges for Live Activity
       const feedDirection = isArcToSepolia ? 'to_sepolia' : 'to_arc';
@@ -131,7 +133,7 @@ export const useServerBridge = () => {
 
       setState(s => ({ ...s, burnTxHash, phase: 'attestation' }));
 
-      await waitForAttestation(burnTxHash, direction);
+      await waitForAttestation(burnTxHash, direction, signal);
 
       setState(s => ({ ...s, phase: 'claiming' }));
       toast.info(`Claiming USDC on ${destName}...`);
@@ -154,14 +156,14 @@ export const useServerBridge = () => {
           throw new Error(retryData.error || 'Claim failed after retry');
         }
         if (retryData.transactionId) {
-          const { txHash: claimTxHash } = await waitForTx(retryData.transactionId, 'Claim');
+          const { txHash: claimTxHash } = await waitForTx(retryData.transactionId, 'Claim', signal);
           setState(s => ({ ...s, phase: 'complete', claimTxHash }));
         }
       } else if (!claimRes.ok) {
         throw new Error(claimData.error || 'Claim failed');
       } else if (claimData.transactionId) {
         // Poll Circle tx until confirmed
-        const { txHash: claimTxHash } = await waitForTx(claimData.transactionId, 'Claim');
+        const { txHash: claimTxHash } = await waitForTx(claimData.transactionId, 'Claim', signal);
         setState(s => ({ ...s, phase: 'complete', claimTxHash }));
       } else {
         setState(s => ({ ...s, phase: 'complete', claimTxHash: claimData.claimTxHash }));
@@ -170,6 +172,8 @@ export const useServerBridge = () => {
       toast.success('Bridge complete!', { description: `USDC arrived on ${destName}` });
 
     } catch (error: any) {
+      // Unmounted or superseded — skip UI updates on a dead component
+      if (signal.aborted || error === ABORTED) return;
       console.error('[ServerBridge] Error:', error);
       const msg = error.message || 'Bridge failed';
       setState(s => ({ ...s, phase: 'error', error: msg }));

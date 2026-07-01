@@ -37,6 +37,8 @@ process.env.CIRCLE_ENTITY_SECRET = 'test-secret';
 import handler from '../bridge';
 import { circlePost, getClient } from '../_lib/circle';
 import { trackTx, updateCircleTxStatus } from '../_lib/supabase';
+import { authenticateUser, verifyWalletOwnership } from '../_lib/auth';
+import { checkRateLimit } from '../_lib/rateLimit';
 
 const VALID_WALLET = '00000000-0000-0000-0000-000000000001';
 const VALID_WALLET2 = '00000000-0000-0000-0000-000000000002';
@@ -404,5 +406,134 @@ describe('api/bridge - claim', () => {
     expect(res.status).toHaveBeenCalledWith(502);
 
     vi.unstubAllGlobals();
+  });
+});
+
+describe('api/bridge - rate limit buckets', () => {
+  it('uses a separate, higher-capacity bucket for tx-status polling', async () => {
+    const req = createMockReq({
+      method: 'GET',
+      query: { action: 'tx-status', txId: 'tx-123' },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    // Polling runs every 2s (30/min) — the default 20/min bucket would 429 it
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      expect.stringContaining('bridge-status:'),
+      60,
+      expect.any(Number),
+    );
+  });
+
+  it('keeps the strict bucket for mutating actions', async () => {
+    const req = createMockReq({
+      method: 'POST',
+      query: { action: 'approve' },
+      body: { walletId: VALID_WALLET, amount: '100' },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      expect.stringMatching(/^bridge:/),
+      20,
+      expect.any(Number),
+    );
+  });
+});
+
+describe('api/bridge - claim authentication', () => {
+  it('returns 401 when claim request is unauthenticated', async () => {
+    vi.mocked(authenticateUser).mockResolvedValueOnce(null);
+
+    const req = createMockReq({
+      method: 'POST',
+      query: { action: 'claim' },
+      body: { burnTxHash: VALID_TX_HASH, destWalletId: VALID_WALLET2 },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(circlePost).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when destWalletId does not belong to authenticated user', async () => {
+    vi.mocked(verifyWalletOwnership).mockResolvedValueOnce(false);
+
+    const req = createMockReq({
+      method: 'POST',
+      query: { action: 'claim' },
+      body: { burnTxHash: VALID_TX_HASH, destWalletId: VALID_WALLET2 },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(circlePost).not.toHaveBeenCalled();
+  });
+
+  it('verifies ownership of destWalletId specifically', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ messages: [{ attestation: 'PENDING' }] }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const req = createMockReq({
+      method: 'POST',
+      query: { action: 'claim' },
+      body: { burnTxHash: VALID_TX_HASH, destWalletId: VALID_WALLET2 },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(verifyWalletOwnership).toHaveBeenCalledWith('test-user-id', VALID_WALLET2);
+
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('api/bridge - amount validation', () => {
+  it.each(['abc', '-5', '5abc', '1e3', '0'])(
+    'rejects approve with invalid amount %s',
+    async (amount) => {
+      const req = createMockReq({
+        method: 'POST',
+        query: { action: 'approve' },
+        body: { walletId: VALID_WALLET, amount, walletAddress: VALID_ADDRESS },
+      });
+      const res = createMockRes();
+      await handler(req as any, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(circlePost).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rejects burn with invalid amount', async () => {
+    const req = createMockReq({
+      method: 'POST',
+      query: { action: 'burn' },
+      body: { walletId: VALID_WALLET, amount: 'NaN', recipientAddress: VALID_ADDRESS },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(circlePost).not.toHaveBeenCalled();
+  });
+
+  it('accepts valid decimal amount', async () => {
+    const req = createMockReq({
+      method: 'POST',
+      query: { action: 'approve' },
+      body: { walletId: VALID_WALLET, amount: '15.5', walletAddress: VALID_ADDRESS },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

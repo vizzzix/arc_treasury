@@ -100,6 +100,24 @@ describe('isValidAmount', () => {
   it('rejects non-numeric', () => {
     expect(isValidAmount('abc')).toBe(false);
   });
+
+  // Strict decimal format: parseFloat alone would accept these,
+  // but BigInt conversion downstream (toMicro) would throw on them
+  it('rejects trailing garbage "5abc"', () => {
+    expect(isValidAmount('5abc')).toBe(false);
+  });
+
+  it('rejects scientific notation "1e3"', () => {
+    expect(isValidAmount('1e3')).toBe(false);
+  });
+
+  it('rejects whitespace-padded " 5 "', () => {
+    expect(isValidAmount(' 5 ')).toBe(false);
+  });
+
+  it('rejects amount over max', () => {
+    expect(isValidAmount('1000000001')).toBe(false);
+  });
 });
 
 describe('escapeHtml', () => {

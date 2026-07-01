@@ -177,7 +177,7 @@ const Bridge = () => {
     reset: resetSolana,
   } = useBridgeSolana();
 
-  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, reset: resetCCTP, isBridging, isClaiming, error, result, transactions, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
+  const { bridge, claimPendingBridge, clearPendingBurn, restorePendingBurn, reset: resetCCTP, isBridging, isClaiming, error, attestationStatus, mintConfirmed, pendingBurn } = useBridgeCCTP();
 
   // Get balances (rawBalance for exact MAX, balance for display)
   const { balance: sepoliaBalance, rawBalance: sepoliaRawBalance, isLoading: isLoadingSepolia, refetch: refetchSepolia } = useUSDCBalance('ethereumSepolia');
@@ -1001,46 +1001,6 @@ const Bridge = () => {
           <p className="text-xs text-center text-muted-foreground">
             Make sure you have {getGasHint()} for gas fees
           </p>
-
-          {/* EVM Transactions */}
-          {isEVMtoEVM && transactions.length > 0 && (
-            <div className="space-y-3 pt-4 border-t border-white/10">
-              <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Transactions</p>
-              <div className="space-y-2">
-                {transactions.map((tx, index) => (
-                  <div key={index} className="p-3 rounded-xl bg-white/5 border border-white/10">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          {tx.status === 'success' && <CheckCircle2 className="w-4 h-4 text-green-400" />}
-                          {tx.status === 'failed' && <XCircle className="w-4 h-4 text-red-400" />}
-                          {tx.status === 'pending' && <Clock className="w-4 h-4 text-yellow-400 animate-pulse" />}
-                          <span className="text-sm font-medium">{tx.step}</span>
-                          <span className="text-xs text-muted-foreground">({tx.network})</span>
-                        </div>
-                        {tx.hash && (
-                          <p className="text-xs text-muted-foreground font-mono truncate">
-                            {tx.hash.slice(0, 10)}...{tx.hash.slice(-8)}
-                          </p>
-                        )}
-                      </div>
-                      {tx.explorerUrl && (
-                        <a
-                          href={tx.explorerUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline flex items-center gap-1 text-sm"
-                        >
-                          View
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Restore Pending Bridge - only for EVM↔EVM */}
           {isEVMtoEVM && (

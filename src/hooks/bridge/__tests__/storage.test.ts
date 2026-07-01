@@ -52,13 +52,20 @@ describe('bridge/storage', () => {
     });
   });
 
-  describe('address isolation (known limitation)', () => {
-    // NOTE: savePendingBurn currently creates { [addr]: burn } from scratch,
-    // so saving for addr B overwrites addr A. This is acceptable because
-    // in practice only one address is active at a time per browser session.
-    it('latest save wins — previous addresses are lost', () => {
+  describe('address isolation', () => {
+    it('keeps pending burns of other addresses when saving a new one', () => {
       savePendingBurn('0xAddrA', makeBurn({ amount: '50' }));
       savePendingBurn('0xAddrB', makeBurn({ amount: '200' }));
+
+      expect(loadPendingBurn('0xAddrA')?.amount).toBe('50');
+      expect(loadPendingBurn('0xAddrB')?.amount).toBe('200');
+    });
+
+    it('clearing one address does not affect others', () => {
+      savePendingBurn('0xAddrA', makeBurn({ amount: '50' }));
+      savePendingBurn('0xAddrB', makeBurn({ amount: '200' }));
+
+      savePendingBurn('0xAddrA', null);
 
       expect(loadPendingBurn('0xAddrA')).toBeNull();
       expect(loadPendingBurn('0xAddrB')?.amount).toBe('200');
@@ -98,19 +105,13 @@ describe('bridge/storage', () => {
     });
   });
 
-  describe('bug: savePendingBurn replaces entire storage object', () => {
-    it('saving for address B removes address A data (current behavior)', () => {
-      // This documents a known limitation in the current implementation:
-      // savePendingBurn creates a NEW object { [addr]: burn } each time,
-      // it does not merge with existing data.
-      savePendingBurn('0xAddrA', makeBurn({ amount: '50' }));
-      savePendingBurn('0xAddrB', makeBurn({ amount: '200' }));
+  describe('merge with corrupted existing data', () => {
+    it('recovers by overwriting when stored JSON is corrupted', () => {
+      localStorage.setItem('arc_treasury_pending_burn', '{invalid json!!!');
+      const burn = makeBurn();
 
-      // Address A is lost because savePendingBurn line 8 creates { [addrB]: burn }
-      // This test documents the current behavior for awareness.
-      const a = loadPendingBurn('0xAddrA');
-      // If this starts failing, it means the bug was fixed!
-      expect(a).toBeNull();
+      expect(() => savePendingBurn('0xAddrA', burn)).not.toThrow();
+      expect(loadPendingBurn('0xAddrA')).toEqual(burn);
     });
   });
 });

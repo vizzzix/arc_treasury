@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateBridgeFee } from '../useBridgeCCTP';
+import { calculateBridgeFee } from '@/lib/bridgeFee';
 
 describe('calculateBridgeFee', () => {
   it('returns 0.5% of amount for normal amounts', () => {

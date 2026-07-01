@@ -3,9 +3,11 @@ import { circlePost, getClient } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
-import { isValidUUID, isValidAddress, isValidTxHash } from './_lib/validate';
+import { isValidUUID, isValidAddress, isValidTxHash, isValidAmount } from './_lib/validate';
 import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
 import { captureApiError } from './_lib/sentry';
+import { IRIS_API_BASE } from './_lib/constants';
+import { calculateBridgeFee } from '../src/lib/bridgeFee';
 
 // CCTP / Bridge constants — Sepolia
 const SEPOLIA_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -19,7 +21,7 @@ const ARC_TOKEN_MESSENGER = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
 const ARC_MESSAGE_TRANSMITTER = '0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275';
 const ARC_DESTINATION_DOMAIN = 26;
 
-const ATTESTATION_API = 'https://iris-api-sandbox.circle.com/v2/messages';
+const ATTESTATION_API = `${IRIS_API_BASE}/messages`;
 
 // Safe amount→micro conversion without floating-point precision loss
 function toMicro(amount: string): string {
@@ -34,9 +36,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
 
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
-  const rlKey = `bridge:${clientIp}`;
-  if (!await checkRateLimit(rlKey, 20, 60_000)) {
-    const headers = getRateLimitHeaders(rlKey, 20);
+  // tx-status is read-only and polled every ~2s during a bridge (30/min),
+  // so it gets its own higher-capacity bucket; mutating actions stay strict
+  const isStatusPoll = action === 'tx-status';
+  const rlKey = isStatusPoll ? `bridge-status:${clientIp}` : `bridge:${clientIp}`;
+  const rlLimit = isStatusPoll ? 60 : 20;
+  if (!await checkRateLimit(rlKey, rlLimit, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, rlLimit);
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(429).json({ error: 'Too many requests' });
   }
@@ -53,16 +59,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST' && req.body?.burnTxHash && !isValidTxHash(req.body.burnTxHash)) {
     return res.status(400).json({ error: 'Invalid burnTxHash format' });
   }
+  if (req.method === 'POST' && req.body?.amount !== undefined && !isValidAmount(req.body.amount)) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
 
-  // JWT auth + wallet ownership verification for financial operations
-  if (req.method === 'POST' && req.body?.walletId) {
+  // JWT auth + wallet ownership verification for financial operations.
+  // Covers both walletId (approve/burn) and destWalletId (claim) — claim executes
+  // receiveMessage from the destination wallet, which pays gas, so it must be owned too.
+  const walletIdsToVerify = req.method === 'POST'
+    ? [req.body?.walletId, req.body?.destWalletId].filter(Boolean)
+    : [];
+  if (walletIdsToVerify.length > 0) {
     const authUser = await authenticateUser(req);
     if (!authUser) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    const ownsWallet = await verifyWalletOwnership(authUser.userId, req.body.walletId);
-    if (!ownsWallet) {
-      return res.status(403).json({ error: 'Wallet does not belong to authenticated user' });
+    for (const id of walletIdsToVerify) {
+      const ownsWallet = await verifyWalletOwnership(authUser.userId, id);
+      if (!ownsWallet) {
+        return res.status(403).json({ error: 'Wallet does not belong to authenticated user' });
+      }
     }
   }
 
@@ -140,11 +156,7 @@ async function handleBurn(req: VercelRequest, res: VercelResponse) {
 
   const isArcToSepolia = direction === 'arc-to-sepolia';
   const amountMicro = BigInt(toMicro(amount));
-  // maxFee is the MAXIMUM Circle relay can deduct (actual fee is lower)
-  const MAX_FEE_CAP = 5_000_000n; // 5 USDC cap
-  const MIN_FEE = 100_000n;       // 0.1 USDC floor
-  const calculatedFee = (amountMicro * 50n) / 10_000n; // 0.5% of amount
-  const maxFee = calculatedFee < MIN_FEE ? MIN_FEE : calculatedFee > MAX_FEE_CAP ? MAX_FEE_CAP : calculatedFee;
+  const maxFee = calculateBridgeFee(amountMicro);
   const zeroBytes32 = '0x0000000000000000000000000000000000000000000000000000000000000000';
 
   console.log(`[Bridge] Burn: amount=${amount}, direction=${direction || 'sepolia-to-arc'}`);

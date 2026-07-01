@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { isValidDomain, isValidTxHash } from './_lib/validate';
+import { IRIS_API_BASE } from './_lib/constants';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (handleCors(req, res)) return;
@@ -39,7 +40,7 @@ async function handleFees(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const circleUrl = `https://iris-api-sandbox.circle.com/v2/burn/USDC/fees/${parseInt(destDomain as string, 10)}/${parseInt(srcDomain as string, 10)}`;
+    const circleUrl = `${IRIS_API_BASE}/burn/USDC/fees/${parseInt(destDomain as string, 10)}/${parseInt(srcDomain as string, 10)}`;
 
     const response = await fetch(circleUrl, {
       headers: { 'Accept': 'application/json' },
@@ -67,7 +68,7 @@ async function handleMessages(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const circleUrl = `https://iris-api-sandbox.circle.com/v2/messages/${parseInt(domain as string, 10)}?transactionHash=${transactionHash}`;
+    const circleUrl = `${IRIS_API_BASE}/messages/${parseInt(domain as string, 10)}?transactionHash=${transactionHash}`;
 
     const response = await fetch(circleUrl, {
       headers: { 'Accept': 'application/json' },

@@ -1,51 +1,33 @@
 /**
- * useBridgeCCTP - Circle Bridge Kit Implementation
+ * useBridgeCCTP - Manual CCTP V2 bridge for external (MetaMask) wallets.
  *
- * Uses Circle's official Bridge Kit SDK for CCTP V2 bridging.
  * Supports: Ethereum Sepolia ↔ Arc Testnet
  *
- * Benefits of Bridge Kit:
- * - Official Circle SDK with automatic updates
- * - Built-in attestation polling and error handling
- * - Arc Testnet officially supported (chainId 5042002, domain 26)
- * - Automatic approval flow
+ * Flow: approve → burn (depositForBurn / bridgeWithPreapproval) →
+ * attestation polling (bridge/attestation) → receiveMessage on destination.
+ * Sepolia → Arc goes through Arc's custom bridge contract (auto-relay hook);
+ * Arc → Sepolia uses the canonical CCTP TokenMessenger.
  *
- * References:
- * - Bridge Kit: https://www.npmjs.com/package/@circle-fin/bridge-kit
- * - Circle Blog: https://www.circle.com/blog/integrating-rainbowkit-with-bridge-kit-for-crosschain-usdc-transfers
+ * Circle-wallet bridging lives in useServerBridge; Solana in useBridgeSolana.
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAccount, useConnectorClient, useSwitchChain, usePublicClient, useWalletClient } from 'wagmi';
 import { sepolia, arcTestnet as arcTestnetChain } from 'wagmi/chains';
-import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, CIRCLE_ATTESTATION_API, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
+import { SUPPORTED_NETWORKS, CCTP_CONTRACTS, CCTP_DOMAINS, TOKEN_ADDRESSES, ARC_BRIDGE_CONTRACT } from '@/lib/constants';
 import { parseUnits, encodeAbiParameters, concat, createWalletClient, custom, pad } from 'viem';
 import { toast } from 'sonner';
-import { BridgeKit, Blockchain, isKitError } from '@circle-fin/bridge-kit';
-import { createAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { MESSAGE_TRANSMITTER_ABI } from '@/lib/abis/cctp';
 import { debug, safeStringify, trackSiteBridge } from './bridge/utils';
 import { trackTransaction } from '@/lib/trackTransaction';
+import { calculateBridgeFee } from '@/lib/bridgeFee';
 import { savePendingBurn, loadPendingBurn } from './bridge/storage';
-import type { BridgeNetwork, BridgeParams, BridgeEstimate, BridgeStep, BridgeState, LastBridgeResult, PendingBurn } from './bridge/types';
+import { fetchAttestationMessage, findAttestationMessage, pollAttestation } from './bridge/attestation';
+import type { BridgeNetwork, BridgeParams, BridgeState, PendingBurn } from './bridge/types';
 
-// Re-export types for consumers
-export type { BridgeNetwork, BridgeParams, BridgeEstimate, BridgeStep, BridgeState, LastBridgeResult, PendingBurn };
-
-// Map our network names to Bridge Kit Blockchain enum (excludes solanaDevnet - handled by useBridgeSolana)
-const NETWORK_TO_BLOCKCHAIN: Record<string, Blockchain> = {
-  ethereumSepolia: Blockchain.Ethereum_Sepolia,
-  arcTestnet: Blockchain.Arc_Testnet,
-};
-
-export function calculateBridgeFee(amountWei: bigint): bigint {
-  const MAX_FEE_CAP = 5_000_000n; // 5 USDC (6 decimals)
-  const MIN_FEE = 100_000n;       // 0.1 USDC
-  const calculated = (amountWei * 50n) / 10_000n; // 0.5%
-  if (calculated < MIN_FEE) return MIN_FEE;
-  if (calculated > MAX_FEE_CAP) return MAX_FEE_CAP;
-  return calculated;
-}
+// Re-export for consumers (Bridge.tsx, tests)
+export type { BridgeNetwork, BridgeParams, BridgeState, PendingBurn };
+export { calculateBridgeFee };
 
 export const useBridgeCCTP = () => {
   const account = useAccount();
@@ -57,54 +39,28 @@ export const useBridgeCCTP = () => {
   const [state, setState] = useState<BridgeState>({
     isBridging: false,
     isClaiming: false,
-    isEstimating: false,
     error: null,
-    result: null,
-    transactions: [],
     mintConfirmed: false,
     pendingBurn: null,
-    estimate: null,
-    steps: [],
-    lastResult: null,
   });
 
   const [attestationStatus, setAttestationStatus] = useState<string | null>(null);
 
   // Use refs to track progress - avoid async state timing issues
-  const mintConfirmedRef = useRef(false);
   const mintTxHashRef = useRef<string | null>(null); // Track if mint tx was sent
   const burnConfirmedRef = useRef(false);
   const burnTxHashRef = useRef<string | null>(null);
-  const approvalConfirmedRef = useRef(false);
-  const approvalStartedRef = useRef(false);
-  const approvalTxHashRef = useRef<string | null>(null);
   const claimPendingBridgeRef = useRef<(() => void) | null>(null);
+
+  // Cancels in-flight attestation polling when the component unmounts
+  // or a new bridge supersedes the current one
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // Get public client for reading chain data
   const sepoliaClient = usePublicClient({ chainId: SUPPORTED_NETWORKS.ethereumSepolia.chainId });
   const arcClient = usePublicClient({ chainId: SUPPORTED_NETWORKS.arcTestnet.chainId });
   const { data: walletClient } = useWalletClient();
-
-  // Initialize Bridge Kit (memoized to avoid re-creating)
-  const bridgeKit = useMemo(() => {
-    const kit = new BridgeKit();
-    debug(' Bridge Kit initialized');
-    return kit;
-  }, []);
-
-  // Log supported chains on mount (debug)
-  useEffect(() => {
-    if (bridgeKit) {
-      const chains = bridgeKit.getSupportedChains();
-      debug(' Supported chains:', chains.map(c => `${c.name} (${c.chain})`));
-
-      // Verify Arc Testnet is supported
-      const arcChain = chains.find(c => c.chain === Blockchain.Arc_Testnet);
-      if (arcChain) {
-        debug(' Arc Testnet config:', arcChain);
-      }
-    }
-  }, [bridgeKit]);
 
   // Load pending burn from localStorage on wallet connect
   // IMPORTANT: Check Circle API first to see if already claimed
@@ -118,12 +74,9 @@ export const useBridgeCCTP = () => {
         const verifyAndLoad = async () => {
           try {
             const sourceDomain = CCTP_DOMAINS[savedPendingBurn.fromNetwork];
-            const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${sourceDomain}&transactionHash=${savedPendingBurn.txHash}`;
-            const response = await fetch(attestationUrl);
-            const data = await response.json();
+            const messageData = await fetchAttestationMessage(sourceDomain, savedPendingBurn.txHash);
 
-            if (data.messages && data.messages.length > 0) {
-              const messageData = data.messages[0];
+            if (messageData) {
               const decodedBody = messageData.decodedMessage?.decodedMessageBody;
 
               // NOTE: feeExecuted does NOT indicate if auto-relay happened!
@@ -186,73 +139,7 @@ export const useBridgeCCTP = () => {
   }, [address]);
 
   /**
-   * Estimate bridge fees before transfer (Bridge Kit 1.3.0)
-   * Returns estimated gas fees and provider fees
-   */
-  const estimateBridge = useCallback(
-    async ({ fromNetwork, toNetwork, amount }: BridgeParams): Promise<BridgeEstimate | null> => {
-      if (!isConnected || !address || !connectorClient) {
-        return null;
-      }
-
-      if (!amount || parseFloat(amount) <= 0) {
-        return null;
-      }
-
-      setState(prev => ({ ...prev, isEstimating: true, estimate: null }));
-
-      try {
-        const provider = (connectorClient as any)?.transport || (window as any).ethereum;
-        if (!provider) {
-          throw new Error('No wallet provider available');
-        }
-
-        const adapter = await createAdapterFromProvider({ provider });
-        const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
-        const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
-
-        debug(' Estimating fees for:', { fromChain, toChain, amount });
-
-        const estimate = await bridgeKit.estimate({
-          from: { adapter, chain: fromChain as any },
-          to: { adapter, chain: toChain as any },
-          amount,
-        });
-
-        debug(' Estimate result:', estimate);
-
-        // Calculate total fees
-        const totalFees = estimate.fees
-          .reduce((sum: number, fee: any) => sum + parseFloat(fee.amount || '0'), 0)
-          .toFixed(6);
-
-        const bridgeEstimate: BridgeEstimate = {
-          amount: estimate.amount,
-          token: estimate.token,
-          source: { chain: estimate.source.chain },
-          destination: { chain: estimate.destination.chain },
-          fees: estimate.fees.map((f: any) => ({
-            type: f.type,
-            amount: f.amount,
-            token: f.token || 'USDC',
-          })),
-          totalFees,
-        };
-
-        setState(prev => ({ ...prev, isEstimating: false, estimate: bridgeEstimate }));
-        return bridgeEstimate;
-
-      } catch (error: any) {
-        console.error('[useBridgeCCTP] Estimate error:', error);
-        setState(prev => ({ ...prev, isEstimating: false, estimate: null }));
-        return null;
-      }
-    },
-    [isConnected, address, connectorClient, bridgeKit]
-  );
-
-  /**
-   * Main bridge function using Circle Bridge Kit
+   * Main bridge function - manual CCTP V2 flow
    */
   const bridge = useCallback(
     async ({ fromNetwork, toNetwork, amount }: BridgeParams) => {
@@ -279,15 +166,14 @@ export const useBridgeCCTP = () => {
       if (address) {
         savePendingBurn(address, null);
       }
-      setState({ isBridging: true, isClaiming: false, isEstimating: false, error: null, result: null, transactions: [], mintConfirmed: false, pendingBurn: null, estimate: null, steps: [], lastResult: null });
+      abortRef.current?.abort();
+      const abortController = new AbortController();
+      abortRef.current = abortController;
+      setState({ isBridging: true, isClaiming: false, error: null, mintConfirmed: false, pendingBurn: null });
       setAttestationStatus(null);
-      mintConfirmedRef.current = false;
       mintTxHashRef.current = null; // Reset mint tx hash
       burnConfirmedRef.current = false;
       burnTxHashRef.current = null;
-      approvalConfirmedRef.current = false;
-      approvalStartedRef.current = false;
-      approvalTxHashRef.current = null;
 
       // Check if user is on the correct network
       const currentChainId = account.chainId;
@@ -299,7 +185,7 @@ export const useBridgeCCTP = () => {
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error: any) {
           console.error('[useBridgeCCTP] Network switch error:', error);
-          setState(prev => ({ ...prev, isBridging: false, error: 'Failed to switch network', result: null, transactions: [] }));
+          setState(prev => ({ ...prev, isBridging: false, error: 'Failed to switch network' }));
           toast.error('Failed to switch network', {
             description: `Please manually switch to ${SUPPORTED_NETWORKS[fromNetwork].name} in your wallet`,
           });
@@ -308,42 +194,10 @@ export const useBridgeCCTP = () => {
       }
 
       try {
-        // Get the EIP-1193 provider from connector client
-        // wagmi's connectorClient exposes transport.value or we can use window.ethereum
-        const provider = (connectorClient as any)?.transport ||
-                         (window as any).ethereum;
+        debug(' Bridge params:', { from: fromNetwork, to: toNetwork, amount, address });
 
-        if (!provider) {
-          throw new Error('No wallet provider available');
-        }
-
-        debug(' Creating adapter from provider...');
-
-        // Create adapter using Bridge Kit's factory
-        const adapter = await createAdapterFromProvider({
-          provider,
-        });
-
-        debug(' Adapter created successfully');
-
-        // Bridge Kit expects human-readable amount (e.g., '20' = 20 USDC)
-        // The SDK handles decimal conversion internally
-        const bridgeAmount = amount;
-
-        const fromChain = NETWORK_TO_BLOCKCHAIN[fromNetwork];
-        const toChain = NETWORK_TO_BLOCKCHAIN[toNetwork];
-
-        debug(' Bridge params:', {
-          from: fromChain,
-          to: toChain,
-          amount: bridgeAmount,
-          address,
-        });
-
-        // Special handling for Sepolia → Arc: use direct bridgeWithPreapproval call
-        // Bridge Kit SDK doesn't properly support Arc's custom bridge contract
-        const isSepoliaToArc = fromNetwork === 'ethereumSepolia' && toNetwork === 'arcTestnet';
-
+        // Sepolia → Arc goes through Arc's custom bridge contract (bridgeWithPreapproval
+        // with auto-relay hook); the canonical CCTP TokenMessenger path is used for Arc → Sepolia
         if (isSepoliaToArc) {
           debug(' Sepolia → Arc: using direct bridgeWithPreapproval');
           if (!walletClient) {
@@ -426,47 +280,27 @@ export const useBridgeCCTP = () => {
           // Track bridge immediately after successful burn (for Live Activity)
           // We'll track again after mint to ensure it's recorded even if user closes browser
           trackSiteBridge(burnHash, address!, amount, 'to_arc');
-          trackTransaction({ txHash: burnHash, txType: 'bridge-burn', walletAddress: address!, amount, currency: 'USDC' });
+          trackTransaction({ txHash: burnHash, txType: 'bridge-burn', walletAddress: address!, amount, currency: 'USDC', status: 'COMPLETE' });
 
           // Wait for attestation and relay (inline AttestationCounter shows progress)
           setAttestationStatus('pending');
 
-          // Poll Circle API for attestation (up to 5 minutes)
-          let attempts = 0;
-          let messageBytes: `0x${string}` | null = null;
-          let attestationBytes: `0x${string}` | null = null;
-          const MAX_ATTEMPTS = 150; // 150 * 2 sec = 5 minutes
-
           debug(' Starting attestation polling for tx:', burnHash);
-          while (attempts < MAX_ATTEMPTS) {
-            await new Promise(r => setTimeout(r, 2000));
-            attempts++;
+          const poll = await pollAttestation({
+            domain: CCTP_DOMAINS.ethereumSepolia,
+            txHash: burnHash,
+            signal: abortController.signal,
+          });
 
-            try {
-              const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=0&transactionHash=${burnHash}`;
-              const response = await fetch(attestationUrl);
-
-              if (!response.ok) {
-                continue;
-              }
-
-              const data = await response.json();
-
-              if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
-                debug(' Attestation received!');
-                messageBytes = data.messages[0].message as `0x${string}`;
-                attestationBytes = data.messages[0].attestation as `0x${string}`;
-                break;
-              }
-            } catch (e) {
-              console.error(`[useBridgeCCTP] Attestation polling error (attempt ${attempts}):`, e);
-              // Continue polling on error
-            }
+          // Unmounted or superseded by a new bridge — funds recoverable via pending burn in storage
+          if (poll.status === 'aborted') {
+            savePendingBurn(address, { txHash: burnHash, fromNetwork, toNetwork, amount, timestamp: Date.now() });
+            return;
           }
 
-          if (!messageBytes || !attestationBytes) {
+          if (poll.status === 'timeout') {
             // Timeout - save as pending burn so user can claim manually
-            debug(' Attestation timeout after', attempts * 2, 'seconds');
+            debug(' Attestation timeout');
             toast.warning('Attestation taking longer than expected', { 
               description: 'Your funds are safe. Click Claim when ready.',
               duration: 15000,
@@ -492,6 +326,9 @@ export const useBridgeCCTP = () => {
             }));
             return;
           }
+
+          const messageBytes = poll.message;
+          const attestationBytes = poll.attestation;
 
           // Step 3: Call receiveMessage on Arc to mint USDC
           toast.info('Minting on Arc...', { description: 'Please confirm to receive your USDC' });
@@ -551,6 +388,7 @@ export const useBridgeCCTP = () => {
               debug(' Mint confirmed!');
               // Bridge already tracked after burn, but ensure it's recorded (upsert handles duplicates)
               trackSiteBridge(burnHash, address!, amount, 'to_arc');
+              trackTransaction({ txHash: mintHash, txType: 'bridge-claim', walletAddress: address!, amount, currency: 'USDC', status: 'COMPLETE' });
               setAttestationStatus('complete');
               savePendingBurn(address!, null); // Clear pending burn from localStorage
               toast.success('Bridge completed!', { description: 'Your USDC has arrived on Arc Testnet' });
@@ -692,41 +530,25 @@ export const useBridgeCCTP = () => {
         }
 
         trackSiteBridge(burnHash, address!, amount, 'to_sepolia');
-        trackTransaction({ txHash: burnHash, txType: 'bridge-burn', walletAddress: address!, amount, currency: 'USDC' });
+        trackTransaction({ txHash: burnHash, txType: 'bridge-burn', walletAddress: address!, amount, currency: 'USDC', status: 'COMPLETE' });
 
         // Step 3: Wait for attestation (inline AttestationCounter shows progress)
         setAttestationStatus('pending');
 
-        let attempts = 0;
-        let messageBytes: `0x${string}` | null = null;
-        let attestationBytes: `0x${string}` | null = null;
-        const MAX_ATTEMPTS = 150; // 5 minutes
-
         debug(' Starting attestation polling for tx:', burnHash);
-        while (attempts < MAX_ATTEMPTS) {
-          await new Promise(r => setTimeout(r, 2000));
-          attempts++;
+        const poll = await pollAttestation({
+          domain: CCTP_DOMAINS.arcTestnet,
+          txHash: burnHash,
+          signal: abortController.signal,
+        });
 
-          try {
-            const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${CCTP_DOMAINS.arcTestnet}&transactionHash=${burnHash}`;
-            const response = await fetch(attestationUrl);
-
-            if (!response.ok) continue;
-
-            const data = await response.json();
-
-            if (data.messages?.[0]?.attestation && data.messages[0].attestation !== 'PENDING') {
-              debug(' Attestation received!');
-              messageBytes = data.messages[0].message as `0x${string}`;
-              attestationBytes = data.messages[0].attestation as `0x${string}`;
-              break;
-            }
-          } catch (e) {
-            // Continue polling on error
-          }
+        // Unmounted or superseded by a new bridge — funds recoverable via pending burn in storage
+        if (poll.status === 'aborted') {
+          savePendingBurn(address, { txHash: burnHash, fromNetwork, toNetwork, amount, timestamp: Date.now() });
+          return;
         }
 
-        if (!messageBytes || !attestationBytes) {
+        if (poll.status === 'timeout') {
           toast.warning('Attestation taking longer than expected', {
             description: 'Your funds are safe. Click Claim when ready.',
             duration: 15000,
@@ -745,6 +567,9 @@ export const useBridgeCCTP = () => {
           setState(prev => ({ ...prev, isBridging: false, pendingBurn: newPendingBurn }));
           return;
         }
+
+        const messageBytes = poll.message;
+        const attestationBytes = poll.attestation;
 
         // Step 4: Switch to Sepolia and call receiveMessage
         toast.info('Minting on Sepolia...', { description: 'Please confirm to receive your USDC' });
@@ -796,6 +621,7 @@ export const useBridgeCCTP = () => {
           if (mintReceipt.status === 'success') {
             debug(' Mint confirmed!');
             trackSiteBridge(burnHash, address!, amount, 'to_sepolia');
+            trackTransaction({ txHash: mintHash, txType: 'bridge-claim', walletAddress: address!, amount, currency: 'USDC', status: 'COMPLETE' });
             setAttestationStatus('complete');
             savePendingBurn(address!, null);
             toast.success('Bridge completed!', { description: 'Your USDC has arrived on Sepolia' });
@@ -823,27 +649,11 @@ export const useBridgeCCTP = () => {
       } catch (error: any) {
         console.error('[useBridgeCCTP] Bridge error:', error);
         debug(' Error object:', safeStringify(error, 2));
-        debug(' Error steps:', error?.steps);
         debug(' On error - burnConfirmed ref:', burnConfirmedRef.current);
 
         let errorMsg = error?.message || 'An unexpected error occurred';
 
-        // Use Bridge Kit structured error categories when available
-        if (isKitError(error)) {
-          if (error.type === 'INPUT' && error.name === 'USER_REJECTED') {
-            errorMsg = 'Transaction rejected by user';
-          } else if (error.type === 'BALANCE') {
-            errorMsg = 'Insufficient funds for gas';
-          } else if (error.type === 'ONCHAIN') {
-            errorMsg = error.message || 'On-chain transaction failed';
-          } else if (error.type === 'NETWORK') {
-            errorMsg = 'Network error — please check your connection';
-          } else if (error.type === 'RPC') {
-            errorMsg = 'RPC error — please try again';
-          } else if (error.type === 'RATE_LIMIT') {
-            errorMsg = 'Too many requests — please wait and retry';
-          }
-        } else if (errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('User denied')) {
+        if (errorMsg.includes('User rejected') || errorMsg.includes('user rejected') || errorMsg.includes('User denied')) {
           errorMsg = 'Transaction rejected by user';
         } else if (errorMsg.includes('insufficient funds')) {
           errorMsg = 'Insufficient funds for gas';
@@ -851,19 +661,17 @@ export const useBridgeCCTP = () => {
           errorMsg = 'Token approval failed';
         }
 
-        // Only trust burnConfirmedRef - it's set when BURN_CONFIRMED event is received
-        // Don't trust error.steps as it may incorrectly report approval as burn
+        // Only trust burnConfirmedRef - it's set after the burn receipt succeeds
         debug(' On error - burnConfirmedRef:', burnConfirmedRef.current, 'burnTxHashRef:', burnTxHashRef.current);
 
         // Check if error is about network switch - don't show "Your funds are safe" for network errors
-        const isNetworkSwitchError = (isKitError(error) && (error.type === 'NETWORK' || error.type === 'RPC')) ||
-                               errorMsg.includes('chain') ||
+        const isNetworkSwitchError = errorMsg.includes('chain') ||
                                errorMsg.includes('network') ||
                                errorMsg.includes('Chain ID') ||
                                errorMsg.includes('not switched') ||
                                errorMsg.includes('does not match') ||
                                (errorMsg.includes('current') && errorMsg.includes('expected'));
-        
+
         if (isNetworkSwitchError && burnConfirmedRef.current) {
           debug(' Network switch error after burn - show network error, not "Your funds are safe"');
           toast.error('Network switch required', { 
@@ -879,15 +687,8 @@ export const useBridgeCCTP = () => {
           return;
         }
 
-        // Check if burn was actually confirmed (BURN_CONFIRMED event was received)
+        // Check if burn was actually confirmed
         if (burnConfirmedRef.current && burnTxHashRef.current) {
-          // Don't show "Your funds are safe" if mint was already confirmed
-          // Only check mintConfirmedRef, not mintTxHashRef (tx might be pending)
-          if (mintConfirmedRef.current) {
-            debug(' Mint already confirmed, skipping pending claim message');
-            return;
-          }
-          
           debug(' Burn was confirmed before error - funds are safe');
           const burnTxHash = burnTxHashRef.current;
           debug(' Burn tx hash:', burnTxHash);
@@ -915,7 +716,6 @@ export const useBridgeCCTP = () => {
             ...prev,
             isBridging: false,
             error: 'Mint was not completed. Your funds are safe - click Claim USDC.',
-            result: null,
             mintConfirmed: false,
             pendingBurn: newPendingBurn,
           }));
@@ -929,8 +729,6 @@ export const useBridgeCCTP = () => {
           ...prev,
           isBridging: false,
           error: errorMsg,
-          result: null,
-          transactions: [],
           mintConfirmed: false,
         }));
 
@@ -940,16 +738,8 @@ export const useBridgeCCTP = () => {
         });
       }
     },
-    [isConnected, address, connectorClient, walletClient, sepoliaClient, switchChainAsync, account.chainId, bridgeKit]
+    [isConnected, address, connectorClient, walletClient, sepoliaClient, switchChainAsync, account.chainId]
   );
-
-  /**
-   * Complete bridge - Bridge Kit handles this automatically
-   * Kept for backwards compatibility with UI
-   */
-  const completeBridge = useCallback(async () => {
-    // Bridge Kit handles the full flow (burn → attestation → mint) automatically
-  }, []);
 
   /**
    * Claim pending USDC from a burn that didn't complete mint
@@ -977,35 +767,17 @@ export const useBridgeCCTP = () => {
       // Try both domains to auto-detect direction (in case saved direction was wrong)
       toast.info('Fetching attestation from Circle...');
 
-      const domains = [
-        { domain: CCTP_DOMAINS[fromNetwork], from: fromNetwork, to: toNetwork }, // Try saved direction first
-        { domain: CCTP_DOMAINS[fromNetwork === 'ethereumSepolia' ? 'arcTestnet' : 'ethereumSepolia'],
-          from: fromNetwork === 'ethereumSepolia' ? 'arcTestnet' as BridgeNetwork : 'ethereumSepolia' as BridgeNetwork,
-          to: fromNetwork === 'ethereumSepolia' ? 'ethereumSepolia' as BridgeNetwork : 'arcTestnet' as BridgeNetwork },
-      ];
+      const otherSourceDomain = fromNetwork === 'ethereumSepolia'
+        ? CCTP_DOMAINS.arcTestnet
+        : CCTP_DOMAINS.ethereumSepolia;
+      const found = await findAttestationMessage(txHash, [CCTP_DOMAINS[fromNetwork], otherSourceDomain]);
 
-      let messageData: any = null;
-      let detectedDestNetwork: BridgeNetwork = toNetwork;
-
-      for (const { domain, to } of domains) {
-        const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${domain}&transactionHash=${txHash}`;
-        debug(' Trying domain', domain, 'URL:', attestationUrl);
-
-        try {
-          const attestationResponse = await fetch(attestationUrl);
-          const attestationData = await attestationResponse.json();
-          debug(' Attestation response for domain', domain, ':', attestationData);
-
-          if (attestationData.messages && attestationData.messages.length > 0) {
-            messageData = attestationData.messages[0];
-            detectedDestNetwork = to;
-            debug(' Found message on domain', domain, '- dest:', to);
-            break;
-          }
-        } catch (e) {
-          debug(' Domain', domain, 'failed, trying next...');
-        }
-      }
+      const messageData = found?.message ?? null;
+      // The domain the message was found on is the burn's source — destination is the opposite network
+      const detectedDestNetwork: BridgeNetwork = found
+        ? (found.domain === CCTP_DOMAINS.ethereumSepolia ? 'arcTestnet' : 'ethereumSepolia')
+        : toNetwork;
+      if (found) debug(' Found message on domain', found.domain, '- dest:', detectedDestNetwork);
 
       if (!messageData) {
         throw new Error('Attestation is still being processed. This usually takes 1-3 minutes. Please wait a moment and try again.');
@@ -1096,6 +868,8 @@ export const useBridgeCCTP = () => {
         savePendingBurn(address, null);
       }
 
+      trackTransaction({ txHash: hash, txType: 'bridge-claim', walletAddress: address, amount: pendingBurn.amount, currency: 'USDC', status: 'COMPLETE' });
+
       toast.success('USDC claimed successfully!', {
         description: `Your ${pendingBurn.amount} USDC has been received.`,
         duration: 10000,
@@ -1151,72 +925,6 @@ export const useBridgeCCTP = () => {
   }, [claimPendingBridge]);
 
   /**
-   * Retry a failed bridge using Bridge Kit 1.3.0 retry method
-   * Only works if we have a lastResult with error state
-   */
-  const retryBridge = useCallback(async () => {
-    const lastResult = state.lastResult;
-    if (!lastResult || lastResult.state !== 'error') {
-      toast.error('No failed bridge to retry');
-      return;
-    }
-
-    if (!isConnected || !address || !connectorClient) {
-      toast.error('Please connect your wallet');
-      return;
-    }
-
-    setState(prev => ({ ...prev, isBridging: true, error: null }));
-
-    try {
-      const provider = (connectorClient as any)?.transport || (window as any).ethereum;
-      if (!provider) {
-        throw new Error('No wallet provider available');
-      }
-
-      const adapter = await createAdapterFromProvider({ provider });
-
-      debug(' Retrying failed bridge...');
-      toast.info('Retrying bridge...');
-
-      const retryResult = await bridgeKit.retry(lastResult as any, {
-        from: adapter,
-        to: adapter,
-      });
-
-      debug(' Retry result:', retryResult);
-
-      if (retryResult.state === 'success') {
-        toast.success('Bridge completed successfully!');
-        setState(prev => ({
-          ...prev,
-          isBridging: false,
-          mintConfirmed: true,
-          lastResult: null,
-          steps: (retryResult.steps || []) as BridgeStep[],
-        }));
-      } else {
-        // Still failed - save for another retry
-        const errorStep = (retryResult as any).steps?.find((s: any) => s.state === 'error');
-        const errorMsg = String(errorStep?.error || 'Retry failed');
-        toast.error('Retry failed', { description: errorMsg });
-        setState(prev => ({
-          ...prev,
-          isBridging: false,
-          error: errorMsg,
-          lastResult: retryResult as unknown as LastBridgeResult,
-          steps: (retryResult.steps || []) as BridgeStep[],
-        }));
-      }
-
-    } catch (error: any) {
-      console.error('[useBridgeCCTP] Retry error:', error);
-      toast.error('Retry failed', { description: error.message });
-      setState(prev => ({ ...prev, isBridging: false, error: error.message }));
-    }
-  }, [state.lastResult, isConnected, address, connectorClient, bridgeKit]);
-
-  /**
    * Manually restore a pending burn for claiming
    * Validates the transaction by checking Circle Attestation API
    * Auto-detects direction by trying both domains
@@ -1235,38 +943,16 @@ export const useBridgeCCTP = () => {
     try {
       // Try both domains to auto-detect the actual direction
       // Domain 0 = Sepolia, Domain 26 = Arc Testnet
-      const domains = [
-        { domain: CCTP_DOMAINS.ethereumSepolia, from: 'ethereumSepolia' as BridgeNetwork, to: 'arcTestnet' as BridgeNetwork },
-        { domain: CCTP_DOMAINS.arcTestnet, from: 'arcTestnet' as BridgeNetwork, to: 'ethereumSepolia' as BridgeNetwork },
-      ];
+      const found = await findAttestationMessage(burnTxHash, [CCTP_DOMAINS.ethereumSepolia, CCTP_DOMAINS.arcTestnet]);
 
-      let messageData: any = null;
-      let detectedFrom: BridgeNetwork = 'ethereumSepolia';
-      let detectedTo: BridgeNetwork = 'arcTestnet';
-
-      for (const { domain, from, to } of domains) {
-        const attestationUrl = `${CIRCLE_ATTESTATION_API}&domain=${domain}&transactionHash=${burnTxHash}`;
-        debug(' Trying domain', domain, 'for:', burnTxHash);
-
-        try {
-          const response = await fetch(attestationUrl);
-          const data = await response.json();
-
-          if (data.messages && data.messages.length > 0) {
-            messageData = data.messages[0];
-            detectedFrom = from;
-            detectedTo = to;
-            debug(' Found message on domain', domain, '- direction:', from, '→', to);
-            break;
-          }
-        } catch (e) {
-          debug(' Domain', domain, 'failed, trying next...');
-        }
-      }
-
-      if (!messageData) {
+      if (!found) {
         return { success: false, message: 'No CCTP burn found for this transaction. Make sure this is a valid burn tx hash.', type: 'error' };
       }
+
+      const messageData = found.message;
+      const detectedFrom: BridgeNetwork = found.domain === CCTP_DOMAINS.ethereumSepolia ? 'ethereumSepolia' : 'arcTestnet';
+      const detectedTo: BridgeNetwork = detectedFrom === 'ethereumSepolia' ? 'arcTestnet' : 'ethereumSepolia';
+      debug(' Found message on domain', found.domain, '- direction:', detectedFrom, '→', detectedTo);
 
       debug(' Attestation check response:', messageData);
 
@@ -1330,39 +1016,23 @@ export const useBridgeCCTP = () => {
     setState({
       isBridging: false,
       isClaiming: false,
-      isEstimating: false,
       error: null,
-      result: null,
-      transactions: [],
       mintConfirmed: false,
       pendingBurn: null,
-      estimate: null,
-      steps: [],
-      lastResult: null,
     });
     setAttestationStatus(null);
-    mintConfirmedRef.current = false;
     burnConfirmedRef.current = false;
     burnTxHashRef.current = null;
-    approvalConfirmedRef.current = false;
-    approvalStartedRef.current = false;
-    approvalTxHashRef.current = null;
+    mintTxHashRef.current = null;
   }, []);
 
   return {
     ...state,
     bridge,
-    completeBridge,
     claimPendingBridge,
     restorePendingBurn,
     clearPendingBurn,
     reset,
     attestationStatus,
-    // Bridge Kit 1.3.0 new features
-    estimateBridge,
-    retryBridge,
-    canRetry: state.lastResult?.state === 'error',
-    // Bridge Kit handles mint automatically, so no manual completion needed
-    canCompleteBridge: false,
   };
 };
