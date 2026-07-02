@@ -1,13 +1,14 @@
-import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
+import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useSendTransaction } from 'wagmi';
 import { useMemo, useRef, useEffect, useCallback } from 'react';
 import { useUnifiedWallet } from './useUnifiedWallet';
 import { useCircleWallet } from '@/providers/CircleWalletProvider';
 import { useServerVault } from './useServerVault';
-import { formatUnits, parseUnits, maxUint256, createPublicClient, http } from 'viem';
+import { formatUnits, parseUnits, maxUint256, createPublicClient, http, encodeFunctionData } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
 import { trackTransaction, updateTransactionStatus } from '@/lib/trackTransaction';
+import { MULTICALL3_FROM_ADDRESS, buildCall3, encodeAggregate3 } from '@/lib/batchCall';
 
 export function formatPoolValue(value: bigint | undefined): string {
   if (!value) return '0.00';
@@ -313,6 +314,8 @@ export const useTreasuryVault = () => {
 
   // Separate hooks for approve transactions - use writeContractAsync for proper error handling
   const { writeContractAsync } = useWriteContract();
+  // For Multicall3From batches (raw calldata)
+  const { sendTransactionAsync } = useSendTransaction();
 
   // Check EURC allowance
   const { data: eurcAllowance, refetch: refetchEURCAllowance } = useReadContract({
@@ -370,52 +373,26 @@ export const useTreasuryVault = () => {
         }
       const amountWei = parseUnits(amount, 6); // EURC uses 6 decimals
 
-      // Check EURC allowance on the vault's actual EURC token
-      const currentEURCAllowance = await client.readContract({
-        address: eurcAddress,
+      // Batch EURC approve + depositEURC into one atomic tx via Multicall3From
+      // (CallFrom preserves the EOA as msg.sender so allowance registers under user)
+      const approveCallData = encodeFunctionData({
         abi: ERC20_ABI,
-        functionName: 'allowance',
-        args: [address, TREASURY_CONTRACTS.TreasuryVault],
-      }) as bigint;
-
-      if (currentEURCAllowance < amountWei) {
-        // Approve first using writeContractAsync
-        if (!writeContractAsync) {
-          throw new Error('Approve function not available');
-        }
-
-        const approveHash = await writeContractAsync({
-          address: eurcAddress,
-          abi: ERC20_ABI,
-          functionName: 'approve',
-          args: [TREASURY_CONTRACTS.TreasuryVault, amountWei * 10n],
-          chainId: arcTestnet.id,
-        });
-
-        // Wait for approval confirmation and check status
-        const approveReceipt = await client.waitForTransactionReceipt({
-          hash: approveHash,
-          timeout: 120000, // 2 minutes timeout
-        });
-
-        if (approveReceipt.status === 'reverted') {
-          throw new Error('EURC approval failed');
-        }
-
-        // Refetch allowance to ensure it's updated
-        await refetchEURCAllowance();
-      }
-
-      // Deposit EURC using writeContractAsync - throws error if user rejects
-      if (!writeContractAsync) {
-        throw new Error('Write function not available');
-      }
-
-      const depositHash = await writeContractAsync({
-        address: TREASURY_CONTRACTS.TreasuryVault,
+        functionName: 'approve',
+        args: [TREASURY_CONTRACTS.TreasuryVault, amountWei],
+      });
+      const depositCallData = encodeFunctionData({
         abi: TREASURY_VAULT_ABI,
         functionName: 'depositEURC',
         args: [amountWei],
+      });
+      const batchData = encodeAggregate3([
+        buildCall3(eurcAddress, approveCallData),
+        buildCall3(TREASURY_CONTRACTS.TreasuryVault, depositCallData),
+      ]);
+
+      const depositHash = await sendTransactionAsync({
+        to: MULTICALL3_FROM_ADDRESS,
+        data: batchData,
         chainId: arcTestnet.id,
       });
 

@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { formatEther, formatUnits, parseEther, parseUnits, encodeFunctionData } from 'viem';
 import { TREASURY_CONTRACTS } from '@/lib/constants';
-import { MULTICALL3_FROM_ADDRESS, buildCall3, encodeAggregate3 } from '@/lib/batchCall';
+import { MULTICALL3_FROM_ADDRESS, buildCall3, buildCall3Value, encodeAggregate3, encodeAggregate3Value } from '@/lib/batchCall';
 import { arcTestnet } from '@/lib/wagmi';
 import { toast } from 'sonner';
 import { useExchangeRate } from './useExchangeRate';
@@ -606,32 +606,29 @@ export function useSwapPool() {
       const usdcWei = parseEther(usdcAmount);
       const eurcWei = parseUnits(eurcAmount, 6);
 
-      // Check EURC allowance
-      const allowance = await publicClient.readContract({
-        address: eurcAddress,
-        abi: EURC_ABI,
-        functionName: 'allowance',
-        args: [address, swapAddress],
-      });
-
-      if (allowance < eurcWei) {
-        toast.info('Approving EURC...');
-        const approveHash = await walletClient.writeContract({
-          address: eurcAddress,
-          abi: EURC_ABI,
-          functionName: 'approve',
-          args: [swapAddress, eurcWei * 10n],
-        });
-        await publicClient.waitForTransactionReceipt({ hash: approveHash });
-      }
-
       toast.info('Adding liquidity...');
 
-      const hash = await walletClient.writeContract({
-        address: swapAddress,
+      // Batch EURC approve + addLiquidity (payable) in one atomic tx via
+      // Multicall3From aggregate3Value. The USDC msg.value is carried on the
+      // outer tx and forwarded to the addLiquidity subcall; approve carries 0.
+      const approveCallData = encodeFunctionData({
+        abi: EURC_ABI,
+        functionName: 'approve',
+        args: [swapAddress, eurcWei],
+      });
+      const addLiqCallData = encodeFunctionData({
         abi: SWAP_ABI,
         functionName: 'addLiquidity',
         args: [eurcWei, 0n],
+      });
+      const batchData = encodeAggregate3Value([
+        buildCall3Value(eurcAddress, approveCallData, 0n),
+        buildCall3Value(swapAddress, addLiqCallData, usdcWei),
+      ]);
+
+      const hash = await walletClient.sendTransaction({
+        to: MULTICALL3_FROM_ADDRESS,
+        data: batchData,
         value: usdcWei,
       });
 

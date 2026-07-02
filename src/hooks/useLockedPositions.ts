@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseUnits, formatUnits, createPublicClient, http } from 'viem';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSendTransaction } from 'wagmi';
+import { parseUnits, formatUnits, createPublicClient, http, encodeFunctionData } from 'viem';
 import { TREASURY_CONTRACTS, TOKEN_ADDRESSES } from '@/lib/constants';
 import TreasuryVaultABI from '@/lib/abis/TreasuryVault.json';
+import { MULTICALL3_FROM_ADDRESS, buildCall3, encodeAggregate3 } from '@/lib/batchCall';
 import { useUSYCPrice } from './useUSYCPrice';
 import { arcTestnet, ARC_RPC_URL } from '@/lib/wagmi';
 import { ERC20_ABI } from '@/lib/abis/erc20';
@@ -135,6 +136,7 @@ export function useDepositLocked() {
   const address = account?.address || (unifiedWallet.address as `0x${string}` | undefined);
   const isCircle = unifiedWallet.walletType === 'circle';
   const { data: hash, writeContractAsync, isPending, error } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
@@ -198,39 +200,25 @@ export function useDepositLocked() {
     const eurcAddress = TOKEN_ADDRESSES.arcTestnet.EURC;
     const amountWei = parseUnits(amount, 6);
 
-    // Check EURC allowance and approve if needed
-    const currentAllowance = eurcAllowance || 0n;
-
-    if (currentAllowance < amountWei) {
-      // Approve first
-      const approveHash = await writeContractAsync({
-        address: eurcAddress,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [TREASURY_CONTRACTS.TreasuryVault, amountWei],
-        chainId: arcTestnet.id,
-      });
-
-      // Wait for approval confirmation
-      const approveReceipt = await client.waitForTransactionReceipt({
-        hash: approveHash,
-        timeout: 120000,
-      });
-
-      if (approveReceipt.status === 'reverted') {
-        throw new Error('EURC approval failed');
-      }
-
-      // Refetch allowance
-      await refetchEURCAllowance();
-    }
-
-    // Now deposit
-    const txHash = await writeContractAsync({
-      address: TREASURY_CONTRACTS.TreasuryVault,
+    // Batch EURC approve + depositLockedEURC into one atomic tx via Multicall3From
+    const approveCallData = encodeFunctionData({
+      abi: ERC20_ABI,
+      functionName: 'approve',
+      args: [TREASURY_CONTRACTS.TreasuryVault, amountWei],
+    });
+    const depositCallData = encodeFunctionData({
       abi: TreasuryVaultABI.abi,
       functionName: 'depositLockedEURC',
       args: [amountWei, lockPeriodMonths],
+    });
+    const batchData = encodeAggregate3([
+      buildCall3(eurcAddress, approveCallData),
+      buildCall3(TREASURY_CONTRACTS.TreasuryVault, depositCallData),
+    ]);
+
+    const txHash = await sendTransactionAsync({
+      to: MULTICALL3_FROM_ADDRESS,
+      data: batchData,
       chainId: arcTestnet.id,
     });
 
