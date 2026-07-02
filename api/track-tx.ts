@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { supabaseAdmin, insertCircleTx, updateCircleTxStatus, insertSwapTx, insertLiquidityEvent } from './_lib/supabase';
+import { supabaseAdmin, insertCircleTx, updateCircleTxStatus, insertSiteSwap, insertSiteLiquidity } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 
@@ -16,6 +16,10 @@ const RATE_LIMIT_WINDOW = 60_000;
 
 // Minimum amount for swap/liquidity tracking (filter dust/spam)
 const MIN_TRACK_AMOUNT_USD = 0.01;
+// Upper bound for client-tracked feed amounts. These rows are cosmetic
+// (Live Activity only, never counted toward points), so this just blocks
+// absurd values from polluting the feed.
+const MAX_TRACK_AMOUNT_USD = 100_000_000;
 
 const VALID_TX_TYPES = new Set([
   'deposit-usdc', 'deposit-eurc',
@@ -139,15 +143,16 @@ async function handleTrackSwap(req: VercelRequest, res: VercelResponse) {
   if (!walletAddress || !ADDRESS_REGEX.test(walletAddress)) {
     return res.status(400).json({ error: 'Valid walletAddress required', received: { walletAddress } });
   }
-  if (!amountUsd || Number(amountUsd) < MIN_TRACK_AMOUNT_USD) {
-    return res.status(400).json({ error: `amountUsd must be >= ${MIN_TRACK_AMOUNT_USD}` });
+  const amt = Number(amountUsd);
+  if (!Number.isFinite(amt) || amt < MIN_TRACK_AMOUNT_USD || amt > MAX_TRACK_AMOUNT_USD) {
+    return res.status(400).json({ error: `amountUsd must be between ${MIN_TRACK_AMOUNT_USD} and ${MAX_TRACK_AMOUNT_USD}` });
   }
 
   try {
-    await insertSwapTx({
+    await insertSiteSwap({
       tx_hash: txHash.toLowerCase(),
       wallet_address: walletAddress.toLowerCase(),
-      amount_usd: Number(amountUsd) || 0,
+      amount_usd: amt,
       token_in: tokenIn || 'USDC',
       token_out: tokenOut || 'EURC',
     });
@@ -172,15 +177,16 @@ async function handleTrackLiquidity(req: VercelRequest, res: VercelResponse) {
   if (!action || !['add', 'remove'].includes(action)) {
     return res.status(400).json({ error: 'action must be add or remove' });
   }
-  if (!amountUsd || Number(amountUsd) < MIN_TRACK_AMOUNT_USD) {
-    return res.status(400).json({ error: `amountUsd must be >= ${MIN_TRACK_AMOUNT_USD}` });
+  const amt = Number(amountUsd);
+  if (!Number.isFinite(amt) || amt < MIN_TRACK_AMOUNT_USD || amt > MAX_TRACK_AMOUNT_USD) {
+    return res.status(400).json({ error: `amountUsd must be between ${MIN_TRACK_AMOUNT_USD} and ${MAX_TRACK_AMOUNT_USD}` });
   }
 
   try {
-    await insertLiquidityEvent({
+    await insertSiteLiquidity({
       tx_hash: txHash.toLowerCase(),
       wallet_address: walletAddress.toLowerCase(),
-      amount_usd: Number(amountUsd) || 0,
+      amount_usd: amt,
       action,
     });
     return res.status(200).json({ ok: true });
@@ -196,13 +202,15 @@ async function handleFeedAll(req: VercelRequest, res: VercelResponse) {
 
   const useTopCache = feedTopCache && Date.now() - feedTopCache.ts < FEED_TOP_TTL;
 
+  // Activity list = client-tracked site_* tables (instant Live Activity feed).
+  // Stats/top RPCs read the bot-populated on-chain tables (real, unforgeable volume).
   const [swapActivityRes, lpActivityRes, statsRes, topRes, topCountRes] = await Promise.all([
-    supabaseAdmin.from('swap_transactions')
+    supabaseAdmin.from('site_swaps')
       .select('id, wallet_address, amount_usd, token_in, token_out, created_at')
       .gte('amount_usd', MIN_AMOUNT_USD)
       .order('created_at', { ascending: false })
       .limit(limit),
-    supabaseAdmin.from('liquidity_events')
+    supabaseAdmin.from('site_liquidity')
       .select('id, wallet_address, amount_usd, action, created_at')
       .gte('amount_usd', MIN_AMOUNT_USD)
       .order('created_at', { ascending: false })
@@ -269,12 +277,12 @@ async function handleFeedActivity(req: VercelRequest, res: VercelResponse) {
   const limit = Math.min(Number(req.query.limit) || 10, 50);
 
   const [swapRes, lpRes] = await Promise.all([
-    supabaseAdmin.from('swap_transactions')
+    supabaseAdmin.from('site_swaps')
       .select('id, wallet_address, amount_usd, token_in, token_out, created_at')
       .gte('amount_usd', MIN_AMOUNT_USD)
       .order('created_at', { ascending: false })
       .limit(limit),
-    supabaseAdmin.from('liquidity_events')
+    supabaseAdmin.from('site_liquidity')
       .select('id, wallet_address, amount_usd, action, created_at')
       .gte('amount_usd', MIN_AMOUNT_USD)
       .order('created_at', { ascending: false })

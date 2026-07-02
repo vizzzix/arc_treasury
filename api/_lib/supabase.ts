@@ -69,7 +69,11 @@ export async function updateCircleTxStatus(
   }
 }
 
-export async function insertSwapTx(params: {
+// NOTE: client-tracked swaps/liquidity go into the site_* feed tables, NOT the
+// on-chain swap_transactions / liquidity_events that the bot populates and the
+// points functions read. This keeps forgeable client input out of the points
+// calculation (mirrors the site_bridges pattern).
+export async function insertSiteSwap(params: {
   tx_hash: string;
   wallet_address: string;
   amount_usd: number;
@@ -77,30 +81,30 @@ export async function insertSwapTx(params: {
   token_out: string;
 }): Promise<void> {
   if (!supabaseAdmin) throw new Error('Supabase not initialized');
-  const { error } = await supabaseAdmin.from('swap_transactions').upsert({
+  const { error } = await supabaseAdmin.from('site_swaps').upsert({
     ...params,
     created_at: new Date().toISOString(),
   }, { onConflict: 'tx_hash' });
   if (error) {
-    console.error('[Supabase] insertSwapTx error:', error.message, error.details);
-    throw new Error(`insertSwapTx failed: ${error.message}`);
+    console.error('[Supabase] insertSiteSwap error:', error.message, error.details);
+    throw new Error(`insertSiteSwap failed: ${error.message}`);
   }
 }
 
-export async function insertLiquidityEvent(params: {
+export async function insertSiteLiquidity(params: {
   tx_hash: string;
   wallet_address: string;
   amount_usd: number;
   action: 'add' | 'remove';
 }): Promise<void> {
   if (!supabaseAdmin) throw new Error('Supabase not initialized');
-  const { error } = await supabaseAdmin.from('liquidity_events').upsert({
+  const { error } = await supabaseAdmin.from('site_liquidity').upsert({
     ...params,
     created_at: new Date().toISOString(),
   }, { onConflict: 'tx_hash' });
   if (error) {
-    console.error('[Supabase] insertLiquidityEvent error:', error.message, error.details);
-    throw new Error(`insertLiquidityEvent failed: ${error.message}`);
+    console.error('[Supabase] insertSiteLiquidity error:', error.message, error.details);
+    throw new Error(`insertSiteLiquidity failed: ${error.message}`);
   }
 }
 
