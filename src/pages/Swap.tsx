@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, ArrowDownUp, RefreshCw, Info, Loader2, Plus, Minus, Droplets, CheckCircle2, XCircle, ExternalLink, Settings2, X } from "lucide-react";
+import { ArrowLeft, ArrowDownUp, RefreshCw, Info, Loader2, Plus, Minus, Droplets, XCircle, Settings2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAccount, useSwitchChain } from "wagmi";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,8 @@ import { useUSDCBalance } from "@/hooks/useUSDCBalance";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useUnifiedWallet } from "@/hooks/useUnifiedWallet";
 import { LiveSwapFeed } from "@/components/LiveSwapFeed";
+import { SingleTxBadge } from "@/components/SingleTxBadge";
+import { TxStatus } from "@/components/TxStatus";
 
 const formatBalance = (balance: string | number) => {
   const num = typeof balance === 'string' ? parseFloat(balance) : balance;
@@ -474,11 +476,13 @@ const Swap = () => {
                   placeholder="0.00"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  aria-label={`Amount to swap in ${fromToken}`}
                   className="pr-24 h-14 text-xl bg-white/5 border-white/10"
                 />
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                   <button
                     onClick={handleMaxFrom}
+                    aria-label={`Use maximum ${fromToken} balance`}
                     className="text-xs text-primary hover:underline"
                   >
                     MAX
@@ -494,9 +498,10 @@ const Swap = () => {
             <div className="flex justify-center my-2 relative z-10">
               <button
                 onClick={handleSwapTokens}
+                aria-label="Reverse swap direction"
                 className="p-3 rounded-full bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-all duration-200 hover:scale-110"
               >
-                <ArrowDownUp className="w-5 h-5 text-primary" />
+                <ArrowDownUp className="w-5 h-5 text-primary" aria-hidden="true" />
               </button>
             </div>
 
@@ -526,6 +531,10 @@ const Swap = () => {
 
             {/* Swap details */}
             <div className="mt-4 p-3 rounded-lg bg-white/5 space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Approval</span>
+                <SingleTxBadge />
+              </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Fee (0.2%)</span>
                 <span>{feeAmount} {toToken}</span>
@@ -570,42 +579,13 @@ const Swap = () => {
 
             {/* Last Swap Transaction */}
             {lastSwap && lastSwap.type === 'swap' && (
-              <div className={`mt-4 p-4 rounded-xl border ${
-                lastSwap.status === 'success'
-                  ? 'bg-green-500/10 border-green-500/20'
-                  : lastSwap.status === 'failed'
-                  ? 'bg-red-500/10 border-red-500/20'
-                  : 'bg-blue-500/10 border-blue-500/20'
-              }`}>
-                <div className="flex items-start gap-3">
-                  {lastSwap.status === 'success' && <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />}
-                  {lastSwap.status === 'failed' && <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
-                  {lastSwap.status === 'pending' && <Loader2 className="w-5 h-5 text-blue-400 animate-spin flex-shrink-0 mt-0.5" />}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium mb-1 ${
-                      lastSwap.status === 'success' ? 'text-green-400' :
-                      lastSwap.status === 'failed' ? 'text-red-400' : 'text-blue-400'
-                    }`}>
-                      {lastSwap.status === 'success' ? 'Swap Complete!' :
-                       lastSwap.status === 'failed' ? 'Swap Failed' : 'Processing Swap...'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Swapped {lastSwap.amountIn} {lastSwap.fromToken} → {lastSwap.amountOut} {lastSwap.toToken}
-                    </p>
-                    <a
-                      href={lastSwap.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline flex items-center gap-1 mt-2"
-                    >
-                      View transaction <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <button onClick={clearLastSwap} className="p-1 hover:bg-white/10 rounded flex-shrink-0">
-                    <X className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
+              <TxStatus
+                status={lastSwap.status}
+                titles={{ pending: 'Processing Swap...', success: 'Swap Complete!', failed: 'Swap Failed' }}
+                description={`Swapped ${lastSwap.amountIn} ${lastSwap.fromToken} → ${lastSwap.amountOut} ${lastSwap.toToken}`}
+                explorerUrl={lastSwap.explorerUrl}
+                onDismiss={clearLastSwap}
+              />
             )}
 
             {/* Info */}
@@ -843,42 +823,13 @@ const Swap = () => {
 
                   {/* Last Transaction for Add Liquidity */}
                   {lastSwap && lastSwap.type === 'addLiquidity' && (
-                    <div className={`mt-4 p-4 rounded-xl border ${
-                      lastSwap.status === 'success'
-                        ? 'bg-green-500/10 border-green-500/20'
-                        : lastSwap.status === 'failed'
-                        ? 'bg-red-500/10 border-red-500/20'
-                        : 'bg-blue-500/10 border-blue-500/20'
-                    }`}>
-                      <div className="flex items-start gap-3">
-                        {lastSwap.status === 'success' && <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />}
-                        {lastSwap.status === 'failed' && <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
-                        {lastSwap.status === 'pending' && <Loader2 className="w-5 h-5 text-blue-400 animate-spin flex-shrink-0 mt-0.5" />}
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium mb-1 ${
-                            lastSwap.status === 'success' ? 'text-green-400' :
-                            lastSwap.status === 'failed' ? 'text-red-400' : 'text-blue-400'
-                          }`}>
-                            {lastSwap.status === 'success' ? 'Liquidity Added!' :
-                             lastSwap.status === 'failed' ? 'Transaction Failed' : 'Adding Liquidity...'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Added {lastSwap.amountIn} to the pool
-                          </p>
-                          <a
-                            href={lastSwap.explorerUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline flex items-center gap-1 mt-2"
-                          >
-                            View transaction <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                        <button onClick={clearLastSwap} className="p-1 hover:bg-white/10 rounded flex-shrink-0">
-                          <X className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    </div>
+                    <TxStatus
+                      status={lastSwap.status}
+                      titles={{ pending: 'Adding Liquidity...', success: 'Liquidity Added!', failed: 'Transaction Failed' }}
+                      description={`Added ${lastSwap.amountIn} to the pool`}
+                      explorerUrl={lastSwap.explorerUrl}
+                      onDismiss={clearLastSwap}
+                    />
                   )}
                 </div>
               ) : (
@@ -938,42 +889,13 @@ const Swap = () => {
 
                   {/* Last Transaction for Remove Liquidity */}
                   {lastSwap && lastSwap.type === 'removeLiquidity' && (
-                    <div className={`mt-4 p-4 rounded-xl border ${
-                      lastSwap.status === 'success'
-                        ? 'bg-green-500/10 border-green-500/20'
-                        : lastSwap.status === 'failed'
-                        ? 'bg-red-500/10 border-red-500/20'
-                        : 'bg-blue-500/10 border-blue-500/20'
-                    }`}>
-                      <div className="flex items-start gap-3">
-                        {lastSwap.status === 'success' && <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />}
-                        {lastSwap.status === 'failed' && <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
-                        {lastSwap.status === 'pending' && <Loader2 className="w-5 h-5 text-blue-400 animate-spin flex-shrink-0 mt-0.5" />}
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium mb-1 ${
-                            lastSwap.status === 'success' ? 'text-green-400' :
-                            lastSwap.status === 'failed' ? 'text-red-400' : 'text-blue-400'
-                          }`}>
-                            {lastSwap.status === 'success' ? 'Liquidity Removed!' :
-                             lastSwap.status === 'failed' ? 'Transaction Failed' : 'Removing Liquidity...'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Removed {lastSwap.amountIn} LP tokens from the pool
-                          </p>
-                          <a
-                            href={lastSwap.explorerUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline flex items-center gap-1 mt-2"
-                          >
-                            View transaction <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </div>
-                        <button onClick={clearLastSwap} className="p-1 hover:bg-white/10 rounded flex-shrink-0">
-                          <X className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </div>
-                    </div>
+                    <TxStatus
+                      status={lastSwap.status}
+                      titles={{ pending: 'Removing Liquidity...', success: 'Liquidity Removed!', failed: 'Transaction Failed' }}
+                      description={`Removed ${lastSwap.amountIn} LP tokens from the pool`}
+                      explorerUrl={lastSwap.explorerUrl}
+                      onDismiss={clearLastSwap}
+                    />
                   )}
                 </div>
               )}

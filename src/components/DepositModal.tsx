@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ArrowRightLeft, ExternalLink, CheckCircle2 } from "lucide-react";
 import { useTokenBalance } from "@/hooks/useTokenBalance";
+import { SingleTxBadge } from "@/components/SingleTxBadge";
 import { TOKEN_ADDRESSES, SUPPORTED_NETWORKS, EURC_DEPOSITS_DISABLED } from "@/lib/constants";
 import { useUSYCPrice } from "@/hooks/useUSYCPrice";
 import { useNavigate } from "react-router-dom";
@@ -182,6 +183,7 @@ export function DepositModal({ open, onOpenChange, onDeposit, isPending }: Depos
               <button
                 onClick={handleMaxClick}
                 disabled={isPending}
+                aria-label={`Use maximum ${tokenType} balance`}
                 className="text-xs text-primary hover:underline font-medium"
               >
                 MAX
@@ -208,6 +210,10 @@ export function DepositModal({ open, onOpenChange, onDeposit, isPending }: Depos
           </div>
 
           <div className="rounded-lg bg-muted p-3 space-y-1">
+            <div className="flex justify-between text-sm items-center">
+              <span className="text-muted-foreground">Approval</span>
+              <SingleTxBadge />
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Current APY</span>
               <span className="font-medium">~{apy.toFixed(2)}%*</span>

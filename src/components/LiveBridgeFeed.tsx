@@ -264,7 +264,7 @@ export const LiveBridgeFeed = () => {
 
       {/* Transactions */}
       {filteredTransactions.length > 0 ? (
-        <div className="space-y-1">
+        <div className="space-y-1" role="log" aria-live="polite" aria-label="Live bridge activity">
           {filteredTransactions.map((tx) => (
             <TransactionRow
               key={tx.id}

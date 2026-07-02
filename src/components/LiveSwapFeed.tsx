@@ -176,7 +176,7 @@ export const LiveSwapFeed = () => {
 
       {/* Activity Feed */}
       {filteredActivity.length > 0 ? (
-        <div className="space-y-1">
+        <div className="space-y-1" role="log" aria-live="polite" aria-label="Live swap activity">
           {filteredActivity.map((item) => (
             <ActivityRow
               key={item.id}
