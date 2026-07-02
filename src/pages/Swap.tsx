@@ -306,7 +306,11 @@ const Swap = () => {
 
                 {/* Rate info */}
                 <div className="p-3 rounded-lg bg-white/5 text-sm text-muted-foreground">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
+                    <span>Approval</span>
+                    <SingleTxBadge />
+                  </div>
+                  <div className="flex justify-between mt-1">
                     <span>Rate</span>
                     <span>1 USDC ≈ {liveRate > 0 ? (1/liveRate).toFixed(4) : '0.9259'} EURC</span>
                   </div>
