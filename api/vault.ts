@@ -1,11 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
+import { circlePost, getClient } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
 import { isValidUUID, isValidAmount, isValidAddress, isValidUintString } from './_lib/validate';
 import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
 import { captureApiError } from './_lib/sentry';
+import {
+  MULTICALL3_FROM_ADDRESS,
+  eurcDepositBatch,
+  lockedEurcDepositBatch,
+  eurcSwapBatch,
+  addLiquidityBatch,
+} from './_lib/vaultBatch';
 
 // Contract addresses on Arc Testnet
 const TREASURY_VAULT = '0x17ca5232415430bC57F646A72fD15634807bF729';
@@ -169,16 +176,14 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   }
 
   // EURC uses 6 decimals
-  const amountMicro = toWei(amount, 6);
-  // Approve 10x for future deposits
-  const approveAmount = (BigInt(amountMicro) * 10n).toString();
+  const amountMicro = BigInt(toWei(amount, 6));
 
   console.log(`[Vault] Deposit EURC: amount=${amount}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
     const balance = await getEurcBalance(walletAddress);
-    if (balance < BigInt(amountMicro)) {
+    if (balance < amountMicro) {
       const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
       return res.status(400).json({
         error: `Insufficient EURC balance: ${balanceFormatted} EURC. Swap USDC → EURC first.`,
@@ -186,31 +191,15 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-
-  const approveResult = await circlePost('/developer/transactions/contractExecution', {
-    walletId,
-    contractAddress: EURC_ADDRESS,
-    abiFunctionSignature: 'approve(address,uint256)',
-    abiParameters: [TREASURY_VAULT, approveAmount],
-    feeLevel: 'HIGH',
-  });
-
-  const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve submitted');
-
-  // Wait for approve to complete
-  await waitForCircleTx(approveTxId);
-
-
+  // Batch approve + depositEURC into one atomic tx via Multicall3From
   const depositResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
-    contractAddress: TREASURY_VAULT,
-    abiFunctionSignature: 'depositEURC(uint256)',
-    abiParameters: [amountMicro],
+    contractAddress: MULTICALL3_FROM_ADDRESS,
+    callData: eurcDepositBatch(EURC_ADDRESS, TREASURY_VAULT, amountMicro),
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Deposit EURC: tx submitted');
+  console.log('[Vault] Deposit EURC: batched tx submitted');
 
   await trackTx(depositResult, 'deposit-eurc', walletId, walletAddress, amount, 'EURC');
 
@@ -334,20 +323,16 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
   }
 
   // EURC in 6 decimals
-  const amountMicro = toWei(amount, 6);
-  const approveAmount = (BigInt(amountMicro) * 10n).toString();
-
+  const amountMicro = BigInt(toWei(amount, 6));
   // minOutput in USDC 18 decimals
-  const minOutputWei = minOutput
-    ? toWei(minOutput, 18)
-    : '0';
+  const minOutputWei = BigInt(minOutput ? toWei(minOutput, 18) : '0');
 
   console.log(`[Vault] Swap EURC→USDC: amount=${amount}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
     const balance = await getEurcBalance(walletAddress);
-    if (balance < BigInt(amountMicro)) {
+    if (balance < amountMicro) {
       const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
       return res.status(400).json({
         error: `Insufficient EURC balance: ${balanceFormatted} EURC`,
@@ -355,30 +340,15 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-
-  const approveResult = await circlePost('/developer/transactions/contractExecution', {
-    walletId,
-    contractAddress: EURC_ADDRESS,
-    abiFunctionSignature: 'approve(address,uint256)',
-    abiParameters: [STABLECOIN_SWAP, approveAmount],
-    feeLevel: 'HIGH',
-  });
-
-  const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve for swap submitted');
-
-  await waitForCircleTx(approveTxId);
-
-
+  // Batch approve + swap into one atomic tx via Multicall3From
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
-    contractAddress: STABLECOIN_SWAP,
-    abiFunctionSignature: 'swapEurcForUsdc(uint256,uint256)',
-    abiParameters: [amountMicro, minOutputWei],
+    contractAddress: MULTICALL3_FROM_ADDRESS,
+    callData: eurcSwapBatch(EURC_ADDRESS, STABLECOIN_SWAP, amountMicro, minOutputWei),
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Swap EURC→USDC: tx submitted');
+  console.log('[Vault] Swap EURC→USDC: batched tx submitted');
 
   await trackTx(result, 'swap-eurc-usdc', walletId, walletAddress, amount, 'EURC');
 
@@ -451,15 +421,14 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
     return res.status(400).json({ error: 'lockPeriodMonths must be 1, 3, or 12' });
   }
 
-  const amountMicro = toWei(amount, 6);
-  const approveAmount = (BigInt(amountMicro) * 10n).toString();
+  const amountMicro = BigInt(toWei(amount, 6));
 
   console.log(`[Vault] Deposit Locked EURC: amount=${amount}, months=${months}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
     const balance = await getEurcBalance(walletAddress);
-    if (balance < BigInt(amountMicro)) {
+    if (balance < amountMicro) {
       const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
       return res.status(400).json({
         error: `Insufficient EURC balance: ${balanceFormatted} EURC. Swap USDC → EURC first.`,
@@ -467,30 +436,15 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
     }
   }
 
-
-  const approveResult = await circlePost('/developer/transactions/contractExecution', {
-    walletId,
-    contractAddress: EURC_ADDRESS,
-    abiFunctionSignature: 'approve(address,uint256)',
-    abiParameters: [TREASURY_VAULT, approveAmount],
-    feeLevel: 'HIGH',
-  });
-
-  const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve for locked deposit submitted');
-
-  await waitForCircleTx(approveTxId);
-
-
+  // Batch approve + depositLockedEURC into one atomic tx via Multicall3From
   const depositResult = await circlePost('/developer/transactions/contractExecution', {
     walletId,
-    contractAddress: TREASURY_VAULT,
-    abiFunctionSignature: 'depositLockedEURC(uint256,uint8)',
-    abiParameters: [amountMicro, months.toString()],
+    contractAddress: MULTICALL3_FROM_ADDRESS,
+    callData: lockedEurcDepositBatch(EURC_ADDRESS, TREASURY_VAULT, amountMicro, months),
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Deposit Locked EURC: tx submitted');
+  console.log('[Vault] Deposit Locked EURC: batched tx submitted');
 
   await trackTx(depositResult, 'deposit-locked-eurc', walletId, walletAddress, amount, 'EURC', { lockPeriodMonths: months });
 
@@ -515,15 +469,15 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid amounts' });
   }
 
-  const eurcMicro = toWei(eurcAmount, 6);
-  const approveAmount = (BigInt(eurcMicro) * 10n).toString();
+  const eurcMicro = BigInt(toWei(eurcAmount, 6));
+  const usdcWei = BigInt(toWei(usdcAmount, 18));
 
   console.log(`[Vault] Add Liquidity: usdc=${usdcAmount}, eurc=${eurcAmount}`);
 
   // Pre-check: verify EURC balance
   if (walletAddress) {
     const balance = await getEurcBalance(walletAddress);
-    if (balance < BigInt(eurcMicro)) {
+    if (balance < eurcMicro) {
       const balanceFormatted = (Number(balance) / 1e6).toFixed(2);
       return res.status(400).json({
         error: `Insufficient EURC balance: ${balanceFormatted} EURC`,
@@ -531,31 +485,17 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-
-  const approveResult = await circlePost('/developer/transactions/contractExecution', {
-    walletId,
-    contractAddress: EURC_ADDRESS,
-    abiFunctionSignature: 'approve(address,uint256)',
-    abiParameters: [STABLECOIN_SWAP, approveAmount],
-    feeLevel: 'HIGH',
-  });
-
-  const approveTxId = approveResult?.id || approveResult?.transactionId;
-  console.log('[Vault] EURC approve for addLiquidity submitted');
-
-  await waitForCircleTx(approveTxId);
-
-
+  // Batch approve + addLiquidity (payable) via Multicall3From aggregate3Value.
+  // `amount` sends the native USDC msg.value; the addLiquidity subcall value matches it.
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
-    contractAddress: STABLECOIN_SWAP,
-    abiFunctionSignature: 'addLiquidity(uint256,uint256)',
-    abiParameters: [eurcMicro, '0'],
-    amount: usdcAmount, // Native USDC for msg.value
+    contractAddress: MULTICALL3_FROM_ADDRESS,
+    callData: addLiquidityBatch(EURC_ADDRESS, STABLECOIN_SWAP, eurcMicro, usdcWei),
+    amount: usdcAmount, // Native USDC for msg.value (== total aggregate3Value)
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Add Liquidity: tx submitted');
+  console.log('[Vault] Add Liquidity: batched tx submitted');
 
   await trackTx(result, 'add-liquidity', walletId, walletAddress, usdcAmount, 'USDC', { eurcAmount });
 
@@ -778,27 +718,4 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
     console.warn(`[Vault] tx-status error:`, e.message);
     return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
   }
-}
-
-// --- Internal helper: wait for Circle tx to complete (uses SDK) ---
-
-async function waitForCircleTx(txId: string, maxAttempts = 30): Promise<void> {
-  const client = getClient();
-
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 2000));
-
-    try {
-      const response = await client.getTransaction({ id: txId });
-      const tx = response.data?.transaction;
-
-      if (tx?.state === 'COMPLETE' || tx?.state === 'CONFIRMED') return;
-      if (tx?.state === 'FAILED' || tx?.state === 'CANCELLED') {
-        throw new Error(`Transaction failed: ${tx.errorReason || tx.state}`);
-      }
-    } catch (e: any) {
-      if (e.message?.includes('failed') || e.message?.includes('Transaction failed')) throw e;
-    }
-  }
-  throw new Error(`Transaction timeout after ${maxAttempts * 2}s`);
 }

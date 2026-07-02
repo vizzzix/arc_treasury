@@ -99,6 +99,48 @@ describe('api/vault - amount validation', () => {
   });
 });
 
+describe('api/vault - batched EURC flows (Multicall3From)', () => {
+  const MULTICALL = '0x522fAf9A91c41c443c66765030741e4AaCe147D0';
+
+  it('deposit-eurc submits ONE batched call to Multicall3From via callData', async () => {
+    const req = createMockReq({
+      method: 'POST', query: { action: 'deposit-eurc' },
+      body: { walletId: WALLET, amount: '50' }, // no walletAddress -> skip balance pre-check
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(circlePost).toHaveBeenCalledTimes(1); // was 2 (approve + deposit)
+    expect(circlePost).toHaveBeenCalledWith(
+      '/developer/transactions/contractExecution',
+      expect.objectContaining({
+        contractAddress: MULTICALL,
+        callData: expect.stringMatching(/^0x/),
+      }),
+    );
+    // callData path must NOT also send abiFunctionSignature
+    const arg = (circlePost as any).mock.calls[0][1];
+    expect(arg.abiFunctionSignature).toBeUndefined();
+  });
+
+  it('add-liquidity batches with native USDC amount for msg.value', async () => {
+    const req = createMockReq({
+      method: 'POST', query: { action: 'add-liquidity' },
+      body: { walletId: WALLET, usdcAmount: '100', eurcAmount: '90' },
+    });
+    const res = createMockRes();
+    await handler(req as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(circlePost).toHaveBeenCalledTimes(1);
+    expect(circlePost).toHaveBeenCalledWith(
+      '/developer/transactions/contractExecution',
+      expect.objectContaining({ contractAddress: MULTICALL, amount: '100', callData: expect.stringMatching(/^0x/) }),
+    );
+  });
+});
+
 describe('api/vault - shares validation (raw uint)', () => {
   it('accepts a wei-scale integer shares string', async () => {
     const req = createMockReq({

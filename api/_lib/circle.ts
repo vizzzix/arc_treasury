@@ -29,15 +29,22 @@ export async function circlePost(path: string, body: any) {
 
   // Contract execution — the primary use case
   if (path === '/developer/transactions/contractExecution') {
-    const { walletId, contractAddress, abiFunctionSignature, abiParameters, amount, feeLevel: _fl, ...rest } = body;
+    const { walletId, contractAddress, abiFunctionSignature, abiParameters, callData, amount, feeLevel: _fl, ...rest } = body;
 
     const input: any = {
       walletId,
       contractAddress,
-      abiFunctionSignature,
-      abiParameters: abiParameters || [],
       fee: { type: 'level' as const, config: { feeLevel: 'HIGH' as const } },
     };
+
+    // callData is mutually exclusive with abiFunctionSignature/abiParameters.
+    // Used for Multicall3From batches (viem-encoded aggregate3 calldata).
+    if (callData) {
+      input.callData = callData;
+    } else {
+      input.abiFunctionSignature = abiFunctionSignature;
+      input.abiParameters = abiParameters || [];
+    }
 
     if (amount) input.amount = String(amount);
 
