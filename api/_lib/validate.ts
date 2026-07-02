@@ -29,6 +29,22 @@ export function isValidAmount(amount: string): boolean {
   return Number.isFinite(n) && n > 0 && n < 1_000_000_000;
 }
 
+// Raw positive integer string in base units (e.g. 18-decimal shares / LP passed
+// directly as a uint256 argument). isValidAmount is for human decimals and caps
+// at 1e9, so it would wrongly reject wei-scale integers like "5000000000000000000".
+const UINT_RE = /^\d+$/;
+const UINT256_MAX = 2n ** 256n - 1n;
+
+export function isValidUintString(s: string): boolean {
+  if (typeof s !== 'string' || !UINT_RE.test(s)) return false;
+  try {
+    const n = BigInt(s);
+    return n > 0n && n <= UINT256_MAX;
+  } catch {
+    return false;
+  }
+}
+
 export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')

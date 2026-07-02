@@ -5,6 +5,7 @@ import {
   isValidTxHash,
   isValidDomain,
   isValidAmount,
+  isValidUintString,
   escapeHtml,
 } from '../../../api/_lib/validate';
 
@@ -117,6 +118,40 @@ describe('isValidAmount', () => {
 
   it('rejects amount over max', () => {
     expect(isValidAmount('1000000001')).toBe(false);
+  });
+});
+
+describe('isValidUintString', () => {
+  it('accepts a wei-scale integer well above the isValidAmount cap', () => {
+    expect(isValidUintString('5000000000000000000')).toBe(true);
+  });
+
+  it('accepts "1"', () => {
+    expect(isValidUintString('1')).toBe(true);
+  });
+
+  it('rejects decimals', () => {
+    expect(isValidUintString('1.5')).toBe(false);
+  });
+
+  it('rejects scientific notation', () => {
+    expect(isValidUintString('5e18')).toBe(false);
+  });
+
+  it('rejects zero', () => {
+    expect(isValidUintString('0')).toBe(false);
+  });
+
+  it('rejects negative', () => {
+    expect(isValidUintString('-1')).toBe(false);
+  });
+
+  it('rejects non-numeric', () => {
+    expect(isValidUintString('abc')).toBe(false);
+  });
+
+  it('rejects values above uint256 max', () => {
+    expect(isValidUintString((2n ** 256n).toString())).toBe(false);
   });
 });
 

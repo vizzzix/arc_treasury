@@ -3,7 +3,7 @@ import { circlePost, getClient, CIRCLE_API_BASE } from './_lib/circle';
 import { trackTx, updateCircleTxStatus } from './_lib/supabase';
 import { handleCors } from './_lib/cors';
 import { checkRateLimit, getRateLimitHeaders } from './_lib/rateLimit';
-import { isValidUUID, isValidAmount, isValidAddress } from './_lib/validate';
+import { isValidUUID, isValidAmount, isValidAddress, isValidUintString } from './_lib/validate';
 import { authenticateUser, verifyWalletOwnership } from './_lib/auth';
 import { captureApiError } from './_lib/sentry';
 
@@ -44,9 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { action } = req.query;
 
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
-  const rlKey = `vault:${clientIp}`;
-  if (!await checkRateLimit(rlKey, 30, 60_000)) {
-    const headers = getRateLimitHeaders(rlKey, 30);
+  // tx-status is polled every few seconds by useServerVault during an operation,
+  // so it gets its own higher-capacity bucket; mutating actions stay strict.
+  const isStatusPoll = action === 'tx-status';
+  const rlKey = isStatusPoll ? `vault-status:${clientIp}` : `vault:${clientIp}`;
+  const rlLimit = isStatusPoll ? 60 : 30;
+  if (!await checkRateLimit(rlKey, rlLimit, 60_000)) {
+    const headers = getRateLimitHeaders(rlKey, rlLimit);
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     return res.status(429).json({ error: 'Too many requests' });
   }
@@ -124,8 +128,7 @@ async function handleDepositUsdc(req: VercelRequest, res: VercelResponse) {
   const { walletId, amount, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
-  const parsedAmount = parseFloat(amount);
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+  if (!isValidAmount(amount)) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
@@ -161,8 +164,7 @@ async function handleDepositEurc(req: VercelRequest, res: VercelResponse) {
   const { walletId, amount, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
-  const parsedAmount = parseFloat(amount);
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+  if (!isValidAmount(amount)) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
@@ -226,6 +228,7 @@ async function handleWithdrawUsdc(req: VercelRequest, res: VercelResponse) {
 
   const { walletId, shares, walletAddress } = req.body;
   if (!walletId || !shares) return res.status(400).json({ error: 'walletId and shares required' });
+  if (!isValidUintString(shares)) return res.status(400).json({ error: 'Invalid shares' });
 
   console.log(`[Vault] Withdraw USDC: shares=${shares}`);
 
@@ -255,6 +258,7 @@ async function handleWithdrawEurc(req: VercelRequest, res: VercelResponse) {
 
   const { walletId, shares, walletAddress } = req.body;
   if (!walletId || !shares) return res.status(400).json({ error: 'walletId and shares required' });
+  if (!isValidUintString(shares)) return res.status(400).json({ error: 'Invalid shares' });
 
   console.log(`[Vault] Withdraw EURC: shares=${shares}`);
 
@@ -285,8 +289,7 @@ async function handleSwapUsdcForEurc(req: VercelRequest, res: VercelResponse) {
   const { walletId, amount, minOutput, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
-  const parsedAmount = parseFloat(amount);
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+  if (!isValidAmount(amount)) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
@@ -326,8 +329,7 @@ async function handleSwapEurcForUsdc(req: VercelRequest, res: VercelResponse) {
   const { walletId, amount, minOutput, walletAddress } = req.body;
   if (!walletId || !amount) return res.status(400).json({ error: 'walletId and amount required' });
 
-  const parsedAmount = parseFloat(amount);
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+  if (!isValidAmount(amount)) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
@@ -397,8 +399,7 @@ async function handleDepositLockedUsdc(req: VercelRequest, res: VercelResponse) 
     return res.status(400).json({ error: 'walletId, amount and lockPeriodMonths required' });
   }
 
-  const parsedAmount = parseFloat(amount);
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+  if (!isValidAmount(amount)) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
@@ -441,8 +442,7 @@ async function handleDepositLockedEurc(req: VercelRequest, res: VercelResponse) 
     return res.status(400).json({ error: 'walletId, amount and lockPeriodMonths required' });
   }
 
-  const parsedAmount = parseFloat(amount);
-  if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+  if (!isValidAmount(amount)) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
 
@@ -511,9 +511,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'walletId, usdcAmount and eurcAmount required' });
   }
 
-  const parsedUsdc = parseFloat(usdcAmount);
-  const parsedEurc = parseFloat(eurcAmount);
-  if (!Number.isFinite(parsedUsdc) || parsedUsdc <= 0 || !Number.isFinite(parsedEurc) || parsedEurc <= 0) {
+  if (!isValidAmount(usdcAmount) || !isValidAmount(eurcAmount)) {
     return res.status(400).json({ error: 'Invalid amounts' });
   }
 
@@ -578,8 +576,7 @@ async function handleRemoveLiquidity(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'walletId and lpAmount required' });
   }
 
-  const parsedLp = parseFloat(lpAmount);
-  if (!Number.isFinite(parsedLp) || parsedLp <= 0) {
+  if (!isValidAmount(lpAmount)) {
     return res.status(400).json({ error: 'Invalid lpAmount' });
   }
 
