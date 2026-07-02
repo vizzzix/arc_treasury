@@ -13,9 +13,7 @@ import { encodeFunctionData } from 'viem';
 import {
   MULTICALL3_FROM_ADDRESS,
   buildCall3,
-  buildCall3Value,
   encodeAggregate3,
-  encodeAggregate3Value,
 } from '../../src/lib/batchCall';
 
 export { MULTICALL3_FROM_ADDRESS };
@@ -46,12 +44,6 @@ const SWAP_EURC_USDC_ABI = [{
   outputs: [{ name: '', type: 'uint256' }],
 }] as const;
 
-const ADD_LIQUIDITY_ABI = [{
-  type: 'function', name: 'addLiquidity', stateMutability: 'payable',
-  inputs: [{ name: 'eurcAmount', type: 'uint256' }, { name: 'minLpTokens', type: 'uint256' }],
-  outputs: [{ name: '', type: 'uint256' }],
-}] as const;
-
 const approveData = (spender: string, amount: bigint) =>
   encodeFunctionData({ abi: APPROVE_ABI, functionName: 'approve', args: [hex(spender), amount] });
 
@@ -79,14 +71,5 @@ export function eurcSwapBatch(eurc: string, swap: string, eurcMicro: bigint, min
   ]);
 }
 
-/**
- * approve(EURC->swap) [value 0] + addLiquidity(eurcAmount, 0) [value = usdcWei].
- * The outer contractExecution must send `amount` = the USDC (native) value; the
- * total of per-call values must equal that msg.value.
- */
-export function addLiquidityBatch(eurc: string, swap: string, eurcMicro: bigint, usdcWei: bigint): `0x${string}` {
-  return encodeAggregate3Value([
-    buildCall3Value(hex(eurc), approveData(swap, eurcMicro), 0n),
-    buildCall3Value(hex(swap), encodeFunctionData({ abi: ADD_LIQUIDITY_ABI, functionName: 'addLiquidity', args: [eurcMicro, 0n] }), usdcWei),
-  ]);
-}
+// NOTE: add-liquidity is payable (native USDC). Arc's Multicall3From has no
+// aggregate3Value, so it cannot be batched and stays a two-step flow in vault.ts.

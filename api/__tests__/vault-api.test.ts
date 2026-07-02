@@ -124,21 +124,8 @@ describe('api/vault - batched EURC flows (Multicall3From)', () => {
     expect(arg.abiFunctionSignature).toBeUndefined();
   });
 
-  it('add-liquidity batches with native USDC amount for msg.value', async () => {
-    const req = createMockReq({
-      method: 'POST', query: { action: 'add-liquidity' },
-      body: { walletId: WALLET, usdcAmount: '100', eurcAmount: '90' },
-    });
-    const res = createMockRes();
-    await handler(req as any, res);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(circlePost).toHaveBeenCalledTimes(1);
-    expect(circlePost).toHaveBeenCalledWith(
-      '/developer/transactions/contractExecution',
-      expect.objectContaining({ contractAddress: MULTICALL, amount: '100', callData: expect.stringMatching(/^0x/) }),
-    );
-  });
+  // NOTE: add-liquidity is intentionally NOT batched (payable; Arc's Multicall3From
+  // lacks aggregate3Value), so it stays a two-step approve + addLiquidity flow.
 });
 
 describe('api/vault - shares validation (raw uint)', () => {

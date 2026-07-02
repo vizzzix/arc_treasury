@@ -11,7 +11,6 @@ import {
   eurcDepositBatch,
   lockedEurcDepositBatch,
   eurcSwapBatch,
-  addLiquidityBatch,
 } from './_lib/vaultBatch';
 
 // Contract addresses on Arc Testnet
@@ -470,7 +469,7 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
   }
 
   const eurcMicro = BigInt(toWei(eurcAmount, 6));
-  const usdcWei = BigInt(toWei(usdcAmount, 18));
+  const approveAmount = (eurcMicro * 10n).toString();
 
   console.log(`[Vault] Add Liquidity: usdc=${usdcAmount}, eurc=${eurcAmount}`);
 
@@ -485,17 +484,28 @@ async function handleAddLiquidity(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  // Batch approve + addLiquidity (payable) via Multicall3From aggregate3Value.
-  // `amount` sends the native USDC msg.value; the addLiquidity subcall value matches it.
+  // NOTE: add-liquidity is payable (native USDC as msg.value). Arc's Multicall3From
+  // has no aggregate3Value, so a payable subcall can't be batched — this stays a
+  // two-step approve + addLiquidity.
+  const approveResult = await circlePost('/developer/transactions/contractExecution', {
+    walletId,
+    contractAddress: EURC_ADDRESS,
+    abiFunctionSignature: 'approve(address,uint256)',
+    abiParameters: [STABLECOIN_SWAP, approveAmount],
+    feeLevel: 'HIGH',
+  });
+  await waitForCircleTx(approveResult?.id || approveResult?.transactionId);
+
   const result = await circlePost('/developer/transactions/contractExecution', {
     walletId,
-    contractAddress: MULTICALL3_FROM_ADDRESS,
-    callData: addLiquidityBatch(EURC_ADDRESS, STABLECOIN_SWAP, eurcMicro, usdcWei),
-    amount: usdcAmount, // Native USDC for msg.value (== total aggregate3Value)
+    contractAddress: STABLECOIN_SWAP,
+    abiFunctionSignature: 'addLiquidity(uint256,uint256)',
+    abiParameters: [eurcMicro.toString(), '0'],
+    amount: usdcAmount, // Native USDC for msg.value
     feeLevel: 'HIGH',
   });
 
-  console.log('[Vault] Add Liquidity: batched tx submitted');
+  console.log('[Vault] Add Liquidity: tx submitted');
 
   await trackTx(result, 'add-liquidity', walletId, walletAddress, usdcAmount, 'USDC', { eurcAmount });
 
@@ -718,4 +728,29 @@ async function handleTxStatus(req: VercelRequest, res: VercelResponse) {
     console.warn(`[Vault] tx-status error:`, e.message);
     return res.status(502).json({ error: 'Could not fetch transaction status from Circle' });
   }
+}
+
+// --- Internal helper: wait for a Circle tx to reach a terminal success state.
+// Still used by add-liquidity, which can't be batched (payable subcall, and Arc's
+// Multicall3From has no aggregate3Value). ---
+
+async function waitForCircleTx(txId: string, maxAttempts = 30): Promise<void> {
+  const client = getClient();
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+
+    try {
+      const response = await client.getTransaction({ id: txId });
+      const tx = response.data?.transaction;
+
+      if (tx?.state === 'COMPLETE' || tx?.state === 'CONFIRMED') return;
+      if (tx?.state === 'FAILED' || tx?.state === 'CANCELLED') {
+        throw new Error(`Transaction failed: ${tx.errorReason || tx.state}`);
+      }
+    } catch (e: any) {
+      if (e.message?.includes('failed') || e.message?.includes('Transaction failed')) throw e;
+    }
+  }
+  throw new Error(`Transaction timeout after ${maxAttempts * 2}s`);
 }

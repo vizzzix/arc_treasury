@@ -116,7 +116,14 @@ export function encodeAggregate3(calls: readonly Call3[]): Hex {
   });
 }
 
-/** Encode the outer aggregate3Value calldata (for the Circle raw-callData path). */
+/**
+ * Encode the outer aggregate3Value calldata.
+ *
+ * ⚠️ Arc Testnet's Multicall3From does NOT implement aggregate3Value (verified:
+ * selector 0x174dea71 absent from bytecode) — calling it reverts empty. Payable
+ * subcalls (native USDC) therefore cannot be batched on Arc and must stay
+ * two-step. Kept for completeness / other chains only.
+ */
 export function encodeAggregate3Value(calls: readonly Call3Value[]): Hex {
   return encodeFunctionData({
     abi: MULTICALL3_FROM_ABI,

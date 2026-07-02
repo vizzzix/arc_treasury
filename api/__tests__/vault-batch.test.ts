@@ -6,7 +6,6 @@ import {
   eurcDepositBatch,
   lockedEurcDepositBatch,
   eurcSwapBatch,
-  addLiquidityBatch,
 } from '../_lib/vaultBatch';
 
 const EURC = '0x742b2d045d430fe718b57046645ba33295914b69';
@@ -45,13 +44,6 @@ describe('vaultBatch encoders', () => {
     expect(calls).toHaveLength(2);
   });
 
-  it('addLiquidityBatch = aggregate3Value with value only on the addLiquidity call', () => {
-    const usdcWei = 100_000000000000000000n;
-    const { fn, calls } = decodeCalls(addLiquidityBatch(EURC, SWAP, 90_000000n, usdcWei));
-    expect(fn).toBe('aggregate3Value');
-    expect(calls[0].target.toLowerCase()).toBe(EURC);
-    expect(calls[0].value).toBe(0n);
-    expect(calls[1].target.toLowerCase()).toBe(SWAP);
-    expect(calls[1].value).toBe(usdcWei); // total value == msg.value the API sends
-  });
+  // add-liquidity is intentionally NOT batched: it's payable and Arc's
+  // Multicall3From lacks aggregate3Value (see vaultBatch.ts note).
 });
